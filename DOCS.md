@@ -1,7 +1,7 @@
 # MORANA — Internal AI Operations Terminal
 
-**Version:** 1.0.0
-**Stack:** Next.js 16 | React 19 | TypeScript | Prisma 7 | PostgreSQL (Neon) | Tailwind CSS 4
+**Version:** 2.0.0
+**Stack:** Next.js 16 | React 19 | TypeScript | Prisma 7 | PostgreSQL (Neon) + pgvector | Tailwind CSS 4
 **Hosting:** Vercel (serverless) | Cloudflare R2 (storage)
 **UI Theme:** Dark hacker/terminal aesthetic
 
@@ -9,24 +9,34 @@
 
 ## Pregled
 
-MORANA je interni AI pipeline za medijsko podjetje. Združuje več AI storitev v enoten terminal-style vmesnik:
+MORANA je interni AI operations terminal za medijsko podjetje. Združuje več AI storitev, pipeline orodja in knowledge management v enoten terminal-style vmesnik.
 
 | Modul | Provider | Opis |
 |-------|----------|------|
-| **LLM** | Anthropic Claude, Google Gemini | Multi-turn chat, single-shot obdelava besedil |
+| **LLM** | Anthropic Claude, OpenAI GPT-4o, Google Gemini | Multi-turn chat z URL fetching, RAG, prompt templates |
 | **STT** | Soniox | Transkripcija zvoka (SL, EN) |
 | **TTS** | ElevenLabs | Sinteza govora z izbiro glasov |
 | **Image** | Google Gemini 2.5 Flash | Generiranje in urejanje slik |
+| **Recipes** | Multi-provider | Multi-step AI pipeline builder |
+| **Jobs** | — | Background job dashboard z monitoring |
 
 ### Ključne zmožnosti
 
 - Google OAuth avtentikacija z email whitelistom
 - JWT session strategija (kompatibilna z Edge middleware)
-- Auth middleware za zaščito vseh route-ov
+- Auth middleware z bot blocking za zaščito vseh route-ov
+- Auth logging vseh prijav in poskusov prijave (IP, geo, user-agent)
 - CSRF zaščita na vseh state-changing endpointih
 - SSRF zaščita z DNS resolucijo in IP blocklisto
-- Security headerji (HSTS, CSP, X-Frame-Options, nosniff)
-- Admin panel za upravljanje uporabnikov in limitov
+- Security headerji na vseh response-ih (HSTS, CSP, X-Frame-Options, nosniff)
+- robots.txt ki blokira vse crawlerje in AI bote
+- Admin panel za upravljanje uporabnikov, templateov, knowledge base, receptov in logov
+- Prompt template sistem (admin-managed system prompts)
+- RAG knowledge base s pgvector embeddingi (PDF/TXT upload)
+- Avtomatsko URL fetching iz uporabniških sporočil (Mozilla Readability)
+- Cost preview pred vsako AI operacijo
+- Multi-step AI recepti (pipeline builder)
+- Background job dashboard z cancel/retry
 - Per-user rate limiting (dnevni runi, mesečni stroški v centih)
 - Globalni mesečni stroškovni cap (GLOBAL_MAX_MONTHLY_COST_CENTS)
 - Beleženje porabe in stroškov po modelu (integer centi, brez float zaokroževanja)
@@ -46,44 +56,67 @@ src/
   app/                    # Next.js App Router
     api/                  # API route handlers
       auth/[...nextauth]  # NextAuth endpoint
-      admin/users/        # Admin CRUD za uporabnike
+      admin/
+        users/            # Admin CRUD za uporabnike
+        templates/        # Admin CRUD za prompt template
+        knowledge/        # Admin CRUD za knowledge base + document upload
+        auth-logs/        # Admin auth log viewer
       conversations/      # LLM multi-turn chat API
       history/            # Zgodovina runov
-      models/             # Seznam odobrenih modelov
+      jobs/               # Background job dashboard API
+      knowledge/          # Public KB endpoint
+      models/             # Seznam odobrenih modelov + pricing
+      recipes/            # Recipe CRUD, execution, steps API
       runs/               # STT, TTS, LLM, Image run endpoints
+      templates/          # Public template endpoint
       usage/              # Statistika porabe
       voices/             # ElevenLabs glasovi
       inngest/            # Inngest webhook handler (zahteva INNGEST_SIGNING_KEY)
-    components/           # React komponente (Nav, StatusBadge, SessionProvider)
-    admin/                # Admin stran
+    components/           # React komponente (Nav, CostPreview, SessionProvider)
+    admin/
+      page.tsx            # Admin dashboard
+      templates/          # Prompt template management
+      knowledge/          # Knowledge base management
+      recipes/            # Recipe builder
+      auth-logs/          # Auth log viewer
     llm/                  # LLM chat stran
     stt/                  # STT stran
     tts/                  # TTS stran
     image/                # Image generiranje stran
+    recipes/              # User recipe list + execution detail
+    jobs/                 # Background job dashboard
     history/              # Zgodovina stran
     usage/                # Poraba stran
     globals.css           # Globalni stili + responsive CSS
     layout.tsx            # Root layout
   lib/                    # Backend logika
-    providers/            # AI provider integracije
-      llm.ts              # Anthropic + Gemini LLM
+    providers/
+      llm.ts              # Anthropic + OpenAI + Gemini LLM
       stt.ts              # Soniox STT
       tts.ts              # ElevenLabs TTS
       image.ts            # Gemini Image generiranje
-    auth.ts               # NextAuth konfiguracija (JWT strategija)
+      embeddings.ts       # OpenAI text-embedding-3-small za RAG
+    auth.ts               # NextAuth konfiguracija (JWT + auth logging)
     config.ts             # Guardrails, modeli, pricing
+    cost-preview.ts       # Client-side cost estimation utilities
     csrf.ts               # CSRF Origin/Referer validacija
+    document-processor.ts # PDF/TXT/HTML text extraction za RAG
     mime-validate.ts      # Magic-bytes MIME validacija
     prisma.ts             # Prisma client singleton + pg.Pool
-    session.ts            # Session utilities (withAuth wrapper + CSRF)
+    rag.ts                # RAG: chunking, embedding search, context building
     rate-limit.ts         # Per-user rate limiting
+    recipe-engine.ts      # Sequential recipe step execution engine
+    session.ts            # Session utilities (withAuth wrapper + CSRF)
     storage.ts            # Cloudflare R2 S3 storage
+    url-fetcher.ts        # URL detection + Readability content extraction
     url-validate.ts       # SSRF zaščita (DNS resolucija, IP blocklist)
     usage.ts              # Usage event logging
     inngest/              # Async job definitions
-  middleware.ts           # Auth middleware (JWT token preverba)
+  middleware.ts           # Auth + bot blocking + security headers
   generated/prisma/       # Auto-generated Prisma client
   types/                  # TypeScript deklaracije
+public/
+  robots.txt              # Disallow all crawlers + AI bots
 prisma/
   schema.prisma           # Database schema
   migrations/             # SQL migracije
@@ -97,17 +130,46 @@ prisma/
 ### Auth middleware (`src/middleware.ts`)
 
 Middleware teče na Edge runtime pred vsakim requestom:
-- Preusmeri neprijavljene uporabnike na `/` (307)
-- Vrne 401 za neprijavljene API requeste
-- Uporablja `getToken()` iz `next-auth/jwt` za JWT verifikacijo
-- Podpira secure cookie name (`__Secure-` prefix) za HTTPS
+
+1. **Bot blocking:** Preverja user-agent proti 30+ patternov (crawlerji, AI boti, scraperji, CLI orodja)
+2. **Security headerji:** Doda na vsak response (glej tabelo spodaj)
+3. **Auth check:** Preusmeri neprijavljene na `/` (307) ali vrne 401 za API
+4. Uporablja `getToken()` iz `next-auth/jwt` za JWT verifikacijo
+5. Podpira secure cookie name (`__Secure-` prefix) za HTTPS
+
+**Blokirani bot patterni:** `bot`, `crawl`, `spider`, `gptbot`, `chatgpt`, `google-extended`, `ccbot`, `anthropic`, `bytespider`, `perplexitybot`, `facebookbot`, `amazonbot`, `semrushbot`, `ahrefsbot`, `python-requests`, `curl`, `wget`, `scrapy` in še 15+ drugih.
 
 **Javne poti** (brez avtentikacije):
 - `/` — Home / login stran
 - `/api/auth/*` — NextAuth endpointi
 - `/api/inngest` — Inngest webhook (ima lastno signing key avtentikacijo)
 - `/_next/*` — Next.js statični asseti
-- `/favicon.ico`
+- `/favicon.ico`, `/robots.txt`
+
+### Auth logging (`src/lib/auth.ts`)
+
+Vsak poskus prijave se logira v `AuthLog` tabelo:
+- **Event tipi:** `sign_in_ok`, `sign_in_denied_inactive`, `sign_in_denied_unknown`, `sign_in_denied_no_email`, `sign_in_bootstrap`
+- **Podatki:** email, IP (x-forwarded-for), user-agent, država/mesto (Vercel geo headerji), razlog zavrnitve
+- Admin pregled na `/admin/auth-logs` s filtriranjem, statistikami (denied 24h/7d, unique IPs) in expandable detajli
+- Logging je fire-and-forget — nikoli ne prekine avtentikacije
+
+### robots.txt (`public/robots.txt`)
+
+Disallow `/` za vse user-agente. Eksplicitno blokira 15+ AI/LLM crawlerjev: GPTBot, ChatGPT-User, Google-Extended, CCBot, anthropic-ai, Claude-Web, Bytespider, cohere-ai, PerplexityBot, FacebookBot, Amazonbot, Applebot-Extended, meta-externalagent.
+
+### Security headerji (middleware)
+
+| Header | Vrednost |
+|--------|----------|
+| `Strict-Transport-Security` | `max-age=63072000; includeSubDomains; preload` |
+| `Content-Security-Policy` | `default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https://accounts.google.com; frame-src https://accounts.google.com; ...` |
+| `X-Frame-Options` | `DENY` |
+| `X-Content-Type-Options` | `nosniff` |
+| `X-XSS-Protection` | `1; mode=block` |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` |
+| `Permissions-Policy` | `camera=(), microphone=(self), geolocation=(), interest-cohort=()` |
+| `X-Powered-By` | (removed) |
 
 ### CSRF zaščita (`src/lib/csrf.ts`)
 
@@ -122,26 +184,9 @@ URL fetch (npr. STT iz URL-ja) je zaščiten z:
 - Blokada credentialov v URL-ju
 - `redirect: "error"` na fetch requestih
 
-### Security headerji (`next.config.ts`)
-
-| Header | Vrednost |
-|--------|----------|
-| `Strict-Transport-Security` | `max-age=63072000; includeSubDomains; preload` |
-| `Content-Security-Policy` | `default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; ...` |
-| `X-Frame-Options` | `DENY` |
-| `X-Content-Type-Options` | `nosniff` |
-| `Referrer-Policy` | `strict-origin-when-cross-origin` |
-| `Permissions-Policy` | `camera=(), microphone=(), geolocation=(), browsing-topics=()` |
-
-CSP `media-src` vključuje `https:` za R2 signed URL-je (TTS audio predvajanje).
-
 ### MIME validacija (`src/lib/mime-validate.ts`)
 
 File uploadi so validirani z magic-bytes (ne zaupamo MIME tipu iz brskalnika). Podprti formati: MP3, WAV, OGG, FLAC, M4A, AAC, WebM, PNG, JPEG, WebP, GIF, PDF.
-
-### Inngest endpoint zaščita
-
-`/api/inngest` vrne 503 če `INNGEST_SIGNING_KEY` ni nastavljen. Brez signing key-a se handler sploh ne ustvari.
 
 ### Error sanitizacija
 
@@ -162,6 +207,9 @@ Vsi API route catch blocki:
 | `RunType` | `stt`, `llm`, `tts`, `image` |
 | `RunStatus` | `queued`, `running`, `done`, `error` |
 | `FileKind` | `input`, `output` |
+| `DocumentStatus` | `pending`, `processing`, `ready`, `error` |
+| `RecipeStatus` | `draft`, `active`, `archived` |
+| `ExecutionStatus` | `pending`, `running`, `done`, `error`, `cancelled` |
 
 ### Modeli
 
@@ -180,7 +228,7 @@ Uporabniški profil z role-based access control in per-user limiti.
 | `allowedModels` | Json? | JSON array model ID stringov (null = vsi modeli) |
 | `lastLoginAt` | DateTime | Zadnja prijava (posodobljeno max 1x/uro) |
 
-Relacije: `runs`, `files`, `usageEvents`, `accounts`, `sessions`, `conversations`
+Relacije: `runs`, `files`, `usageEvents`, `accounts`, `sessions`, `conversations`, `promptTemplates`, `knowledgeBases`, `recipes`, `recipeExecutions`
 
 #### Conversation
 Multi-turn LLM pogovori.
@@ -191,6 +239,8 @@ Multi-turn LLM pogovori.
 | `userId` | String | FK na User |
 | `title` | String | Naslov pogovora |
 | `modelId` | String | ID izbranega modela |
+| `templateId` | String? | FK na PromptTemplate |
+| `knowledgeBaseIds` | Json? | JSON array KB ID-jev za RAG |
 
 Relacije: `user`, `messages`
 
@@ -206,33 +256,126 @@ Sporočila znotraj pogovora.
 | `latencyMs` | Int? | Latenca odgovora |
 | `runId` | String? | FK na Run |
 
-#### Run
-Posamezna izvedba AI operacije.
+#### PromptTemplate
+Admin-managed prompt predloge za LLM chat.
 
 | Polje | Tip | Opis |
 |-------|-----|------|
-| `type` | RunType | `stt`, `llm`, `tts`, `image` |
-| `status` | RunStatus | `queued`, `running`, `done`, `error` |
-| `provider` | String | AI provider |
-| `model` | String | Model ID |
-| `errorMessage` | Text? | Napaka, če status = error |
-| `idempotencyKey` | String? (unique) | Za preprečevanje dupliciranih runov |
+| `name` | String | Ime template |
+| `slug` | String (unique) | URL-friendly identifikator |
+| `systemPrompt` | Text | System prompt za LLM |
+| `userPromptTemplate` | Text? | Opcijski user prompt template |
+| `category` | String | Kategorija (default: "general") |
+| `knowledgeText` | Text? | Statično referenčno besedilo |
+| `isActive` | Boolean | Ali je template aktiven |
+| `sortOrder` | Int | Vrstni red prikaza |
+| `createdBy` | String | FK na User (admin) |
 
-Relacije: `user`, `input` (RunInput), `output` (RunOutput), `files`, `usage`, `messages`
-
-#### RunInput / RunOutput
-JSON payload za vhod in izhod runa.
-
-#### UsageEvent
-Beleženje porabe in stroškov.
+#### KnowledgeBase
+RAG knowledge base za kontekstualizacijo LLM odgovorov.
 
 | Polje | Tip | Opis |
 |-------|-----|------|
-| `provider` | String | Provider |
-| `model` | String | Model ID |
-| `unitsJson` | Json | `{ inputTokens, outputTokens, chars, seconds }` |
-| `costEstimateCents` | Int | Strošek v **centih** (integer, brez float zaokroževanja) |
-| `latencyMs` | Int | Latenca |
+| `name` | String | Ime KB |
+| `description` | Text? | Opis |
+| `isActive` | Boolean | Ali je KB aktivna |
+| `createdBy` | String | FK na User (admin) |
+
+Relacije: `creator`, `documents`
+
+#### Document
+Dokumenti znotraj knowledge base.
+
+| Polje | Tip | Opis |
+|-------|-----|------|
+| `knowledgeBaseId` | String | FK na KnowledgeBase |
+| `fileName` | String | Ime datoteke |
+| `mimeType` | String | MIME tip |
+| `sizeBytes` | Int | Velikost |
+| `status` | DocumentStatus | `pending`, `processing`, `ready`, `error` |
+| `chunkCount` | Int | Število chunkov |
+
+Relacije: `knowledgeBase`, `chunks`
+
+#### DocumentChunk
+Chunki dokumentov z vektorskimi embeddingi.
+
+| Polje | Tip | Opis |
+|-------|-----|------|
+| `documentId` | String | FK na Document |
+| `content` | Text | Vsebina chunka |
+| `chunkIndex` | Int | Indeks chunka |
+| `embedding` | vector(1536) | pgvector embedding (via raw SQL) |
+
+#### Recipe
+Multi-step AI pipeline definicije.
+
+| Polje | Tip | Opis |
+|-------|-----|------|
+| `name` | String | Ime recepta |
+| `slug` | String (unique) | URL-friendly identifikator |
+| `status` | RecipeStatus | `draft`, `active`, `archived` |
+| `createdBy` | String | FK na User (admin) |
+
+Relacije: `creator`, `steps`, `executions`
+
+#### RecipeStep
+Posamezni koraki recepta.
+
+| Polje | Tip | Opis |
+|-------|-----|------|
+| `recipeId` | String | FK na Recipe |
+| `stepIndex` | Int | Vrstni red koraka |
+| `name` | String | Ime koraka |
+| `type` | String | `stt`, `llm`, `tts`, `image`, `output_format` |
+| `config` | Json | Step-specific konfiguracija |
+
+#### RecipeExecution
+Izvedbe receptov.
+
+| Polje | Tip | Opis |
+|-------|-----|------|
+| `recipeId` | String | FK na Recipe |
+| `userId` | String | FK na User |
+| `status` | ExecutionStatus | `pending`, `running`, `done`, `error`, `cancelled` |
+| `progress` | Int | Napredek v % |
+| `currentStep` | Int | Trenutni korak |
+| `totalSteps` | Int | Skupno korakov |
+| `inputData` | Json? | Vhodni podatki |
+
+Relacije: `recipe`, `user`, `stepResults`
+
+#### RecipeStepResult
+Rezultati posameznih korakov izvedbe.
+
+| Polje | Tip | Opis |
+|-------|-----|------|
+| `executionId` | String | FK na RecipeExecution |
+| `stepIndex` | Int | Indeks koraka |
+| `runId` | String? | FK na Run |
+| `status` | String | `pending`, `running`, `done`, `error` |
+| `inputPreview` | Text? | Predogled vhoda |
+| `outputPreview` | Text? | Predogled izhoda |
+| `outputFull` | Json? | Polni izhod |
+
+#### AuthLog
+Logiranje vseh poskusov avtentikacije.
+
+| Polje | Tip | Opis |
+|-------|-----|------|
+| `email` | String | Email naslov |
+| `event` | String | Tip dogodka (sign_in_ok, denied_*, bootstrap) |
+| `provider` | String | OAuth provider (default: google) |
+| `ip` | String? | IP naslov (x-forwarded-for) |
+| `userAgent` | Text? | User-Agent string |
+| `country` | String? | Država (Vercel geo header) |
+| `city` | String? | Mesto (Vercel geo header) |
+| `reason` | String? | Razlog zavrnitve |
+
+Indeksi: `email`, `createdAt`, `event`
+
+#### Run, RunInput, RunOutput, UsageEvent, File
+(Nespremenjeno od v1 — glej posamezne modele v Prisma schema)
 
 ---
 
@@ -249,11 +392,11 @@ Beleženje porabe in stroškov.
 | Endpoint | Metoda | CSRF | Opis |
 |----------|--------|------|------|
 | `/api/conversations` | GET | — | Seznam pogovorov uporabnika |
-| `/api/conversations` | POST | ✅ | Ustvari nov pogovor |
+| `/api/conversations` | POST | ✅ | Ustvari nov pogovor (z modelId, templateId, knowledgeBaseIds) |
 | `/api/conversations/[id]` | GET | — | Podrobnosti pogovora z sporočili |
-| `/api/conversations/[id]` | PATCH | ✅ | Posodobi model |
+| `/api/conversations/[id]` | PATCH | ✅ | Posodobi model, template, knowledgeBaseIds |
 | `/api/conversations/[id]` | DELETE | ✅ | Izbriši pogovor |
-| `/api/conversations/[id]/messages` | POST | ✅ | Pošlji sporočilo, prejmi AI odgovor (maxDuration: 60s) |
+| `/api/conversations/[id]/messages` | POST | ✅ | Pošlji sporočilo, prejmi AI odgovor (maxDuration: 60s). Avtomatsko: template system prompt, RAG retrieval, URL fetching |
 
 ### Run Endpoints
 
@@ -265,133 +408,268 @@ Beleženje porabe in stroškov.
 | `/api/runs/image` | POST | ✅ | 60s | Generiranje/urejanje slike |
 | `/api/runs/[id]` | GET | — | — | Podrobnosti runa z input/output |
 
+### Prompt Templates
+
+| Endpoint | Metoda | Opis |
+|----------|--------|------|
+| `/api/templates` | GET | Seznam aktivnih templateov (public) |
+| `/api/admin/templates` | GET | Vsi templati (admin) |
+| `/api/admin/templates` | POST | Ustvari template (admin) |
+| `/api/admin/templates/[id]` | GET, PATCH, DELETE | CRUD za posamezen template (admin) |
+
+### Knowledge Base (RAG)
+
+| Endpoint | Metoda | Opis |
+|----------|--------|------|
+| `/api/knowledge` | GET | Seznam aktivnih KB (public) |
+| `/api/admin/knowledge` | GET, POST | Seznam / ustvari KB (admin) |
+| `/api/admin/knowledge/[id]` | GET, PATCH, DELETE | CRUD za KB (admin) |
+| `/api/admin/knowledge/[id]/documents` | GET, POST | Seznam / upload dokument (admin, maxDuration: 120s) |
+| `/api/admin/knowledge/[id]/documents/[docId]` | DELETE | Izbriši dokument (admin) |
+
+### Recipes (AI Pipelines)
+
+| Endpoint | Metoda | Opis |
+|----------|--------|------|
+| `/api/recipes` | GET | Seznam receptov (active za userje, vsi za admin) |
+| `/api/recipes` | POST | Ustvari recept (admin) |
+| `/api/recipes/[id]` | GET, PATCH, DELETE | CRUD za recept (admin) |
+| `/api/recipes/[id]/steps` | PUT | Zamenjaj vse korake recepta (admin) |
+| `/api/recipes/[id]/execute` | POST | Zaženi izvedbo (maxDuration: 300s) |
+| `/api/recipes/executions` | GET | Seznam uporabnikovih izvedb |
+| `/api/recipes/executions/[id]` | GET | Podrobnosti izvedbe |
+| `/api/recipes/executions/[id]` | POST | Cancel izvedbo |
+
+### Jobs (Background Job Dashboard)
+
+| Endpoint | Metoda | Opis |
+|----------|--------|------|
+| `/api/jobs` | GET | Seznam vseh jobov (admin vidi vse, user svoje) |
+| `/api/jobs/[id]` | GET | Podrobnosti joba |
+| `/api/jobs/[id]` | POST | Cancel ali retry (body: `{ action: "cancel" | "retry" }`) |
+
 ### Zgodovina in poraba
 
 | Endpoint | Metoda | Opis |
 |----------|--------|------|
-| `/api/history` | GET | Paginirana zgodovina runov, filter po tipu (SQL $queryRaw) |
+| `/api/history` | GET | Paginirana zgodovina runov, filter po tipu |
 | `/api/usage` | GET | Statistika porabe po datumu in modelu |
 
 ### Reference
 
 | Endpoint | Metoda | Opis |
 |----------|--------|------|
-| `/api/models` | GET | Seznam odobrenih LLM modelov |
+| `/api/models` | GET | Seznam odobrenih LLM modelov + pricing mapa |
 | `/api/voices` | GET | Seznam ElevenLabs glasov |
 
-### Admin (zahteva role=admin)
+### Admin
 
 | Endpoint | Metoda | CSRF | Opis |
 |----------|--------|------|------|
 | `/api/admin/users` | GET | — | Seznam vseh uporabnikov s statistiko |
 | `/api/admin/users` | POST | ✅ | Dodaj novega uporabnika (whitelist email) |
-| `/api/admin/users/[id]` | GET | — | Podrobnosti uporabnika z runi in statistiko |
+| `/api/admin/users/[id]` | GET | — | Podrobnosti uporabnika |
 | `/api/admin/users/[id]` | PATCH | ✅ | Posodobi role, limite, active status |
 | `/api/admin/users/[id]` | DELETE | ✅ | Deaktiviraj uporabnika (soft delete) |
+| `/api/admin/auth-logs` | GET | — | Auth logi s filtriranjem in statistikami |
 
 ---
 
 ## AI Providerji
 
-### LLM — Anthropic Claude + Google Gemini
+### LLM — Anthropic Claude + OpenAI GPT-4o + Google Gemini
 
 **Datoteka:** `src/lib/providers/llm.ts`
 
 Podpira dva načina:
 - **Single-shot** (`runLLM`): Pošlji prompt + opcijsko izvorno besedilo
-- **Multi-turn chat** (`runLLMChat`): Pošlji celoten history sporočil
+- **Multi-turn chat** (`runLLMChat`): Pošlji celoten history sporočil + opcijski system prompt
 
 **Modeli:**
 | Model | Provider | Input cena | Output cena |
 |-------|----------|-----------|-------------|
 | `claude-sonnet-4-5-20250929` | Anthropic | $3.00/1M tok | $15.00/1M tok |
+| `gpt-4o` | OpenAI | $2.50/1M tok | $10.00/1M tok |
+| `gpt-4o-mini` | OpenAI | $0.15/1M tok | $0.60/1M tok |
 | `gemini-2.0-flash` | Gemini | $0.10/1M tok | $0.40/1M tok |
 
+OpenAI modeli so na voljo samo če je `OPENAI_API_KEY` nastavljen.
 Gemini je na voljo samo če je `GEMINI_API_KEY` nastavljen.
 
-**Anthropic:** Uporablja `@anthropic-ai/sdk`, `max_tokens: 8192`
-**Gemini:** Uporablja `@google/generative-ai`, `startChat` za multi-turn
+**System prompt:** Vsak provider uporablja nativno system prompt podporo:
+- Anthropic: `system` parameter
+- OpenAI: `role: "system"` message
+- Gemini: `systemInstruction` parameter
 
 ### STT — Soniox
 
 **Datoteka:** `src/lib/providers/stt.ts`
 
 Async transkripcija prek Soniox REST API:
-1. Upload audio datoteke (`POST /v1/files`)
-2. Ustvari transkripcijo (`POST /v1/transcriptions`)
+1. Upload audio datoteke
+2. Ustvari transkripcijo
 3. Polling do zaključka (max 3 min)
-4. Preberi transkript (`GET /v1/transcriptions/{id}/transcript`)
+4. Preberi transkript
 5. Cleanup uploada
 
-**SSRF zaščita:** URL fetch je zaščiten z `validateFetchUrl()` — DNS resolucija, IP blocklist, HTTPS-only.
-
-**Model:** `stt-async-v4`
-**Jeziki:** Slovenščina (`sl`), Angleščina (`en`)
-**Formati:** MP3, WAV, OGG, FLAC, M4A, AAC, WebM
-**Cena:** $0.35/minuta
-**Vercel:** `maxDuration: 300` — zahteva **Vercel Pro plan** ($20/mo)
+**Model:** `stt-async-v4` | **Jeziki:** SL, EN | **Cena:** $0.35/min
 
 ### TTS — ElevenLabs
 
 **Datoteka:** `src/lib/providers/tts.ts`
 
-Text-to-speech z izbiro glasu:
-- Seznam glasov: `GET /v1/voices`
-- Sinteza: `POST /v1/text-to-speech/{voiceId}`
-- Audio se uploada v **Cloudflare R2** (key: `tts/output/{runId}/{uuid}.mp3`)
-- Fallback na base64 data URI če R2 ni dosegljiv
-
-**Model:** `eleven_v3`
-**Output:** MP3 (audio/mpeg) → R2 signed URL
-**Limit:** 10,000 znakov
-**Cena:** $0.30/1k znakov
+**Model:** `eleven_v3` | **Output:** MP3 → R2 signed URL | **Limit:** 10,000 znakov | **Cena:** $0.30/1k znakov
 
 ### Image — Gemini 2.5 Flash Image
 
 **Datoteka:** `src/lib/providers/image.ts`
 
-Generiranje in urejanje slik z besedilnimi navodili:
-- Text prompt za generiranje novih slik
-- Text prompt + input slika za urejanje obstoječih slik
+**Model:** `gemini-2.5-flash-image` | **Output:** Base64 → R2 | **Cena:** ~$0.039/slika
 
-**Model:** `gemini-2.5-flash-image`
-**Config:** `responseModalities: ["Text", "Image"]`
-**Formati input:** PNG, JPEG, WebP, GIF (max 50MB)
-**Output:** Base64 encoded slika (shranjena v R2 za image runs)
-**Cena:** $0.15/1M input tok, $30.00/1M output tok (~$0.039/slika)
+### Embeddings — OpenAI
+
+**Datoteka:** `src/lib/providers/embeddings.ts`
+
+Za RAG knowledge base. Uporablja `text-embedding-3-small` (1536 dimenzij).
+- `generateEmbedding(text)` — posamezen embedding
+- `generateEmbeddings(texts)` — batch embeddingi
 
 ---
 
-## Konfiguracija
+## Prompt Template System
 
-### Guardrails (`src/lib/config.ts`)
+**Admin:** `/admin/templates` — CRUD za prompt template
 
-| Parameter | ENV spremenljivka | Default | Vercel priporočilo |
-|-----------|-------------------|---------|---------------------|
-| Max upload velikost | `MAX_FILE_SIZE_MB` | 50 MB | 4 MB (Vercel body limit) |
-| URL fetch timeout | `MAX_URL_FETCH_SECONDS` | 60 s | 55 s |
-| TTS znakov limit | `MAX_TTS_CHARS` | 10,000 | — |
-| LLM prompt limit | `MAX_LLM_PROMPT_CHARS` | 200,000 | — |
-| Dnevni runi/uporabnik | `MAX_RUNS_PER_DAY_PER_USER` | 200 | — |
-| Globalni mesečni cap | `GLOBAL_MAX_MONTHLY_COST_CENTS` | 30000 (=$300) | — |
+Template vsebuje:
+- **System prompt** — nativno poslan LLM-u (ne kot user message)
+- **Knowledge text** — statično referenčno besedilo (vstavljen za system prompt)
+- **User prompt template** — opcijski template za formatiranje user sporočil
+- **Kategorija** — za organizacijo (general, creative, technical...)
 
-### Environment spremenljivke
+Uporabnik izbere template v LLM chat headerju. Template se shrani na conversacijo (`templateId`). System prompt se vsakič naloži iz DB in inject-a v LLM klic.
 
-Vsi env-ji so dokumentirani v `.env.example`. Ključne kategorije:
+---
 
-| Kategorija | Spremenljivke |
-|------------|---------------|
-| Database | `DATABASE_URL` |
-| NextAuth | `NEXTAUTH_URL`, `NEXTAUTH_SECRET` |
-| Google OAuth | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` |
-| Access Control | `ALLOWED_EMAILS` |
-| Anthropic | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` |
-| Gemini | `GEMINI_API_KEY`, `GEMINI_MODEL` |
-| Soniox | `SONIOX_API_KEY` |
-| ElevenLabs | `ELEVENLABS_API_KEY` |
-| Cloudflare R2 | `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` |
-| Inngest | `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY` |
-| Guardrails | `MAX_FILE_SIZE_MB`, `MAX_URL_FETCH_SECONDS`, `MAX_TTS_CHARS`, itd. |
+## RAG Knowledge Base
+
+### Arhitektura
+
+```
+Admin upload PDF/TXT → extract text → chunk (500 chars, 50 overlap)
+→ OpenAI embedding (text-embedding-3-small, 1536d) → pgvector store
+
+User message → embed query → cosine similarity search (top 5)
+→ inject matching chunks as system prompt context → LLM response
+```
+
+### Komponente
+
+| Datoteka | Opis |
+|----------|------|
+| `src/lib/providers/embeddings.ts` | OpenAI embedding API |
+| `src/lib/document-processor.ts` | PDF (pdf-parse), TXT, HTML text extraction |
+| `src/lib/rag.ts` | Chunking, pgvector search, context building |
+
+### pgvector
+
+- Razširitev: `CREATE EXTENSION vector`
+- Kolona: `DocumentChunk.embedding vector(1536)`
+- Indeks: IVFFlat z cosine distance (`vector_cosine_ops`, lists=100)
+- Similarity search: `1 - (embedding <=> query::vector) as score`
+
+**Admin:** `/admin/knowledge` — Ustvari KB, uploadi dokumente (PDF/TXT), pregled chunkov.
+**User:** Izbere KB v LLM chat headerju. Relevantni chunki se avtomatsko vstavijo v prompt.
+
+---
+
+## URL Fetching
+
+**Datoteka:** `src/lib/url-fetcher.ts`
+
+Ko uporabnik pošlje sporočilo z URL-ji v LLM chatu:
+
+1. **Regex detekcija** URL-jev v sporočilu (max 3)
+2. **Fetch** vsakega URL-ja paralelno (8s timeout)
+3. **Meta extraction** — title, og:description, JSON-LD structured data
+4. **Mozilla Readability** (linkedom) — isti algoritem kot Firefox Reader View za ekstrakcijo article vsebine
+5. **Fallback** — regex-based extraction če Readability faila
+6. **Injection** — vsebina se vstavi v system prompt z navodilom "Use ONLY the information provided"
+
+**Omejitve:** 3 URL-ji/sporočilo, 12k znakov/URL, 30k skupaj, 8s timeout/URL.
+
+**Odvisnosti:** `@mozilla/readability`, `linkedom`
+
+---
+
+## Cost Preview
+
+**Datoteke:** `src/lib/cost-preview.ts`, `src/app/components/CostPreview.tsx`
+
+Real-time ocena stroškov pred izvedbo operacije:
+
+| Modul | Metoda ocene |
+|-------|--------------|
+| LLM | ~3.5 chars/token, input+output estimate na podlagi pricing mape |
+| STT | File size → trajanje (~1MB/min) → cena/min |
+| TTS | Število znakov → cena/1k znakov |
+| Image | Flat estimate na sliko |
+
+`/api/models` endpoint vrne `pricing` mapo poleg seznama modelov.
+
+---
+
+## AI Recipes (Pipeline Builder)
+
+### Koncept
+
+Recipe je multi-step AI pipeline. Admin definira korake (npr. STT → LLM summarize → TTS), uporabnik zažene z vhodnimi podatki. Koraki se izvajajo sekvenčno, output enega koraka je input naslednjega.
+
+### Execution engine (`src/lib/recipe-engine.ts`)
+
+```
+executeRecipe(executionId):
+  for each step:
+    1. Update progress (step N/total, %)
+    2. Create Run record for cost tracking
+    3. Execute step (LLM, STT, TTS, Image, output_format)
+    4. Pipe output → next step input
+    5. Save step result (inputPreview, outputPreview, outputFull)
+  Mark execution as done/error
+```
+
+**Step tipi:**
+- `llm` — LLM klic z system prompt iz config
+- `stt` — Speech-to-text
+- `tts` — Text-to-speech
+- `image` — Image generation
+- `output_format` — Text transformation/formatting
+
+**Admin:** `/admin/recipes` — Recipe builder s form-based step management
+**User:** `/recipes` — Seznam receptov, execute z text inputom, execution history z auto-polling
+**Detail:** `/recipes/[id]` — Step-by-step progress, rezultati posameznih korakov
+
+---
+
+## Background Job Dashboard
+
+**Stran:** `/jobs`
+
+Centraliziran pregled vseh recipe izvedb:
+
+- **Filtriranje** po statusu: all, running, done, error, cancelled
+- **Summary bar** s štetjem po statusu
+- **Job list** z expandable detajli:
+  - Job ID, user, started/finished, duration
+  - Progress bar za running jobe
+  - Step timeline z per-step status in trajanjem
+  - Error message prikaz
+- **Actions:** View detail, Cancel (running), Retry (failed/cancelled)
+- **Auto-polling** — osveži vsake 3s ko so running jobi
+
+**API:**
+- `GET /api/jobs` — seznam (admin vidi vse)
+- `GET /api/jobs/[id]` — detail s step results
+- `POST /api/jobs/[id]` — cancel ali retry (`{ action: "cancel" | "retry" }`)
 
 ---
 
@@ -401,17 +679,24 @@ Vsi env-ji so dokumentirani v `.env.example`. Ključne kategorije:
 
 1. Uporabnik klikne "sign_in --google"
 2. Google OAuth redirect
-3. Callback preveri:
-   - Ali obstaja User v DB z `active: true`? → Dovoli
-   - Ali je email v `ALLOWED_EMAILS` env (bootstrap)? → Ustvari User v DB, dovoli
-   - Ali obstaja User v DB z `active: false`? → Zavrni
-   - Sicer → Zavrni
+3. Callback preveri + logira poskus:
+   - Ali obstaja User v DB z `active: true`? → Poveže Google Account (če manjka), dovoli, logira `sign_in_ok`
+   - Ali je email v `ALLOWED_EMAILS` env (bootstrap)? → Ustvari User v DB, dovoli, logira `sign_in_bootstrap`
+   - Ali obstaja User v DB z `active: false`? → Zavrni, logira `sign_in_denied_inactive`
+   - Sicer → Zavrni, logira `sign_in_denied_unknown`
+
+### Pre-created uporabniki
+
+Ko admin doda uporabnika preko admin panela, se ustvari samo User zapis (brez OAuth Account linka). Ob prvem Google sign-inu signIn callback:
+1. Najde obstoječega User-ja po emailu
+2. Preveri, da Account link za Google ne obstaja
+3. Ustvari Account zapis ki poveže Google profil z DB uporabnikom
+4. Nastavi pravilen `user.id` za JWT
 
 ### JWT strategija
 
-NextAuth je konfiguriran z `session: { strategy: "jwt" }` ker:
+NextAuth z `session: { strategy: "jwt" }`:
 - Edge middleware na Vercelu nima dostopa do baze
-- `getToken()` iz `next-auth/jwt` dela samo z JWT tokeni
 - JWT vsebuje `id` in `role` (nastavljeno v `jwt` callback)
 - Cookie name v production: `__Secure-next-auth.session-token`
 
@@ -419,8 +704,8 @@ NextAuth je konfiguriran z `session: { strategy: "jwt" }` ker:
 
 | Vloga | Dostop |
 |-------|--------|
-| `user` | LLM, STT, TTS, Image, History, Usage |
-| `admin` | Vse kot user + Admin panel |
+| `user` | LLM, STT, TTS, Image, Recipes, Jobs, History, Usage |
+| `admin` | Vse kot user + Admin panel, Templates, KB, Recipe Builder, Auth Logs |
 
 ### Rate limiting (`src/lib/rate-limit.ts`)
 
@@ -430,28 +715,6 @@ Preverjanja pred vsako AI operacijo:
 3. **Mesečni strošek:** Per-user `maxMonthlyCostCents` (opcijsko)
 4. **Globalni mesečni cap:** `GLOBAL_MAX_MONTHLY_COST_CENTS` čez vse uporabnike
 
-### Session wrapper (`src/lib/session.ts`)
-
-`withAuth(handler, req?)` — zaščiti API route:
-- Preveri NextAuth session
-- Vrne 401 če ni prijavljen
-- Izvede **CSRF validacijo** na state-changing requestih (POST/PATCH/DELETE)
-- Lovi napake, logira interno, vrne generični 500
-
----
-
-## Admin panel
-
-Dostop: samo uporabniki z `role: admin`
-
-### Funkcije
-
-- **Dodaj uporabnika:** Pre-create User v DB → email se doda na whitelist → uporabnik se prijavi z Google Auth
-- **Upravljaj uporabnike:** Spremeni role, active status, dnevne limite, mesečne stroške (v centih), dovoljene modele (JSON array)
-- **Pregled statistike:** Dnevni in mesečni runi, stroški, zadnja prijava
-- **Zadnji runi:** Pregled 50 zadnjih runov vsakega uporabnika
-- **Deaktivacija:** Soft delete (active = false), admin ne more deaktivirati sam sebe
-
 ---
 
 ## Strani (Pages)
@@ -460,51 +723,78 @@ Dostop: samo uporabniki z `role: admin`
 Dashboard z ASCII art logotipom in pregledom orodij.
 
 ### LLM (`/llm`)
-Multi-turn chat vmesnik. Sidebar s seznamom pogovorov. Izbira modela per-conversation. Avtomatski naslovi pogovorov.
+Multi-turn chat vmesnik. Sidebar s seznamom pogovorov. Izbira modela (Anthropic/OpenAI/Gemini), prompt template in knowledge base per-conversation. Avtomatski naslovi pogovorov. Cost preview med tipkanjem. Avtomatsko URL fetching.
 
 ### STT (`/stt`)
-Upload audio datoteke ali URL. Izbira jezika (SL/EN). SSRF zaščita za URL fetch. Rezultat transkripcije z latency statistiko. Sidebar z zgodovino. Možnost pošiljanja rezultata v LLM za obdelavo.
+Upload audio datoteke ali URL. Izbira jezika (SL/EN). SSRF zaščita za URL fetch. Rezultat transkripcije z latency statistiko. Cost preview. Sidebar z zgodovino.
 
 ### TTS (`/tts`)
-Tekstovno polje z counter znakov (max 10,000). Izbira glasu iz ElevenLabs. Audio player za predvajanje (R2 signed URL). Sidebar z zgodovino.
+Tekstovno polje z counter znakov. Izbira glasu iz ElevenLabs. Audio player (R2 signed URL). Cost preview. Sidebar z zgodovino.
 
 ### Image (`/image`)
-Tekstovni prompt za generiranje. Opcijski upload slike za urejanje. MIME magic-bytes validacija. Prikaz generirane slike z download gumbom. Sidebar z zgodovino.
+Tekstovni prompt za generiranje. Opcijski upload slike za urejanje. MIME validacija. Cost preview. Sidebar z zgodovino.
+
+### Recipes (`/recipes`)
+Seznam aktivnih receptov z opisom. Execute z text inputom. Execution history z auto-polling (3s). Expandable detail s step-by-step rezultati.
+
+### Recipe Detail (`/recipes/[id]`)
+Execution progress bar. Step-by-step timeline s statusom, trajanjem, inputom in outputom. Auto-polling za running izvedbe.
+
+### Jobs (`/jobs`)
+Centraliziran dashboard za vse recipe izvedbe. Filtriranje po statusu. Summary bar. Expandable detajli s step timeline. Cancel/retry akcije.
 
 ### History (`/history`)
-Tabela vseh runov z expandable podrobnostmi. Filtriranje po tipu (LLM, STT, TTS, Image). Paginacija. SQL query z `$queryRaw` (ne `$queryRawUnsafe`).
+Tabela vseh runov z expandable podrobnostmi. Filtriranje po tipu. Paginacija.
 
 ### Usage (`/usage`)
-Statistika porabe po datumu. Stroški po modelu (v centih). Tabelarični pregled z filtriranjem po obdobju.
+Statistika porabe po datumu. Stroški po modelu (v centih). Tabelarični pregled z filtriranjem.
 
 ### Admin (`/admin`)
-Tabela uporabnikov z inline urejanjem. Obrazec za dodajanje novih uporabnikov. Expandable detail panel s statistiko in zadnjimi runi.
+Tabela uporabnikov z inline urejanjem. Obrazec za dodajanje novih uporabnikov.
+
+### Admin Templates (`/admin/templates`)
+CRUD za prompt template. Obrazec s system prompt, knowledge text, kategorijo.
+
+### Admin Knowledge (`/admin/knowledge`)
+Knowledge base management. Upload dokumentov (PDF/TXT). Pregled dokumentov in stanja procesiranja.
+
+### Admin Recipes (`/admin/recipes`)
+Recipe builder. Form-based step management (add, remove, reorder). Step konfiguracija po tipu.
+
+### Admin Auth Logs (`/admin/auth-logs`)
+Tabela vseh auth poskusov. Filtriranje po emailu in event tipu. Statistike (denied 24h/7d, unique IPs). Expandable detajli z IP, user-agent, geo, razlogom.
 
 ---
 
-## Responsive dizajn
+## Konfiguracija
 
-### Breakpoints
+### Guardrails (`src/lib/config.ts`)
 
-| Breakpoint | Opis |
-|------------|------|
-| `> 768px` | Desktop: horizontalni nav, sidebar levo |
-| `<= 768px` | Mobilni: hamburger meni, sidebar nad content (max 200px) |
-| `<= 480px` | Mali telefoni: manjši font (13px) |
+| Parameter | ENV spremenljivka | Default |
+|-----------|-------------------|---------|
+| Max upload velikost | `MAX_FILE_SIZE_MB` | 50 MB |
+| URL fetch timeout | `MAX_URL_FETCH_SECONDS` | 60 s |
+| TTS znakov limit | `MAX_TTS_CHARS` | 10,000 |
+| LLM prompt limit | `MAX_LLM_PROMPT_CHARS` | 200,000 |
+| Dnevni runi/uporabnik | `MAX_RUNS_PER_DAY_PER_USER` | 200 |
+| Globalni mesečni cap | `GLOBAL_MAX_MONTHLY_COST_CENTS` | 30000 (=$300) |
 
-### CSS klase
+### Environment spremenljivke
 
-| Klasa | Opis |
-|-------|------|
-| `.nav-hamburger` | Hamburger gumb (skrit na desktop) |
-| `.nav-links-desktop` | Horizontalni nav linki (skriti na mobile) |
-| `.nav-email` | Email uporabnika (skrit na mobile) |
-| `.nav-signout-desktop` | Sign out gumb (skrit na mobile) |
-| `.page-with-sidebar` | Wrapper za strani s sidebar (flex-direction: column na mobile) |
-| `.page-sidebar` | Sidebar kontejner (full width, max-height 200px na mobile) |
-| `.page-main` | Main content kontejner |
-| `.admin-form-grid-*` | Admin obrazci (single column na mobile) |
-| `.admin-table-wrap` | Admin tabela (horizontal scroll na mobile) |
+| Kategorija | Spremenljivke |
+|------------|---------------|
+| Database | `DATABASE_URL` |
+| NextAuth | `NEXTAUTH_URL`, `NEXTAUTH_SECRET` |
+| Google OAuth | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` |
+| Access Control | `ALLOWED_EMAILS` |
+| Anthropic | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` |
+| OpenAI | `OPENAI_API_KEY`, `OPENAI_MODEL` |
+| Gemini | `GEMINI_API_KEY`, `GEMINI_MODEL` |
+| Soniox | `SONIOX_API_KEY` |
+| ElevenLabs | `ELEVENLABS_API_KEY` |
+| Cloudflare R2 | `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` |
+| Inngest | `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY` |
+| Guardrails | `MAX_FILE_SIZE_MB`, `MAX_URL_FETCH_SECONDS`, `MAX_TTS_CHARS`, itd. |
 
 ---
 
@@ -512,7 +802,7 @@ Tabela uporabnikov z inline urejanjem. Obrazec za dodajanje novih uporabnikov. E
 
 ### Zahteve
 
-- **Vercel Pro plan** ($20/mo) — potreben za STT (`maxDuration: 300s`). Hobby plan ima limit 10s.
+- **Vercel Pro plan** ($20/mo) — potreben za STT in recipe execution (`maxDuration: 300s`)
 - **Node.js 20.x**
 - Build command: `prisma generate && next build` (default)
 
@@ -524,101 +814,23 @@ Tabela uporabnikov z inline urejanjem. Obrazec za dodajanje novih uporabnikov. E
 | `/api/runs/tts` | 60s | ElevenLabs sinteza + R2 upload |
 | `/api/runs/llm` | 60s | LLM API klic |
 | `/api/runs/image` | 60s | Gemini image generiranje |
-| `/api/conversations/[id]/messages` | 60s | LLM chat odgovor |
-
-### Environment spremenljivke — razlike od lokala
-
-| Spremenljivka | Lokalno | Vercel Production |
-|---------------|---------|-------------------|
-| `NEXTAUTH_URL` | `http://localhost:3003` | `https://your-domain.com` |
-| `NEXTAUTH_SECRET` | (development secret) | **nov** — `openssl rand -base64 32` |
-| `MAX_FILE_SIZE_MB` | `50` | `4` (Vercel body limit) |
-| `MAX_URL_FETCH_SECONDS` | `60` | `55` |
-
-### Google OAuth
-
-V Google Cloud Console → Credentials → OAuth 2.0 Client dodaj:
-- **Authorized JavaScript origins:** `https://your-domain.com`
-- **Authorized redirect URIs:** `https://your-domain.com/api/auth/callback/google`
-
-### Custom domena
-
-V Vercel → Settings → Domains:
-- CNAME `app.domain.com` → `cname.vercel-dns.com`
-- Ali A record za apex → `76.76.21.21`
-
----
-
-## Tehnični detajli
-
-### Prisma + Neon PostgreSQL
-
-```typescript
-// src/lib/prisma.ts
-const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
-  max: 5,                          // max 5 connections (Neon free tier)
-  idleTimeoutMillis: 30_000,
-  connectionTimeoutMillis: 10_000,  // 10s connection timeout
-  statement_timeout: 15_000,        // 15s query timeout
-});
-```
-
-Prisma 7 z `@prisma/adapter-pg` za direktno pg.Pool povezavo.
-
-### Storage — Cloudflare R2
-
-S3-compatible storage prek `@aws-sdk/client-s3`:
-- `uploadToR2(key, body, contentType)` — upload datoteke
-- `uploadStreamToR2(key, stream, contentType)` — upload stream
-- `getSignedDownloadUrl(key, expiresIn)` — signed URL za download (default 1h)
-
-TTS audio se shranjuje v R2 z ključem `tts/output/{runId}/{uuid}.mp3`.
-
-### Usage tracking
-
-Vsaka AI operacija logira `UsageEvent` s:
-- Provider in model
-- Units (tokeni, znaki, sekunde) kot JSON
-- Strošek v **centih** (integer) prek `estimateCost()`
-- Latenca v milisekundah
-
-### Sanitizacija payload-a
-
-`/api/runs/[id]` vrne sanitizirane payloade — stringi nad 10KB so skrajšani, da preprečijo zamrznitev brskalnika (npr. base64 audio).
-
----
-
-## Razvoj
-
-### Zagon
-
-```bash
-# Namestitev
-npm install
-
-# Generiranje Prisma clienta
-npx prisma generate
-
-# Dev server (port 3003)
-PORT=3003 npx next dev --turbopack -p 3003
-```
-
-### Build
-
-```bash
-npm run build    # prisma generate + next build
-npm start        # production server
-```
+| `/api/conversations/[id]/messages` | 60s | LLM chat + URL fetch + RAG |
+| `/api/admin/knowledge/[id]/documents` | 120s | Document processing (extract → chunk → embed) |
+| `/api/recipes/[id]/execute` | 300s | Multi-step recipe execution |
 
 ### Database migracije
 
 ```bash
-# Generiranje migracije
+# Dev: ustvari + apliciraj migracijo
 npx prisma migrate dev --name opis_spremembe
 
-# Apliciranje migracij na production
+# Production: apliciraj obstoječe migracije
 npx prisma migrate deploy
+
+# pgvector setup (raw SQL — ni v Prisma schema):
+# CREATE EXTENSION IF NOT EXISTS vector;
+# ALTER TABLE "DocumentChunk" ADD COLUMN "embedding" vector(1536);
+# CREATE INDEX ... USING ivfflat ... vector_cosine_ops;
 ```
 
 ---
@@ -627,27 +839,29 @@ npx prisma migrate deploy
 
 ### Runtime
 
-| Paket | Verzija | Namen |
-|-------|---------|-------|
-| `next` | 16.1.6 | Framework |
-| `react` | 19.2.3 | UI |
-| `@prisma/client` | ^7.4.0 | ORM (generated) |
-| `@prisma/adapter-pg` | ^7.4.0 | PostgreSQL adapter |
-| `pg` | ^8.18.0 | PostgreSQL driver |
-| `next-auth` | ^4.24.13 | Avtentikacija (JWT strategija) |
-| `@auth/prisma-adapter` | ^2.11.1 | NextAuth Prisma adapter |
-| `@anthropic-ai/sdk` | ^0.74.0 | Claude API |
-| `@google/generative-ai` | ^0.24.1 | Gemini API |
-| `@aws-sdk/client-s3` | ^3.990.0 | R2 Storage |
-| `@aws-sdk/s3-request-presigner` | ^3.990.0 | Signed URLs |
-| `inngest` | ^3.52.0 | Async job queue |
-| `uuid` | ^13.0.0 | UUID generiranje |
+| Paket | Namen |
+|-------|-------|
+| `next` 16.1.6 | Framework |
+| `react` 19.x | UI |
+| `@prisma/client` ^7.4.0 | ORM |
+| `@prisma/adapter-pg` + `pg` | PostgreSQL driver |
+| `next-auth` ^4.24 | Avtentikacija (JWT) |
+| `@auth/prisma-adapter` | NextAuth Prisma adapter |
+| `@anthropic-ai/sdk` | Claude API |
+| `openai` | GPT-4o API |
+| `@google/generative-ai` | Gemini API |
+| `@mozilla/readability` | Article text extraction (Reader View) |
+| `linkedom` | Server-side DOM za Readability |
+| `pdf-parse` | PDF text extraction za RAG |
+| `@aws-sdk/client-s3` + presigner | R2 Storage |
+| `inngest` | Async job queue |
+| `uuid` | UUID generiranje |
 
 ### Dev
 
-| Paket | Verzija | Namen |
-|-------|---------|-------|
-| `typescript` | ^5 | Type checking |
-| `tailwindcss` | ^4 | CSS framework |
-| `eslint` | ^9 | Linting |
-| `prisma` | ^7.4.0 | Schema management + migracije |
+| Paket | Namen |
+|-------|-------|
+| `typescript` ^5 | Type checking |
+| `tailwindcss` ^4 | CSS framework |
+| `eslint` ^9 | Linting |
+| `prisma` ^7.4.0 | Schema management + migracije |
