@@ -6,6 +6,7 @@ import { getApprovedModels, config } from "@/lib/config";
 import { runLLMChat, ChatMessage } from "@/lib/providers/llm";
 import { logUsage } from "@/lib/usage";
 import { buildRAGContext } from "@/lib/rag";
+import { fetchURLsFromMessage } from "@/lib/url-fetcher";
 
 // Vercel serverless: LLM chat can take 30-60s for complex prompts
 export const maxDuration = 60;
@@ -89,6 +90,16 @@ export async function POST(
         // RAG retrieval failed — continue without it
         console.error("[RAG] Retrieval error:", err instanceof Error ? err.message : err);
       }
+    }
+
+    // URL content fetching — detect URLs in user message and fetch their content
+    try {
+      const urlContext = await fetchURLsFromMessage(content);
+      if (urlContext) {
+        systemPrompt = (systemPrompt || "") + "\n\n" + urlContext;
+      }
+    } catch (err) {
+      console.error("[URL Fetch] Error:", err instanceof Error ? err.message : err);
     }
 
     // Build message history
