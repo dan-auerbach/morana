@@ -114,6 +114,13 @@ export default function LLMPage() {
     inputRef.current?.focus();
   }, [activeConvId]);
 
+  // Total chars for cost preview (history + current input)
+  // Must be declared before early return to satisfy Rules of Hooks
+  const totalInputChars = useMemo(() => {
+    const historyChars = messages.reduce((sum, m) => sum + m.content.length, 0);
+    return historyChars + input.length;
+  }, [messages, input]);
+
   if (!session) {
     return (
       <div style={{ color: "#5a6a7a" }}>
@@ -258,12 +265,6 @@ export default function LLMPage() {
   }
 
   const activeConv = conversations.find((c) => c.id === activeConvId);
-
-  // Total chars for cost preview (history + current input)
-  const totalInputChars = useMemo(() => {
-    const historyChars = messages.reduce((sum, m) => sum + m.content.length, 0);
-    return historyChars + input.length;
-  }, [messages, input]);
 
   return (
     <div className="page-with-sidebar" style={{ display: "flex", gap: "0", margin: "-24px -16px", height: "calc(100vh - 57px)" }}>
