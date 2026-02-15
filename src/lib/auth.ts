@@ -6,6 +6,9 @@ import { config } from "./config";
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma) as NextAuthOptions["adapter"],
+  // JWT strategy is required for Edge middleware on Vercel
+  // (Edge runtime cannot access the database to validate session tokens)
+  session: { strategy: "jwt" },
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -45,23 +48,36 @@ export const authOptions: NextAuthOptions = {
       // Not in DB and not a bootstrap email → deny
       return false;
     },
-    async session({ session, user }) {
-      if (session.user) {
-        (session.user as Record<string, unknown>).id = user.id;
-        // Fetch role + lastLoginAt in a single query
+    async jwt({ token, user }) {
+      // On first sign-in, `user` is set — persist id + role into the JWT
+      if (user) {
+        token.id = user.id;
         const dbUser = await prisma.user.findUnique({
           where: { id: user.id },
-          select: { role: true, lastLoginAt: true },
+          select: { role: true },
         });
-        (session.user as Record<string, unknown>).role = dbUser?.role || "user";
-        // Only update lastLoginAt if >1 hour stale (avoids DB write on every request)
-        if (dbUser) {
-          const oneHourAgo = new Date(Date.now() - 3600_000);
-          if (!dbUser.lastLoginAt || dbUser.lastLoginAt < oneHourAgo) {
-            prisma.user.update({
-              where: { id: user.id },
-              data: { lastLoginAt: new Date() },
-            }).catch(() => {});
+        token.role = dbUser?.role || "user";
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (session.user && token) {
+        (session.user as Record<string, unknown>).id = token.id;
+        (session.user as Record<string, unknown>).role = token.role || "user";
+        // Update lastLoginAt if >1 hour stale (fire-and-forget)
+        if (token.id) {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: token.id as string },
+            select: { lastLoginAt: true },
+          });
+          if (dbUser) {
+            const oneHourAgo = new Date(Date.now() - 3600_000);
+            if (!dbUser.lastLoginAt || dbUser.lastLoginAt < oneHourAgo) {
+              prisma.user.update({
+                where: { id: token.id as string },
+                data: { lastLoginAt: new Date() },
+              }).catch(() => {});
+            }
           }
         }
       }
