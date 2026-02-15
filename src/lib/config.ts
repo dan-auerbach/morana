@@ -19,7 +19,7 @@ export const config = {
 };
 
 // Approved models — change via ENV or here
-export type ModelEntry = { id: string; label: string; provider: "anthropic" | "gemini" };
+export type ModelEntry = { id: string; label: string; provider: "anthropic" | "gemini" | "openai" };
 
 const defaultModels: ModelEntry[] = [
   {
@@ -37,6 +37,21 @@ const defaultModels: ModelEntry[] = [
         },
       ]
     : []),
+  // Only include OpenAI if OPENAI_API_KEY is configured
+  ...(process.env.OPENAI_API_KEY
+    ? [
+        {
+          id: process.env.OPENAI_MODEL || "gpt-4o",
+          label: "OpenAI GPT-4o",
+          provider: "openai" as const,
+        },
+        {
+          id: "gpt-4o-mini",
+          label: "OpenAI GPT-4o Mini",
+          provider: "openai" as const,
+        },
+      ]
+    : []),
 ];
 
 export function getApprovedModels(): ModelEntry[] {
@@ -48,6 +63,8 @@ export const pricing: Record<string, { input: number; output: number; unit: stri
   "claude-sonnet-4-5-20250929": { input: 3.0, output: 15.0, unit: "1M_tokens" },
   "gemini-2.0-flash": { input: 0.1, output: 0.4, unit: "1M_tokens" },
   "gemini-2.5-flash-image": { input: 0.15, output: 30.0, unit: "1M_tokens" },
+  "gpt-4o": { input: 2.5, output: 10.0, unit: "1M_tokens" },
+  "gpt-4o-mini": { input: 0.15, output: 0.6, unit: "1M_tokens" },
   soniox: { input: 0.35, output: 0, unit: "per_minute" },
   elevenlabs: { input: 0.30, output: 0, unit: "1k_chars" },
 };

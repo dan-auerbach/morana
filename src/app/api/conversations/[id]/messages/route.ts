@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getApprovedModels, config } from "@/lib/config";
 import { runLLMChat, ChatMessage } from "@/lib/providers/llm";
 import { logUsage } from "@/lib/usage";
+import { buildRAGContext } from "@/lib/rag";
 
 // Vercel serverless: LLM chat can take 30-60s for complex prompts
 export const maxDuration = 60;
@@ -58,6 +59,38 @@ export async function POST(
       return NextResponse.json({ error: "You do not have access to this model" }, { status: 403 });
     }
 
+    // Build system prompt from template + RAG knowledge base
+    let systemPrompt: string | undefined;
+
+    // Template system prompt
+    if (conversation.templateId) {
+      const template = await prisma.promptTemplate.findUnique({
+        where: { id: conversation.templateId },
+        select: { systemPrompt: true, knowledgeText: true },
+      });
+      if (template) {
+        const parts: string[] = [template.systemPrompt];
+        if (template.knowledgeText) {
+          parts.push("\n\n---\nReference material:\n" + template.knowledgeText);
+        }
+        systemPrompt = parts.join("");
+      }
+    }
+
+    // RAG knowledge base retrieval
+    const kbIds = conversation.knowledgeBaseIds as string[] | null;
+    if (kbIds && kbIds.length > 0) {
+      try {
+        const ragContext = await buildRAGContext(content, kbIds, 5);
+        if (ragContext) {
+          systemPrompt = (systemPrompt || "") + "\n\n" + ragContext;
+        }
+      } catch (err) {
+        // RAG retrieval failed — continue without it
+        console.error("[RAG] Retrieval error:", err instanceof Error ? err.message : err);
+      }
+    }
+
     // Build message history
     const history: ChatMessage[] = conversation.messages.map((m) => ({
       role: m.role as "user" | "assistant",
@@ -95,7 +128,7 @@ export async function POST(
     });
 
     try {
-      const result = await runLLMChat(modelEntry, history);
+      const result = await runLLMChat(modelEntry, history, systemPrompt);
 
       // Save assistant message
       const assistantMessage = await prisma.message.create({

@@ -62,6 +62,12 @@ export async function PATCH(
       data: {
         ...(body.title !== undefined && { title: body.title }),
         ...(body.modelId !== undefined && { modelId: body.modelId }),
+        ...(body.templateId !== undefined && { templateId: body.templateId || null }),
+        ...(body.knowledgeBaseIds !== undefined && {
+          knowledgeBaseIds: Array.isArray(body.knowledgeBaseIds) && body.knowledgeBaseIds.length > 0
+            ? body.knowledgeBaseIds
+            : null,
+        }),
       },
     });
 

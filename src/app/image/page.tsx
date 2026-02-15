@@ -3,6 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useState, useRef, useEffect, useCallback } from "react";
 import StatusBadge from "../components/StatusBadge";
+import CostPreview from "../components/CostPreview";
 
 type HistoryRun = {
   id: string;
@@ -316,6 +317,13 @@ export default function ImagePage() {
               </div>
             )}
           </div>
+
+          {/* Cost preview */}
+          {prompt.trim() && (
+            <div style={{ alignSelf: "flex-start" }}>
+              <CostPreview type="image" modelId="gemini-2.5-flash-image" />
+            </div>
+          )}
 
           {/* Generate button */}
           <button

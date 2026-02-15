@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenerativeAI, Content } from "@google/generative-ai";
+import OpenAI from "openai";
 import { ModelEntry } from "../config";
 
 function getApiKey(name: string): string {
@@ -16,6 +17,10 @@ function getAnthropic() {
 
 function getGenAI() {
   return new GoogleGenerativeAI(getApiKey("GEMINI_API_KEY"));
+}
+
+function getOpenAI() {
+  return new OpenAI({ apiKey: getApiKey("OPENAI_API_KEY") });
 }
 
 export type ChatMessage = {
@@ -43,11 +48,12 @@ export async function runLLM(
 }
 
 /**
- * Multi-turn chat LLM call.
+ * Multi-turn chat LLM call with optional system prompt.
  */
 export async function runLLMChat(
   modelEntry: ModelEntry,
-  messages: ChatMessage[]
+  messages: ChatMessage[],
+  systemPrompt?: string
 ): Promise<LLMResult> {
   const start = Date.now();
 
@@ -56,6 +62,7 @@ export async function runLLMChat(
     const resp = await anthropic.messages.create({
       model: modelEntry.id,
       max_tokens: 8192,
+      ...(systemPrompt && { system: systemPrompt }),
       messages: messages.map((m) => ({ role: m.role, content: m.content })),
     });
     const text = resp.content
@@ -70,9 +77,34 @@ export async function runLLMChat(
     };
   }
 
+  if (modelEntry.provider === "openai") {
+    const openai = getOpenAI();
+    const openaiMessages: { role: "system" | "user" | "assistant"; content: string }[] = [];
+    if (systemPrompt) {
+      openaiMessages.push({ role: "system", content: systemPrompt });
+    }
+    openaiMessages.push(...messages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })));
+    const resp = await openai.chat.completions.create({
+      model: modelEntry.id,
+      max_tokens: 8192,
+      messages: openaiMessages,
+    });
+    const choice = resp.choices[0];
+    const text = choice?.message?.content || "";
+    return {
+      text,
+      inputTokens: resp.usage?.prompt_tokens || 0,
+      outputTokens: resp.usage?.completion_tokens || 0,
+      latencyMs: Date.now() - start,
+    };
+  }
+
   // Gemini
   const genAI = getGenAI();
-  const model = genAI.getGenerativeModel({ model: modelEntry.id });
+  const model = genAI.getGenerativeModel({
+    model: modelEntry.id,
+    ...(systemPrompt && { systemInstruction: systemPrompt }),
+  });
 
   // Gemini uses "history" for multi-turn: all messages except the last
   if (messages.length === 1) {

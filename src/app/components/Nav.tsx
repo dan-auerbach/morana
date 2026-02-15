@@ -10,6 +10,8 @@ const baseLinks = [
   { href: "/stt", label: "STT" },
   { href: "/tts", label: "TTS" },
   { href: "/image", label: "Image" },
+  { href: "/recipes", label: "Recipes" },
+  { href: "/jobs", label: "Jobs" },
   { href: "/history", label: "History" },
   { href: "/usage", label: "Usage" },
 ];
@@ -18,7 +20,9 @@ export default function Nav() {
   const pathname = usePathname();
   const { data: session } = useSession();
   const isAdmin = (session?.user as Record<string, unknown>)?.role === "admin";
-  const links = isAdmin ? [...baseLinks, { href: "/admin", label: "Admin" }] : baseLinks;
+  const links = isAdmin
+    ? [...baseLinks, { href: "/admin/templates", label: "Templates" }, { href: "/admin/knowledge", label: "KB" }, { href: "/admin", label: "Admin" }]
+    : baseLinks;
   const [menuOpen, setMenuOpen] = useState(false);
 
   // Close menu on route change
@@ -53,8 +57,8 @@ export default function Nav() {
             <div className="nav-links-desktop">
               <span style={{ color: "#555", fontSize: "12px", marginRight: "4px" }}>//</span>
               {links.map((l) => {
-                const isActive = pathname === l.href;
-                const isAdminLink = l.href === "/admin";
+                const isActive = pathname === l.href || pathname.startsWith(l.href + "/");
+                const isAdminLink = l.href.startsWith("/admin");
                 const activeColor = isAdminLink ? "#ff4444" : "#00ff88";
                 return (
                   <Link
@@ -137,8 +141,8 @@ export default function Nav() {
         <div style={{ backgroundColor: "#0a0e14", borderTop: "1px solid #1e2a3a", padding: "8px 16px 12px" }}>
           <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
             {links.map((l) => {
-              const isActive = pathname === l.href;
-              const isAdminLink = l.href === "/admin";
+              const isActive = pathname === l.href || pathname.startsWith(l.href + "/");
+              const isAdminLink = l.href.startsWith("/admin");
               const activeColor = isAdminLink ? "#ff4444" : "#00ff88";
               return (
                 <Link

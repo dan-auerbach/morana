@@ -12,6 +12,7 @@ export async function GET() {
         id: true,
         title: true,
         modelId: true,
+        templateId: true,
         createdAt: true,
         updatedAt: true,
         _count: { select: { messages: true } },
@@ -26,13 +27,17 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   return withAuth(async (user) => {
     const body = await req.json();
-    const { modelId, title } = body;
+    const { modelId, title, templateId, knowledgeBaseIds } = body;
 
     const conversation = await prisma.conversation.create({
       data: {
         userId: user.id,
         title: title || "New conversation",
         modelId: modelId || "claude-sonnet-4-5-20250929",
+        templateId: templateId || null,
+        knowledgeBaseIds: Array.isArray(knowledgeBaseIds) && knowledgeBaseIds.length > 0
+          ? knowledgeBaseIds
+          : undefined,
       },
     });
 

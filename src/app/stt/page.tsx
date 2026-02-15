@@ -3,6 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useState, useRef, useEffect, useCallback } from "react";
 import StatusBadge from "../components/StatusBadge";
+import CostPreview from "../components/CostPreview";
 
 type HistoryRun = {
   id: string;
@@ -24,7 +25,11 @@ export default function STTPage() {
   const [transcript, setTranscript] = useState("");
   const [stats, setStats] = useState<{ latencyMs: number; durationSeconds: number } | null>(null);
   const [fileName, setFileName] = useState("");
+  const [fileSizeBytes, setFileSizeBytes] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Rough estimate: ~1MB per minute for compressed audio
+  const estimatedDurationSec = fileSizeBytes > 0 ? Math.max(10, (fileSizeBytes / 1_000_000) * 60) : 0;
 
   // History sidebar
   const [history, setHistory] = useState<HistoryRun[]>([]);
@@ -274,7 +279,7 @@ export default function STTPage() {
                   </>
                 )}
               </div>
-              <input ref={fileRef} type="file" accept="audio/*,.mp3,.wav,.ogg,.flac,.m4a,.aac,.webm" style={{ display: "none" }} onChange={(e) => { const file = e.target.files?.[0]; if (file) { setFileName(file.name); setError(""); } }} />
+              <input ref={fileRef} type="file" accept="audio/*,.mp3,.wav,.ogg,.flac,.m4a,.aac,.webm" style={{ display: "none" }} onChange={(e) => { const file = e.target.files?.[0]; if (file) { setFileName(file.name); setFileSizeBytes(file.size); setError(""); } }} />
             </div>
           ) : (
             <div>
@@ -295,6 +300,13 @@ export default function STTPage() {
               <option value="sl">sl (Slovenian)</option>
             </select>
           </div>
+
+          {/* Cost preview */}
+          {(fileName || url) && (
+            <div style={{ alignSelf: "flex-start" }}>
+              <CostPreview type="stt" modelId="soniox" pricing={{ input: 0.35, output: 0, unit: "per_minute" }} durationSeconds={estimatedDurationSec || 60} />
+            </div>
+          )}
 
           {/* Transcribe button */}
           <button

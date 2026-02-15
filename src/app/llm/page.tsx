@@ -1,13 +1,29 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import CostPreview from "@/app/components/CostPreview";
+import { PricingInfo } from "@/lib/cost-preview";
 
 type Model = { id: string; label: string; provider: string };
+type TemplateOption = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  category: string;
+};
+type KBOption = {
+  id: string;
+  name: string;
+  description: string | null;
+};
 type ConversationSummary = {
   id: string;
   title: string;
   modelId: string;
+  templateId: string | null;
+  knowledgeBaseIds: string[] | null;
   updatedAt: string;
   _count: { messages: number };
 };
@@ -24,6 +40,10 @@ type Message = {
 export default function LLMPage() {
   const { data: session } = useSession();
   const [models, setModels] = useState<Model[]>([]);
+  const [pricingMap, setPricingMap] = useState<Record<string, PricingInfo>>({});
+  const [templates, setTemplates] = useState<TemplateOption[]>([]);
+  const [knowledgeBases, setKnowledgeBases] = useState<KBOption[]>([]);
+  const [selectedKBIds, setSelectedKBIds] = useState<string[]>([]);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -31,18 +51,28 @@ export default function LLMPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [selectedModelId, setSelectedModelId] = useState("");
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Load models
+  // Load models + templates
   useEffect(() => {
     fetch("/api/models")
       .then((r) => r.json())
       .then((d) => {
         setModels(d.models || []);
         if (d.models?.length) setSelectedModelId(d.models[0].id);
+        if (d.pricing) setPricingMap(d.pricing);
       });
+    fetch("/api/templates")
+      .then((r) => r.json())
+      .then((d) => setTemplates(d.templates || []))
+      .catch(() => {});
+    fetch("/api/knowledge")
+      .then((r) => r.json())
+      .then((d) => setKnowledgeBases(d.knowledgeBases || []))
+      .catch(() => {});
   }, []);
 
   // Load conversations
@@ -68,6 +98,8 @@ export default function LLMPage() {
         if (d.conversation) {
           setMessages(d.conversation.messages || []);
           setSelectedModelId(d.conversation.modelId);
+          setSelectedTemplateId(d.conversation.templateId || "");
+          setSelectedKBIds(d.conversation.knowledgeBaseIds || []);
         }
       });
   }, [activeConvId]);
@@ -94,7 +126,11 @@ export default function LLMPage() {
     const resp = await fetch("/api/conversations", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ modelId: selectedModelId }),
+      body: JSON.stringify({
+        modelId: selectedModelId,
+        templateId: selectedTemplateId || null,
+        knowledgeBaseIds: selectedKBIds.length > 0 ? selectedKBIds : null,
+      }),
     });
     const d = await resp.json();
     if (d.conversation) {
@@ -132,7 +168,10 @@ export default function LLMPage() {
       const resp = await fetch("/api/conversations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ modelId: selectedModelId }),
+        body: JSON.stringify({
+          modelId: selectedModelId,
+          templateId: selectedTemplateId || null,
+        }),
       });
       const d = await resp.json();
       if (!d.conversation) {
@@ -203,7 +242,28 @@ export default function LLMPage() {
     }
   }
 
+  async function handleTemplateChange(newTemplateId: string) {
+    setSelectedTemplateId(newTemplateId);
+    if (activeConvId) {
+      try {
+        await fetch(`/api/conversations/${activeConvId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ templateId: newTemplateId || null }),
+        });
+      } catch {
+        // Template change failed — continue with local state
+      }
+    }
+  }
+
   const activeConv = conversations.find((c) => c.id === activeConvId);
+
+  // Total chars for cost preview (history + current input)
+  const totalInputChars = useMemo(() => {
+    const historyChars = messages.reduce((sum, m) => sum + m.content.length, 0);
+    return historyChars + input.length;
+  }, [messages, input]);
 
   return (
     <div className="page-with-sidebar" style={{ display: "flex", gap: "0", margin: "-24px -16px", height: "calc(100vh - 57px)" }}>
@@ -381,6 +441,71 @@ export default function LLMPage() {
             ))}
           </select>
 
+          {templates.length > 0 && (
+            <>
+              <span style={{ color: "#333" }}>|</span>
+              <select
+                value={selectedTemplateId}
+                onChange={(e) => handleTemplateChange(e.target.value)}
+                style={{
+                  padding: "4px 8px",
+                  backgroundColor: "#111820",
+                  border: `1px solid ${selectedTemplateId ? "rgba(255, 204, 0, 0.4)" : "#1e2a3a"}`,
+                  color: selectedTemplateId ? "#ffcc00" : "#5a6a7a",
+                  fontFamily: "inherit",
+                  fontSize: "12px",
+                  maxWidth: "180px",
+                }}
+                title="Prompt template"
+              >
+                <option value="">-- no template --</option>
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
+
+          {knowledgeBases.length > 0 && (
+            <>
+              <span style={{ color: "#333" }}>|</span>
+              <select
+                value={selectedKBIds[0] || ""}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  const newIds = val ? [val] : [];
+                  setSelectedKBIds(newIds);
+                  if (activeConvId) {
+                    fetch(`/api/conversations/${activeConvId}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ knowledgeBaseIds: newIds.length > 0 ? newIds : null }),
+                    }).catch(() => {});
+                  }
+                }}
+                style={{
+                  padding: "4px 8px",
+                  backgroundColor: "#111820",
+                  border: `1px solid ${selectedKBIds.length > 0 ? "rgba(0, 229, 255, 0.4)" : "#1e2a3a"}`,
+                  color: selectedKBIds.length > 0 ? "#00e5ff" : "#5a6a7a",
+                  fontFamily: "inherit",
+                  fontSize: "12px",
+                  maxWidth: "150px",
+                }}
+                title="Knowledge base (RAG)"
+              >
+                <option value="">-- no KB --</option>
+                {knowledgeBases.map((kb) => (
+                  <option key={kb.id} value={kb.id}>
+                    {kb.name}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
+
           {activeConv && (
             <>
               <span style={{ color: "#333" }}>|</span>
@@ -549,7 +674,17 @@ export default function LLMPage() {
           </div>
         )}
 
-        {/* Input area */}
+        {/* Cost preview + Input area */}
+        {input.trim() && (
+          <div style={{ padding: "4px 16px 0", flexShrink: 0 }}>
+            <CostPreview
+              type="llm"
+              modelId={selectedModelId}
+              pricing={pricingMap[selectedModelId]}
+              inputChars={totalInputChars}
+            />
+          </div>
+        )}
         <div
           style={{
             padding: "12px 16px",

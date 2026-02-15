@@ -3,6 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useState, useEffect, useCallback } from "react";
 import StatusBadge from "../components/StatusBadge";
+import CostPreview from "../components/CostPreview";
 
 type Voice = { id: string; name: string };
 type HistoryRun = {
@@ -214,6 +215,13 @@ export default function TTSPage() {
               ))}
             </select>
           </div>
+
+          {/* Cost preview */}
+          {text.length > 0 && (
+            <div style={{ alignSelf: "flex-start" }}>
+              <CostPreview type="tts" modelId="elevenlabs" pricing={{ input: 0.30, output: 0, unit: "1k_chars" }} charCount={text.length} />
+            </div>
+          )}
 
           {/* Synthesize button */}
           <button
