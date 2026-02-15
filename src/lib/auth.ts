@@ -16,7 +16,7 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async signIn({ user }) {
+    async signIn({ user, account }) {
       if (!user.email) return false;
       const email = user.email.toLowerCase();
 
@@ -25,7 +25,46 @@ export const authOptions: NextAuthOptions = {
 
       if (dbUser) {
         // User exists in DB — check if active
-        return dbUser.active;
+        if (!dbUser.active) return false;
+
+        // Ensure the OAuth Account link exists.
+        // When admin pre-creates a user via the admin panel, the User record
+        // exists but there's no Account record linking it to Google.
+        // PrismaAdapter will try to createUser() which fails on unique email.
+        // We fix this by creating the Account link here if missing.
+        if (account) {
+          const existingAccount = await prisma.account.findUnique({
+            where: {
+              provider_providerAccountId: {
+                provider: account.provider,
+                providerAccountId: account.providerAccountId,
+              },
+            },
+          });
+          if (!existingAccount) {
+            await prisma.account.create({
+              data: {
+                userId: dbUser.id,
+                type: account.type,
+                provider: account.provider,
+                providerAccountId: account.providerAccountId,
+                refresh_token: account.refresh_token,
+                access_token: account.access_token,
+                expires_at: account.expires_at,
+                token_type: account.token_type,
+                scope: account.scope,
+                id_token: account.id_token,
+                session_state: account.session_state as string | null,
+              },
+            }).catch(() => {
+              // Race condition or already exists — fine
+            });
+          }
+        }
+
+        // Overwrite user.id so the JWT callback gets the correct DB id
+        user.id = dbUser.id;
+        return true;
       }
 
       // BOOTSTRAP: if email is in ALLOWED_EMAILS env, auto-create in DB.
