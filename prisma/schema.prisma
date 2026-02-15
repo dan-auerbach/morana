@@ -359,3 +359,22 @@ model RecipeStepResult {
   @@unique([executionId, stepIndex])
   @@index([executionId])
 }
+
+// ─── Auth Logging ───────────────────────────────────────────────
+
+model AuthLog {
+  id        String   @id @default(cuid())
+  email     String
+  event     String   // "sign_in_ok", "sign_in_denied_inactive", "sign_in_denied_unknown", "sign_in_error", "sign_in_bootstrap"
+  provider  String   @default("google")
+  ip        String?
+  userAgent String?  @db.Text
+  country   String?  // from Vercel geo headers
+  city      String?
+  reason    String?  // denial reason
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([createdAt])
+  @@index([event])
+}

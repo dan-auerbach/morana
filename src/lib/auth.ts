@@ -3,6 +3,45 @@ import GoogleProvider from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "./prisma";
 import { config } from "./config";
+import { headers } from "next/headers";
+
+/**
+ * Log an authentication event (fire-and-forget).
+ */
+async function logAuth(params: {
+  email: string;
+  event: string;
+  provider?: string;
+  reason?: string;
+}) {
+  try {
+    const hdrs = await headers();
+    const ip =
+      hdrs.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      hdrs.get("x-real-ip") ||
+      "unknown";
+    const userAgent = hdrs.get("user-agent") || null;
+    // Vercel geo headers
+    const country = hdrs.get("x-vercel-ip-country") || null;
+    const city = hdrs.get("x-vercel-ip-city") || null;
+
+    await prisma.authLog.create({
+      data: {
+        email: params.email,
+        event: params.event,
+        provider: params.provider || "google",
+        ip,
+        userAgent,
+        country,
+        city,
+        reason: params.reason || null,
+      },
+    });
+  } catch (err) {
+    // Never let logging break authentication
+    console.error("[AuthLog] Failed to log:", err instanceof Error ? err.message : err);
+  }
+}
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma) as NextAuthOptions["adapter"],
@@ -17,7 +56,10 @@ export const authOptions: NextAuthOptions = {
   ],
   callbacks: {
     async signIn({ user, account }) {
-      if (!user.email) return false;
+      if (!user.email) {
+        logAuth({ email: "(no email)", event: "sign_in_denied_no_email", reason: "No email in OAuth profile" });
+        return false;
+      }
       const email = user.email.toLowerCase();
 
       // Single source of truth: the DB User table.
@@ -25,7 +67,10 @@ export const authOptions: NextAuthOptions = {
 
       if (dbUser) {
         // User exists in DB — check if active
-        if (!dbUser.active) return false;
+        if (!dbUser.active) {
+          logAuth({ email, event: "sign_in_denied_inactive", reason: "Account deactivated" });
+          return false;
+        }
 
         // Ensure the OAuth Account link exists.
         // When admin pre-creates a user via the admin panel, the User record
@@ -64,6 +109,7 @@ export const authOptions: NextAuthOptions = {
 
         // Overwrite user.id so the JWT callback gets the correct DB id
         user.id = dbUser.id;
+        logAuth({ email, event: "sign_in_ok", provider: account?.provider });
         return true;
       }
 
@@ -81,10 +127,12 @@ export const authOptions: NextAuthOptions = {
           // Race condition: user was created between findUnique and create
           // This is fine, the PrismaAdapter will link the account
         });
+        logAuth({ email, event: "sign_in_bootstrap", provider: account?.provider });
         return true;
       }
 
       // Not in DB and not a bootstrap email → deny
+      logAuth({ email, event: "sign_in_denied_unknown", reason: "Email not in user list" });
       return false;
     },
     async jwt({ token, user }) {
