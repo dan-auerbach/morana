@@ -15,6 +15,7 @@ const PUBLIC_PATHS = [
   "/",                    // Home / login page
   "/api/auth",            // NextAuth endpoints (sign-in, callback, session, etc.)
   "/api/inngest",         // Inngest webhook (has its own signing key auth)
+  "/api/debug-auth",      // Temporary debug endpoint
   "/_next",               // Next.js static assets
   "/favicon.ico",
 ];
