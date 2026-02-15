@@ -32,7 +32,17 @@ export async function middleware(req: NextRequest) {
   }
 
   // Check for valid session token
-  const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+  // In production (HTTPS), NextAuth v4 uses __Secure- prefix for cookies.
+  // getToken() must be told to look for the secure cookie name.
+  const isSecure = req.nextUrl.protocol === "https:";
+  const cookieName = isSecure
+    ? "__Secure-next-auth.session-token"
+    : "next-auth.session-token";
+  const token = await getToken({
+    req,
+    secret: process.env.NEXTAUTH_SECRET,
+    cookieName,
+  });
 
   if (!token) {
     // API routes: return 401
