@@ -1,26 +1,153 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #0a0a0a;
+  --bg-panel: #0d1117;
+  --bg-input: #111820;
+  --border: #1e2a3a;
+  --border-focus: #00ff88;
+  --green: #00ff88;
+  --green-dim: #00cc6a;
+  --yellow: #ffcc00;
+  --cyan: #00e5ff;
+  --red: #ff4444;
+  --white: #e0e0e0;
+  --gray: #5a6a7a;
+  --glow-green: 0 0 10px rgba(0, 255, 136, 0.3);
+  --glow-yellow: 0 0 10px rgba(255, 204, 0, 0.3);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --color-background: var(--bg);
+  --color-foreground: var(--white);
+  --font-sans: var(--font-geist-mono);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #1e2a3a #0a0a0a;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--white);
+  font-family: 'Geist Mono', 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 14px;
+}
+
+/* Scanline overlay */
+body::after {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9999;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 255, 136, 0.015) 2px,
+    rgba(0, 255, 136, 0.015) 4px
+  );
+}
+
+::selection {
+  background: rgba(0, 255, 136, 0.3);
+  color: #fff;
+}
+
+/* Terminal-style inputs */
+input, textarea, select {
+  font-family: inherit !important;
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--green) !important;
+  box-shadow: var(--glow-green) !important;
+}
+
+/* Blinking cursor animation */
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 5px rgba(0, 255, 136, 0.2); }
+  50% { box-shadow: 0 0 20px rgba(0, 255, 136, 0.4); }
+}
+
+@keyframes typing {
+  from { width: 0; }
+  to { width: 100%; }
+}
+
+/* Status badge glows */
+.status-done { text-shadow: 0 0 8px rgba(0, 255, 136, 0.6); }
+.status-running { text-shadow: 0 0 8px rgba(0, 229, 255, 0.6); }
+.status-error { text-shadow: 0 0 8px rgba(255, 68, 68, 0.6); }
+.status-queued { text-shadow: 0 0 8px rgba(255, 204, 0, 0.6); }
+
+/* ===== RESPONSIVE / MOBILE ===== */
+
+/* Nav: hamburger hidden on desktop, shown on mobile */
+.nav-hamburger { display: none !important; }
+.nav-links-desktop { display: flex; gap: 2px; align-items: center; }
+.nav-email { display: inline; }
+.nav-signout-desktop { display: inline-flex; }
+
+@media (max-width: 768px) {
+  .nav-hamburger { display: inline-flex !important; }
+  .nav-links-desktop { display: none !important; }
+  .nav-email { display: none !important; }
+  .nav-signout-desktop { display: none !important; }
+
+  /* Pages with sidebars: hide sidebar on mobile, make layout vertical */
+  .page-with-sidebar {
+    flex-direction: column !important;
+    height: auto !important;
+    min-height: calc(100vh - 48px);
+  }
+  .page-sidebar {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-height: 200px !important;
+    border-right: none !important;
+    border-bottom: 1px solid #1e2a3a !important;
+  }
+  .page-main {
+    min-width: 0 !important;
+  }
+
+  /* Admin page: stack form grids */
+  .admin-form-grid-3 {
+    grid-template-columns: 1fr !important;
+  }
+  .admin-form-grid-2 {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Admin table: horizontal scroll */
+  .admin-table-wrap {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+  .admin-user-row {
+    min-width: 700px;
+  }
+
+  /* Admin detail stats: stack on mobile */
+  .admin-detail-stats {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Small phone */
+@media (max-width: 480px) {
+  body { font-size: 13px; }
 }

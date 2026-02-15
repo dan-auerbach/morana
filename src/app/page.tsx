@@ -1,65 +1,168 @@
-import Image from "next/image";
+"use client";
+
+import { useSession, signIn } from "next-auth/react";
+import Link from "next/link";
+
+const tools = [
+  { href: "/llm", label: "LLM", desc: "Chat with Anthropic Sonnet or Gemini Flash", cmd: "> run llm --model sonnet" },
+  { href: "/stt", label: "STT", desc: "Transcribe audio (Soniox)", cmd: "> run stt --engine soniox" },
+  { href: "/tts", label: "TTS", desc: "Generate audio (ElevenLabs)", cmd: "> run tts --voice rachel" },
+  { href: "/history", label: "HISTORY", desc: "View all runs", cmd: "> query runs --all" },
+  { href: "/usage", label: "USAGE", desc: "Track costs and API usage", cmd: "> stats --costs --usage" },
+];
+
+const ASCII_LOGO = `
+ __  __  ___  ____      _    _   _    _
+|  \\/  |/ _ \\|  _ \\    / \\  | \\ | |  / \\
+| |\\/| | | | | |_) |  / _ \\ |  \\| | / _ \\
+| |  | | |_| |  _ <  / ___ \\| |\\  |/ ___ \\
+|_|  |_|\\___/|_| \\_\\/_/   \\_\\_| \\_/_/   \\_\\
+`;
 
 export default function Home() {
+  const { data: session, status } = useSession();
+
+  if (status === "loading") {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div style={{ color: "#00ff88" }}>
+          <span style={{ animation: "blink 1s step-end infinite" }}>_</span> Initializing system...
+        </div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-6">
+        <pre
+          style={{
+            color: "#00ff88",
+            fontSize: "10px",
+            lineHeight: "1.2",
+            textShadow: "0 0 10px rgba(0, 255, 136, 0.3)",
+            textAlign: "center",
+          }}
+        >
+          {ASCII_LOGO}
+        </pre>
+        <p style={{ color: "#5a6a7a", fontFamily: "inherit" }}>
+          [ MORANA ] Slovanska boginja smrti // internal AI ops terminal
+        </p>
+        <button
+          onClick={() => signIn("google")}
+          style={{
+            background: "transparent",
+            border: "1px solid #00ff88",
+            color: "#00ff88",
+            padding: "10px 24px",
+            fontFamily: "inherit",
+            fontSize: "13px",
+            cursor: "pointer",
+            textTransform: "uppercase",
+            letterSpacing: "0.1em",
+            transition: "all 0.2s",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "rgba(0, 255, 136, 0.1)";
+            e.currentTarget.style.boxShadow = "0 0 20px rgba(0, 255, 136, 0.3)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "transparent";
+            e.currentTarget.style.boxShadow = "none";
+          }}
+        >
+          {"> authenticate --provider google"}
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <div>
+      <pre
+        style={{
+          color: "#00ff88",
+          fontSize: "9px",
+          lineHeight: "1.2",
+          textShadow: "0 0 10px rgba(0, 255, 136, 0.3)",
+          marginBottom: "16px",
+        }}
+      >
+        {ASCII_LOGO}
+      </pre>
+      <div style={{ marginBottom: "24px", color: "#5a6a7a", fontSize: "13px" }}>
+        <span style={{ color: "#00ff88" }}>$</span> whoami{" "}
+        <span style={{ color: "#e0e0e0" }}>{session.user?.name || session.user?.email}</span>
+        <br />
+        <span style={{ color: "#00ff88" }}>$</span> status{" "}
+        <span style={{ color: "#00ff88" }}>ONLINE</span>{" "}
+        <span style={{ color: "#5a6a7a" }}>| session active | {tools.length} modules loaded</span>
+      </div>
+
+      <div
+        style={{
+          color: "#ffcc00",
+          fontSize: "11px",
+          textTransform: "uppercase",
+          letterSpacing: "0.15em",
+          marginBottom: "12px",
+          borderBottom: "1px solid #1e2a3a",
+          paddingBottom: "8px",
+        }}
+      >
+        Available Modules
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {tools.map((t) => (
+          <Link
+            key={t.href}
+            href={t.href}
+            className="group block"
+            style={{
+              border: "1px solid #1e2a3a",
+              backgroundColor: "#0d1117",
+              padding: "16px",
+              transition: "all 0.2s ease",
+              textDecoration: "none",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = "#00ff88";
+              e.currentTarget.style.boxShadow = "0 0 15px rgba(0, 255, 136, 0.15)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = "#1e2a3a";
+              e.currentTarget.style.boxShadow = "none";
+            }}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+            <div
+              style={{
+                color: "#00ff88",
+                fontSize: "14px",
+                fontWeight: 700,
+                marginBottom: "4px",
+                letterSpacing: "0.05em",
+              }}
+            >
+              [{t.label}]
+            </div>
+            <div style={{ color: "#5a6a7a", fontSize: "12px", marginBottom: "8px" }}>
+              {t.desc}
+            </div>
+            <div
+              style={{
+                color: "#00cc6a",
+                fontSize: "11px",
+                fontFamily: "inherit",
+                opacity: 0.7,
+              }}
+            >
+              {t.cmd}
+            </div>
+          </Link>
+        ))}
+      </div>
     </div>
   );
 }
