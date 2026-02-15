@@ -2,9 +2,13 @@
  * URL detection and content fetching for LLM context injection.
  *
  * Detects URLs in user messages, fetches them server-side,
- * extracts readable text from HTML, and returns the content
- * for injection into the LLM prompt.
+ * extracts readable text using Mozilla Readability (same algorithm
+ * as Firefox Reader View), and returns the content for injection
+ * into the LLM prompt.
  */
+
+import { Readability } from "@mozilla/readability";
+import { parseHTML } from "linkedom";
 
 const URL_REGEX = /https?:\/\/[^\s<>"')\]]+/gi;
 const MAX_URLS = 3;
@@ -15,6 +19,7 @@ const MAX_TOTAL_CHARS = 30000; // total across all URLs
 type FetchedURL = {
   url: string;
   title: string;
+  meta: string; // meta description / og:description
   content: string;
   error?: string;
 };
@@ -26,58 +31,126 @@ export function extractURLs(text: string): string[] {
   const matches = text.match(URL_REGEX);
   if (!matches) return [];
 
-  // Deduplicate and limit
+  // Deduplicate, strip trailing punctuation, and limit
   const unique = [...new Set(matches.map((u) => u.replace(/[.,;:!?)]+$/, "")))];
   return unique.slice(0, MAX_URLS);
 }
 
 /**
- * Strip HTML tags and extract readable text content.
+ * Extract metadata from raw HTML before Readability processes it.
+ * Returns title, description, and any JSON-LD structured data summary.
  */
-function htmlToText(html: string): { title: string; text: string } {
-  // Extract title
+function extractMeta(html: string): { title: string; description: string; jsonLd: string } {
+  // Title
   const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
   const title = titleMatch ? titleMatch[1].replace(/\s+/g, " ").trim() : "";
 
-  // Remove script, style, nav, header, footer tags and their content
+  // Meta description
+  const descMatch =
+    html.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([\s\S]*?)["'][^>]*>/i) ||
+    html.match(/<meta[^>]*content=["']([\s\S]*?)["'][^>]*property=["']og:description["'][^>]*>/i) ||
+    html.match(/<meta[^>]*name=["']description["'][^>]*content=["']([\s\S]*?)["'][^>]*>/i) ||
+    html.match(/<meta[^>]*content=["']([\s\S]*?)["'][^>]*name=["']description["'][^>]*>/i);
+  const description = descMatch ? descMatch[1].replace(/\s+/g, " ").trim() : "";
+
+  // JSON-LD structured data (extract key facts)
+  let jsonLd = "";
+  const jsonLdMatches = html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
+  for (const match of jsonLdMatches) {
+    try {
+      const data = JSON.parse(match[1]);
+      const items = Array.isArray(data) ? data : [data];
+      for (const item of items) {
+        // Extract the most useful fields from common schema types
+        const parts: string[] = [];
+        if (item["@type"]) parts.push(`Type: ${item["@type"]}`);
+        if (item.headline) parts.push(`Headline: ${item.headline}`);
+        if (item.description) parts.push(`Description: ${item.description}`);
+        if (item.datePublished) parts.push(`Published: ${item.datePublished}`);
+        if (item.author) {
+          const authorName = typeof item.author === "string"
+            ? item.author
+            : item.author?.name || (Array.isArray(item.author) ? item.author.map((a: Record<string, string>) => a.name).join(", ") : "");
+          if (authorName) parts.push(`Author: ${authorName}`);
+        }
+        if (item.about) parts.push(`About: ${typeof item.about === "string" ? item.about : JSON.stringify(item.about)}`);
+        if (parts.length > 1) { // only include if we got more than just @type
+          jsonLd += parts.join(" | ") + "\n";
+        }
+      }
+    } catch {
+      // Invalid JSON-LD — skip
+    }
+  }
+
+  return { title, description, jsonLd: jsonLd.trim() };
+}
+
+/**
+ * Use Mozilla Readability to extract article content from HTML.
+ * Falls back to basic text extraction if Readability fails.
+ */
+function extractContent(html: string, url: string): { title: string; content: string } {
+  try {
+    const { document } = parseHTML(html);
+
+    const reader = new Readability(document, {
+      charThreshold: 100,
+    });
+    const article = reader.parse();
+
+    if (article && article.textContent && article.textContent.trim().length > 100) {
+      // Clean up the text content
+      const text = article.textContent
+        .split("\n")
+        .map((line: string) => line.replace(/\s+/g, " ").trim())
+        .filter((line: string) => line.length > 0)
+        .join("\n")
+        .replace(/\n{3,}/g, "\n\n")
+        .trim();
+
+      return {
+        title: article.title || "",
+        content: text,
+      };
+    }
+  } catch (err) {
+    console.error("[URL Fetch] Readability failed for", url, err instanceof Error ? err.message : err);
+  }
+
+  // Fallback: basic regex extraction
+  return fallbackExtract(html);
+}
+
+/**
+ * Basic regex-based text extraction as fallback.
+ */
+function fallbackExtract(html: string): { title: string; content: string } {
+  const titleMatch = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  const title = titleMatch ? titleMatch[1].replace(/\s+/g, " ").trim() : "";
+
   let cleaned = html
     .replace(/<script[\s\S]*?<\/script>/gi, "")
     .replace(/<style[\s\S]*?<\/style>/gi, "")
     .replace(/<nav[\s\S]*?<\/nav>/gi, "")
-    .replace(/<header[\s\S]*?<\/header>/gi, "")
     .replace(/<footer[\s\S]*?<\/footer>/gi, "")
     .replace(/<aside[\s\S]*?<\/aside>/gi, "");
 
-  // Try to extract main/article content first
   const articleMatch = cleaned.match(/<(?:article|main)[^>]*>([\s\S]*?)<\/(?:article|main)>/i);
-  if (articleMatch) {
-    cleaned = articleMatch[1];
-  }
+  if (articleMatch) cleaned = articleMatch[1];
 
-  // Replace block-level elements with newlines
   cleaned = cleaned
     .replace(/<br\s*\/?>/gi, "\n")
     .replace(/<\/(?:p|div|h[1-6]|li|tr|blockquote|section)>/gi, "\n")
-    .replace(/<(?:hr)\s*\/?>/gi, "\n---\n");
-
-  // Remove remaining HTML tags
-  cleaned = cleaned.replace(/<[^>]+>/g, " ");
-
-  // Decode common HTML entities
-  cleaned = cleaned
+    .replace(/<[^>]+>/g, " ")
     .replace(/&nbsp;/gi, " ")
     .replace(/&amp;/gi, "&")
     .replace(/&lt;/gi, "<")
     .replace(/&gt;/gi, ">")
     .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/&#x27;/gi, "'")
-    .replace(/&mdash;/gi, "—")
-    .replace(/&ndash;/gi, "–")
-    .replace(/&#\d+;/gi, "");
+    .replace(/&#39;/gi, "'");
 
-  // Collapse whitespace
-  const text = cleaned
+  const content = cleaned
     .split("\n")
     .map((line) => line.replace(/\s+/g, " ").trim())
     .filter((line) => line.length > 0)
@@ -85,7 +158,7 @@ function htmlToText(html: string): { title: string; text: string } {
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 
-  return { title, text };
+  return { title, content };
 }
 
 /**
@@ -108,7 +181,7 @@ async function fetchURL(url: string): Promise<FetchedURL> {
     clearTimeout(timeout);
 
     if (!response.ok) {
-      return { url, title: "", content: "", error: `HTTP ${response.status}` };
+      return { url, title: "", meta: "", content: "", error: `HTTP ${response.status}` };
     }
 
     const contentType = response.headers.get("content-type") || "";
@@ -122,10 +195,11 @@ async function fetchURL(url: string): Promise<FetchedURL> {
         return {
           url,
           title: "JSON response",
+          meta: "",
           content: formatted.slice(0, MAX_CONTENT_CHARS),
         };
       } catch {
-        return { url, title: "JSON response", content: rawBody.slice(0, MAX_CONTENT_CHARS) };
+        return { url, title: "JSON response", meta: "", content: rawBody.slice(0, MAX_CONTENT_CHARS) };
       }
     }
 
@@ -134,23 +208,27 @@ async function fetchURL(url: string): Promise<FetchedURL> {
       return {
         url,
         title: url.split("/").pop() || "Text",
+        meta: "",
         content: rawBody.slice(0, MAX_CONTENT_CHARS),
       };
     }
 
-    // HTML — extract readable text
-    const { title, text } = htmlToText(rawBody);
+    // HTML — extract with Readability + meta
+    const meta = extractMeta(rawBody);
+    const { title, content } = extractContent(rawBody, url);
+
     return {
       url,
-      title: title || url,
-      content: text.slice(0, MAX_CONTENT_CHARS),
+      title: meta.title || title || url,
+      meta: [meta.description, meta.jsonLd].filter(Boolean).join("\n"),
+      content: content.slice(0, MAX_CONTENT_CHARS),
     };
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown error";
     if (msg.includes("abort")) {
-      return { url, title: "", content: "", error: "Timeout" };
+      return { url, title: "", meta: "", content: "", error: "Timeout" };
     }
-    return { url, title: "", content: "", error: msg };
+    return { url, title: "", meta: "", content: "", error: msg };
   }
 }
 
@@ -181,18 +259,31 @@ export async function fetchURLsFromMessage(message: string): Promise<string> {
     const available = MAX_TOTAL_CHARS - totalChars;
     if (available <= 200) break;
 
-    const truncated = r.content.slice(0, available);
-    totalChars += truncated.length;
+    // Build context block with meta + content
+    const parts: string[] = [];
+    parts.push(`[URL: ${r.url}]${r.title ? ` — ${r.title}` : ""}`);
 
-    blocks.push(
-      `[URL: ${r.url}]${r.title ? ` — ${r.title}` : ""}\n${truncated}${truncated.length < r.content.length ? "\n[...truncated]" : ""}\n`
-    );
+    if (r.meta) {
+      parts.push(`[META] ${r.meta}`);
+    }
+
+    const truncatedContent = r.content.slice(0, available);
+    parts.push(truncatedContent);
+
+    if (truncatedContent.length < r.content.length) {
+      parts.push("[...truncated]");
+    }
+
+    const block = parts.join("\n") + "\n";
+    totalChars += block.length;
+    blocks.push(block);
   }
 
   if (blocks.length === 0) return "";
 
   return (
-    "---\nThe user's message contains URLs. Here is the fetched content from those pages:\n\n" +
+    "---\nThe user's message contains URLs. Here is the fetched content from those pages. " +
+    "Use ONLY the information provided below — do not hallucinate or infer facts not present in the text.\n\n" +
     blocks.join("\n") +
     "---"
   );
