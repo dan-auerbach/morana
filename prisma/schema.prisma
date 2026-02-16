@@ -17,6 +17,7 @@ enum RunType {
   llm
   tts
   image
+  sfx
 }
 
 enum RunStatus {

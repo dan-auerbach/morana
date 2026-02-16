@@ -1,6 +1,6 @@
 # MORANA — Internal AI Operations Terminal
 
-**Version:** 2.3.0
+**Version:** 2.4.0
 **Stack:** Next.js 16 | React 19 | TypeScript | Prisma 7 | PostgreSQL (Neon) + pgvector | Tailwind CSS 4
 **Hosting:** Vercel (serverless) | Cloudflare R2 (storage)
 **UI Theme:** Dark hacker/terminal aesthetic
@@ -16,7 +16,7 @@ MORANA je interni AI operations terminal za medijsko podjetje. Združuje več AI
 |-------|----------|------|
 | **LLM** | Anthropic Claude, OpenAI GPT-4o, Google Gemini | Multi-turn chat z URL fetching, RAG, prompt templates, web search |
 | **STT** | Soniox | Transkripcija zvoka (SL, EN) |
-| **TTS** | ElevenLabs | Sinteza govora z izbiro glasov |
+| **TTS** | ElevenLabs | Sinteza govora z voice settings, model izbiro, SFX generiranje |
 | **Image** | Google Gemini 2.5 Flash | Generiranje in urejanje slik |
 | **Recipes** | Multi-provider | Multi-step AI pipeline builder z audio podporo |
 | **Jobs** | — | Background job dashboard z monitoring |
@@ -82,7 +82,8 @@ src/
       knowledge/          # Public KB endpoint
       models/             # Seznam odobrenih modelov + pricing
       recipes/            # Recipe CRUD, execution, steps, presets API
-      runs/               # STT, TTS, LLM, Image run endpoints
+      files/[id]          # R2 file proxy endpoint (avoids CORS)
+      runs/               # STT, TTS, LLM, Image, SFX run endpoints
       templates/          # Public template endpoint
       usage/              # Statistika porabe
       voices/             # ElevenLabs glasovi
@@ -115,7 +116,7 @@ src/
     providers/
       llm.ts              # Anthropic + OpenAI + Gemini LLM
       stt.ts              # Soniox STT
-      tts.ts              # ElevenLabs TTS
+      tts.ts              # ElevenLabs TTS + SFX (voice settings, multi-model, sound effects)
       image.ts            # Gemini Image generiranje
       embeddings.ts       # OpenAI text-embedding-3-small za RAG
     auth.ts               # NextAuth konfiguracija (JWT + auth logging)
@@ -225,7 +226,7 @@ Vsi API route catch blocki:
 | Enum | Vrednosti |
 |------|-----------|
 | `Role` | `user`, `admin` |
-| `RunType` | `stt`, `llm`, `tts`, `image` |
+| `RunType` | `stt`, `llm`, `tts`, `image`, `sfx` |
 | `RunStatus` | `queued`, `running`, `done`, `error` |
 | `FileKind` | `input`, `output` |
 | `DocumentStatus` | `pending`, `processing`, `ready`, `error` |
@@ -536,8 +537,10 @@ Indeksi: `email`, `createdAt`, `event`
 |----------|--------|------|-------------|------|
 | `/api/runs/llm` | POST | ✅ | 60s | Single-shot LLM obdelava |
 | `/api/runs/stt` | POST | ✅ | 300s | Speech-to-text (file/URL) — zahteva Vercel Pro |
-| `/api/runs/tts` | POST | ✅ | 60s | Text-to-speech (audio upload v R2) |
+| `/api/runs/tts` | POST | ✅ | 60s | Text-to-speech z voice settings, model izbiro (body: `text, voiceId, modelId?, outputFormat?, languageCode?, voiceSettings?`) |
+| `/api/runs/sfx` | POST | ✅ | 60s | Sound effect generiranje (body: `prompt, durationSeconds?, promptInfluence?`) |
 | `/api/runs/image` | POST | ✅ | 60s | Generiranje/urejanje slike |
+| `/api/files/[id]` | GET | — | — | Proxy za R2 datoteke (audio, slike) — brez CORS problemov |
 | `/api/runs/[id]` | GET | — | — | Podrobnosti runa z input/output |
 
 ### Prompt Templates
@@ -668,7 +671,43 @@ Async transkripcija prek Soniox REST API:
 
 **Datoteka:** `src/lib/providers/tts.ts`
 
-**Model:** `eleven_v3` | **Output:** MP3 → R2 signed URL | **Limit:** 10,000 znakov | **Cena:** $0.30/1k znakov
+**Funkcije:**
+- `runTTS(text, voiceId, options?)` — Text-to-Speech sinteza z voice settings
+- `runSoundEffect(prompt, options?)` — Text-to-Sound Effects generiranje
+- `listVoices()` — Seznam ElevenLabs glasov
+
+**TTS modeli:**
+| Model ID | Label | Jeziki | Char limit |
+|----------|-------|--------|------------|
+| `eleven_v3` | Eleven v3 | 70+ | 5,000 |
+| `eleven_flash_v2_5` | Flash v2.5 (fast) | 32 | 40,000 |
+| `eleven_multilingual_v2` | Multilingual v2 | 29 | 10,000 |
+| `eleven_turbo_v2_5` | Turbo v2.5 | 32 | 40,000 |
+
+**Voice Settings (TTSOptions.voiceSettings):**
+| Parameter | Range | Default | Opis |
+|-----------|-------|---------|------|
+| `stability` | 0.0–1.0 | 0.5 | Nižje = bolj ekspresivno, Višje = bolj konsistentno |
+| `similarityBoost` | 0.0–1.0 | 0.75 | Ujemanje z originalnim glasom |
+| `style` | 0.0–1.0 | 0 | Stil ekzageracija (priporočeno: 0) |
+| `speed` | 0.7–1.2 | 1.0 | Hitrost govora |
+
+**Output formati:**
+| Format ID | Opis | MIME |
+|-----------|------|------|
+| `mp3_44100_128` | MP3 HQ 128kbps (default) | audio/mpeg |
+| `mp3_22050_32` | MP3 LQ 32kbps | audio/mpeg |
+| `pcm_24000` | PCM 24kHz (WAV) | audio/wav |
+| `opus_48000_128` | Opus 128kbps | audio/ogg |
+
+**Sound Effects (SFX):**
+- Model: `eleven_text_to_sound_v2`
+- Endpoint: `/v1/sound-generation`
+- Duration: 0.5–30 sekund
+- Prompt influence: 0–1 (0=kreativno, 1=strogo)
+- Cena: $0.30/1k znakov
+
+**Cena TTS:** $0.30/1k znakov | **Audio proxy:** `/api/files/:id` (brez R2 CORS problemov)
 
 ### Image — Gemini 2.5 Flash Image
 
@@ -1025,7 +1064,7 @@ Multi-turn chat vmesnik. Sidebar s seznamom pogovorov. Izbira modela (Anthropic/
 Upload audio datoteke ali URL. Izbira jezika (SL/EN). SSRF zaščita za URL fetch. Rezultat transkripcije z latency statistiko. Cost preview. Sidebar z zgodovino.
 
 ### TTS (`/tts`)
-Tekstovno polje z counter znakov. Izbira glasu iz ElevenLabs. Audio player (R2 signed URL). Cost preview. Sidebar z zgodovino.
+Dve modi: **Speech** in **SFX**. Speech: tekst z counter znakov (dinamičen per model), izbira glasu, model selektor (v3/flash/multilingual/turbo), output format (MP3/PCM/Opus), language code, collapsible Voice Settings panel (stability, similarity, style, speed sliderji z Reset Defaults). SFX: text prompt za zvočne efekte, duration slider (0.5–30s), prompt influence slider. Audio player s proxy URL (brez CORS), download link. Cost preview. Sidebar z zgodovino.
 
 ### Image (`/image`)
 Tekstovni prompt za generiranje. Opcijski upload slike za urejanje. MIME validacija. Cost preview. Sidebar z zgodovino.
@@ -1180,6 +1219,20 @@ npx prisma migrate deploy
 ---
 
 ## Changelog
+
+### v2.4.0 (2026-02-16)
+
+- **TTS Voice Settings:** Collapsible Voice Settings panel z stability, similarity boost, style in speed sliderji. Nastavitve se shranijo v RunInput in se obnovijo pri odpiranju history elementa. Reset Defaults gumb.
+- **TTS Model Selection:** Izbira med Eleven v3 (70+ jezikov), Flash v2.5 (hitro), Multilingual v2 in Turbo v2.5. Dinamičen char limit per model. Model se shrani v Run zapis.
+- **TTS Output Format:** Izbira MP3 HQ (128kbps), MP3 LQ (32kbps), PCM (WAV) ali Opus (128kbps). Format se pošlje kot query parameter v ElevenLabs API.
+- **TTS Language Code:** Opcijsko vsiljevanje jezika (ISO 639-1) za pravilno normalizacijo besedila.
+- **Sound Effects (SFX):** Nova SFX moda na TTS strani. Text-to-Sound generiranje z ElevenLabs `eleven_text_to_sound_v2` modelom. Duration slider (0.5–30s), prompt influence slider (0–1). Oranžni (#ff8800) UI elementi. Nov `sfx` RunType, `/api/runs/sfx` endpoint.
+- **File Proxy Endpoint:** Nov `/api/files/:id` endpoint ki streže R2 datoteke skozi Next.js. Odpravlja CORS probleme z R2 signed URL-ji. Vse audio in image datoteke se zdaj servirajo prek proxy-ja.
+- **TTS Audio Playback Fix:** Audio player je prej kazal 0:00/0:00 zaradi CORS problemov z R2 signed URL-ji. Zdaj deluje zanesljivo prek proxy endpointa.
+- **TTS Download Link:** Download gumb pod audio playerjem za shranjevanje MP3 datotek.
+- **TTS Idempotency Fix:** Cached TTS runi zdaj pravilno vračajo proxy audio URL namesto "audio not stored" sporočila.
+- **TTS History Fix:** Odpiranje TTS history elementov zdaj pravilno naloži audio prek files array namesto neobstoječega output.audioUrl.
+- **ElevenLabs Response Validation:** Preverjanje content-type odgovora (zaznava JSON napak z 200 statusom), preverjanje praznega bufferja, eksplicitni output_format query parameter.
 
 ### v2.3.0 (2026-02-16)
 

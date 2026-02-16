@@ -3,7 +3,7 @@ import { withAuth } from "@/lib/session";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { prisma } from "@/lib/prisma";
 import { config } from "@/lib/config";
-import { runTTS } from "@/lib/providers/tts";
+import { runTTS, TTSOptions } from "@/lib/providers/tts";
 import { logUsage } from "@/lib/usage";
 import { uploadToR2 } from "@/lib/storage";
 import { v4 as uuid } from "uuid";
@@ -14,7 +14,7 @@ export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   return withAuth(async (user) => {
-    const { text, voiceId } = await req.json();
+    const { text, voiceId, modelId, outputFormat, languageCode, voiceSettings } = await req.json();
 
 
     if (!text || !voiceId) {
@@ -33,7 +33,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: rl.reason || "Rate limit reached" }, { status: 429 });
     }
 
-    const textHash = crypto.createHash("sha256").update(text).digest("hex").slice(0, 16);
+    const settingsStr = JSON.stringify({ modelId, outputFormat, languageCode, voiceSettings });
+    const textHash = crypto.createHash("sha256").update(text + settingsStr).digest("hex").slice(0, 16);
     const idempotencyKey = `tts-${user.id}-${voiceId}-${textHash}`;
 
     // Check for existing run with same idempotency key
@@ -67,17 +68,24 @@ export async function POST(req: NextRequest) {
         type: "tts",
         status: "running",
         provider: "elevenlabs",
-        model: "elevenlabs",
+        model: modelId || "eleven_v3",
         idempotencyKey,
       },
     });
 
+    const ttsOptions: TTSOptions = {
+      ...(modelId && { modelId }),
+      ...(outputFormat && { outputFormat }),
+      ...(languageCode && { languageCode }),
+      ...(voiceSettings && { voiceSettings }),
+    };
+
     await prisma.runInput.create({
-      data: { runId: run.id, payloadJson: { text, voiceId } },
+      data: { runId: run.id, payloadJson: { text, voiceId, ...ttsOptions } },
     });
 
     try {
-      const result = await runTTS(text, voiceId);
+      const result = await runTTS(text, voiceId, ttsOptions);
 
       // Upload audio to R2 storage and serve via proxy endpoint
       let audioUrl: string;
