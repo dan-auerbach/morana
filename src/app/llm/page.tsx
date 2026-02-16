@@ -418,9 +418,15 @@ export default function LLMPage() {
             backgroundColor: "#0d1117",
             display: "flex",
             alignItems: "center",
-            gap: "12px",
+            gap: "8px",
             flexShrink: 0,
+            overflowX: "auto",
+            overflowY: "hidden",
+            WebkitOverflowScrolling: "touch",
+            scrollbarWidth: "none",       // Firefox
+            msOverflowStyle: "none",      // IE/Edge
           }}
+          className="chat-header-scroll"
         >
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -442,7 +448,7 @@ export default function LLMPage() {
             [LLM]
           </span>
 
-          <span style={{ color: "#333" }}>|</span>
+          <span className="chat-sep" style={{ color: "#333" }}>|</span>
 
           <select
             value={selectedModelId}
@@ -465,7 +471,7 @@ export default function LLMPage() {
 
           {templates.length > 0 && (
             <>
-              <span style={{ color: "#333" }}>|</span>
+              <span className="chat-sep" style={{ color: "#333" }}>|</span>
               <select
                 value={selectedTemplateId}
                 onChange={(e) => handleTemplateChange(e.target.value)}
@@ -492,7 +498,7 @@ export default function LLMPage() {
 
           {knowledgeBases.length > 0 && (
             <>
-              <span style={{ color: "#333" }}>|</span>
+              <span className="chat-sep" style={{ color: "#333" }}>|</span>
               <select
                 value={selectedKBIds[0] || ""}
                 onChange={(e) => {
@@ -530,7 +536,7 @@ export default function LLMPage() {
 
           {isOpenAIModel && (
             <>
-              <span style={{ color: "#333" }}>|</span>
+              <span className="chat-sep" style={{ color: "#333" }}>|</span>
               <button
                 onClick={() => {
                   const next = !webSearchEnabled;
@@ -577,7 +583,7 @@ export default function LLMPage() {
 
           {activeConv && (
             <>
-              <span style={{ color: "#333" }}>|</span>
+              <span className="chat-sep" style={{ color: "#333" }}>|</span>
               <span style={{ color: "#5a6a7a", fontSize: "12px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {activeConv.title}
               </span>

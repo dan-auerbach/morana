@@ -158,7 +158,21 @@ input:focus, textarea:focus, select:focus {
   .admin-detail-stats {
     grid-template-columns: 1fr !important;
   }
+
+  /* Chat header: wrap controls on mobile */
+  .chat-header-scroll {
+    flex-wrap: wrap !important;
+    overflow-x: visible !important;
+    gap: 6px !important;
+    padding: 8px 12px !important;
+  }
+  .chat-header-scroll .chat-sep {
+    display: none !important;
+  }
 }
+
+/* Hide scrollbar for chat header horizontal scroll (desktop) */
+.chat-header-scroll::-webkit-scrollbar { display: none; }
 
 /* Small phone */
 @media (max-width: 480px) {
