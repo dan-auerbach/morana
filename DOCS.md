@@ -524,11 +524,11 @@ Indeksi: `email`, `createdAt`, `event`
 | Endpoint | Metoda | CSRF | Opis |
 |----------|--------|------|------|
 | `/api/conversations` | GET | — | Seznam pogovorov uporabnika (workspace-scoped) |
-| `/api/conversations` | POST | ✅ | Ustvari nov pogovor (z modelId, templateId, knowledgeBaseIds) |
-| `/api/conversations/[id]` | GET | — | Podrobnosti pogovora z sporočili |
-| `/api/conversations/[id]` | PATCH | ✅ | Posodobi model, template, knowledgeBaseIds |
+| `/api/conversations` | POST | ✅ | Ustvari nov pogovor (z modelId, templateId, knowledgeBaseIds, webSearchEnabled) |
+| `/api/conversations/[id]` | GET | — | Podrobnosti pogovora z sporočili (vključno s citationsJson) |
+| `/api/conversations/[id]` | PATCH | ✅ | Posodobi model, template, knowledgeBaseIds, webSearchEnabled |
 | `/api/conversations/[id]` | DELETE | ✅ | Izbriši pogovor |
-| `/api/conversations/[id]/messages` | POST | ✅ | Pošlji sporočilo, prejmi AI odgovor (maxDuration: 60s). Avtomatsko: template system prompt, RAG retrieval, URL fetching |
+| `/api/conversations/[id]/messages` | POST | ✅ | Pošlji sporočilo (body: `{ content, webSearch? }`), prejmi AI odgovor (maxDuration: 60s). Avtomatsko: template system prompt, RAG retrieval, URL fetching. Če `webSearch: true` ali `conversation.webSearchEnabled` in OpenAI model → uporabi Responses API z web search. Response vključuje `citations[]` če so na voljo. |
 
 ### Run Endpoints
 
@@ -786,6 +786,8 @@ Workspace omogoča izolacijo podatkov med različnimi ekipami ali projekti. Vsak
 
 Workspace-scoped entitete (imajo `workspaceId`): Conversation, PromptTemplate, KnowledgeBase, Recipe, Run, UsageEvent
 
+**LLM chat workspace propagation:** Ko uporabnik pošlje sporočilo v LLM chatu, se `workspaceId` iz conversacije propagira v `Run` in `UsageEvent` zapise. To zagotavlja, da so vsi LLM klici (vključno z web search) vidni v workspace-scoped usage pogledu.
+
 ### Admin UI (`/admin/workspaces`)
 
 - Ustvari/uredi workspace
@@ -1017,7 +1019,7 @@ Preverjanja pred vsako AI operacijo:
 Dashboard z ASCII art logotipom in pregledom orodij.
 
 ### LLM (`/llm`)
-Multi-turn chat vmesnik. Sidebar s seznamom pogovorov. Izbira modela (Anthropic/OpenAI/Gemini), prompt template in knowledge base per-conversation. Avtomatski naslovi pogovorov. Cost preview med tipkanjem. Avtomatsko URL fetching.
+Multi-turn chat vmesnik. Sidebar s seznamom pogovorov. Izbira modela (Anthropic/OpenAI/Gemini), prompt template in knowledge base per-conversation. **Web Search toggle** (modri "WEB" gumb, viden samo za OpenAI modele) — vklopi OpenAI Responses API z web_search_preview za aktualne podatke s citati. Citati se prikažejo pod assistant sporočilom v modrem "SOURCES" bloku s klikljivimi linki. Ob prehodu na non-OpenAI model se web search avtomatsko izklopi. Avtomatski naslovi pogovorov. Cost preview med tipkanjem. Avtomatsko URL fetching. Header kontrole se na mobile wrapajo v več vrstic.
 
 ### STT (`/stt`)
 Upload audio datoteke ali URL. Izbira jezika (SL/EN). SSRF zaščita za URL fetch. Rezultat transkripcije z latency statistiko. Cost preview. Sidebar z zgodovino.
@@ -1182,6 +1184,8 @@ npx prisma migrate deploy
 ### v2.3.0 (2026-02-16)
 
 - **Web Search mode (OpenAI Responses API):** Opcijski web search za LLM chat z GPT-4o. Uporablja `web_search_preview` tool z `search_context_size: "low"` za stroškovno optimizacijo. Citati (URL + title) se ekstrahirajo iz `url_citation` anotacij in shranijo v `Message.citationsJson`. Toggle v LLM header (viden samo za OpenAI modele), modra (#0096ff) barva. Fallback na standardni chat ob napaki Responses API. Per-conversation `webSearchEnabled` flag + per-message `webSearch` flag.
+- **LLM chat workspace scoping fix:** Run in UsageEvent zapisi iz LLM chata zdaj pravilno dedujejo `workspaceId` iz conversacije. Prej so imeli `null`, kar je povzročalo, da web search (in drugi LLM) klici niso bili vidni v workspace-scoped usage pogledu.
+- **Responsive LLM chat header:** Header kontrole (model, template, KB, web search toggle) se na mobile (≤768px) wrapajo v naslednjo vrstico, pipe separatorji se skrijejo. Desktop ima horizontal scroll z hidden scrollbar za overflow.
 
 ### v2.2.0 (2026-02-16)
 
