@@ -1,9 +1,10 @@
 # MORANA — Internal AI Operations Terminal
 
-**Version:** 2.0.0
+**Version:** 2.1.0
 **Stack:** Next.js 16 | React 19 | TypeScript | Prisma 7 | PostgreSQL (Neon) + pgvector | Tailwind CSS 4
 **Hosting:** Vercel (serverless) | Cloudflare R2 (storage)
 **UI Theme:** Dark hacker/terminal aesthetic
+**URL:** morana.mojimediji.si
 
 ---
 
@@ -17,7 +18,7 @@ MORANA je interni AI operations terminal za medijsko podjetje. Združuje več AI
 | **STT** | Soniox | Transkripcija zvoka (SL, EN) |
 | **TTS** | ElevenLabs | Sinteza govora z izbiro glasov |
 | **Image** | Google Gemini 2.5 Flash | Generiranje in urejanje slik |
-| **Recipes** | Multi-provider | Multi-step AI pipeline builder |
+| **Recipes** | Multi-provider | Multi-step AI pipeline builder z audio podporo |
 | **Jobs** | — | Background job dashboard z monitoring |
 
 ### Ključne zmožnosti
@@ -30,22 +31,26 @@ MORANA je interni AI operations terminal za medijsko podjetje. Združuje več AI
 - SSRF zaščita z DNS resolucijo in IP blocklisto
 - Security headerji na vseh response-ih (HSTS, CSP, X-Frame-Options, nosniff)
 - robots.txt ki blokira vse crawlerje in AI bote
-- Admin panel za upravljanje uporabnikov, templateov, knowledge base, receptov in logov
-- Prompt template sistem (admin-managed system prompts)
+- **Workspace multi-tenancy** — več workspaceov z ločenimi podatki in member roles
+- Admin panel za upravljanje uporabnikov, templateov, knowledge base, receptov, workspaceov in logov
+- Prompt template sistem z versioniranjem (admin-managed system prompts)
 - RAG knowledge base s pgvector embeddingi (PDF/TXT upload)
 - Avtomatsko URL fetching iz uporabniških sporočil (Mozilla Readability)
 - Cost preview pred vsako AI operacijo
-- Multi-step AI recepti (pipeline builder)
+- **Multi-step AI recepti z audio input podporo** (file upload, URL, transcript paste)
+- **Recipe preset sistem** — preddefinirani pipelini (NOVINAR) z one-click instantiation
 - Background job dashboard z cancel/retry
 - Per-user rate limiting (dnevni runi, mesečni stroški v centih)
 - Globalni mesečni stroškovni cap (GLOBAL_MAX_MONTHLY_COST_CENTS)
+- Workspace-level stroškovni cap in model omejitve
 - Beleženje porabe in stroškov po modelu (integer centi, brez float zaokroževanja)
 - MIME magic-bytes validacija za file uploade
 - Error message sanitizacija (brez internih leakov)
-- Responsive dizajn za mobilne naprave
-- Cloudflare R2 storage za datoteke in TTS audio
+- **Responsive nav z admin dropdownom, user dropdownom in overflow sistemom**
+- Cloudflare R2 storage za datoteke, TTS audio in recipe audio uploade
 - Inngest async task queue za dolgotrajne procese (zahteva signing key)
 - Vercel deployment z maxDuration za dolgotrajne API route
+- **MORANA branded favicon** (zeleni terminal square)
 
 ---
 
@@ -66,19 +71,21 @@ src/
       jobs/               # Background job dashboard API
       knowledge/          # Public KB endpoint
       models/             # Seznam odobrenih modelov + pricing
-      recipes/            # Recipe CRUD, execution, steps API
+      recipes/            # Recipe CRUD, execution, steps, presets API
       runs/               # STT, TTS, LLM, Image run endpoints
       templates/          # Public template endpoint
       usage/              # Statistika porabe
       voices/             # ElevenLabs glasovi
+      workspaces/         # Workspace list + switch API
       inngest/            # Inngest webhook handler (zahteva INNGEST_SIGNING_KEY)
     components/           # React komponente (Nav, CostPreview, SessionProvider)
     admin/
       page.tsx            # Admin dashboard
       templates/          # Prompt template management
       knowledge/          # Knowledge base management
-      recipes/            # Recipe builder
+      recipes/            # Recipe builder z step config paneli
       auth-logs/          # Auth log viewer
+      workspaces/         # Workspace management
     llm/                  # LLM chat stran
     stt/                  # STT stran
     tts/                  # TTS stran
@@ -89,6 +96,9 @@ src/
     usage/                # Poraba stran
     globals.css           # Globalni stili + responsive CSS
     layout.tsx            # Root layout
+    favicon.ico           # MORANA favicon (multi-size ICO)
+    icon.png              # 32x32 PNG favicon
+    apple-icon.png        # 180x180 Apple touch icon
   lib/                    # Backend logika
     providers/
       llm.ts              # Anthropic + OpenAI + Gemini LLM
@@ -105,22 +115,21 @@ src/
     prisma.ts             # Prisma client singleton + pg.Pool
     rag.ts                # RAG: chunking, embedding search, context building
     rate-limit.ts         # Per-user rate limiting
-    recipe-engine.ts      # Sequential recipe step execution engine
+    recipe-engine.ts      # Sequential recipe step execution engine (STT + LLM + output)
+    recipe-presets.ts     # Preddefinirani recipe preseti (NOVINAR)
     session.ts            # Session utilities (withAuth wrapper + CSRF)
-    storage.ts            # Cloudflare R2 S3 storage
+    storage.ts            # Cloudflare R2 S3 storage (upload + download)
     url-fetcher.ts        # URL detection + Readability content extraction
     url-validate.ts       # SSRF zaščita (DNS resolucija, IP blocklist)
     usage.ts              # Usage event logging
+    workspace.ts          # Workspace utilities (getActiveWorkspaceId)
     inngest/              # Async job definitions
   middleware.ts           # Auth + bot blocking + security headers
   generated/prisma/       # Auto-generated Prisma client
   types/                  # TypeScript deklaracije
-public/
-  robots.txt              # Disallow all crawlers + AI bots
 prisma/
   schema.prisma           # Database schema
   migrations/             # SQL migracije
-.env.example              # Dokumentacija vseh env spremenljivk
 ```
 
 ---
@@ -144,7 +153,7 @@ Middleware teče na Edge runtime pred vsakim requestom:
 - `/api/auth/*` — NextAuth endpointi
 - `/api/inngest` — Inngest webhook (ima lastno signing key avtentikacijo)
 - `/_next/*` — Next.js statični asseti
-- `/favicon.ico`, `/robots.txt`
+- `/favicon.ico`, `/icon.png`, `/apple-icon.png`, `/robots.txt`
 
 ### Auth logging (`src/lib/auth.ts`)
 
@@ -210,8 +219,34 @@ Vsi API route catch blocki:
 | `DocumentStatus` | `pending`, `processing`, `ready`, `error` |
 | `RecipeStatus` | `draft`, `active`, `archived` |
 | `ExecutionStatus` | `pending`, `running`, `done`, `error`, `cancelled` |
+| `WorkspaceRole` | `member`, `admin` |
 
 ### Modeli
+
+#### Workspace
+Workspace za multi-tenant izolacijo podatkov.
+
+| Polje | Tip | Opis |
+|-------|-----|------|
+| `id` | String (cuid) | Primarni ključ |
+| `name` | String | Ime workspacea |
+| `slug` | String (unique) | URL-friendly identifikator |
+| `isActive` | Boolean | Ali je workspace aktiven |
+| `maxMonthlyCostCents` | Int? | Workspace mesečni stroškovni cap (v centih) |
+| `allowedModels` | Json? | JSON array model ID-jev (null = vsi) |
+
+Relacije: `members`, `conversations`, `promptTemplates`, `knowledgeBases`, `recipes`, `runs`, `usageEvents`
+
+#### WorkspaceMember
+Članstvo uporabnika v workspaceu.
+
+| Polje | Tip | Opis |
+|-------|-----|------|
+| `workspaceId` | String | FK na Workspace |
+| `userId` | String | FK na User |
+| `role` | WorkspaceRole | `member` ali `admin` |
+
+Unique constraint: `[workspaceId, userId]`
 
 #### User
 Uporabniški profil z role-based access control in per-user limiti.
@@ -226,9 +261,10 @@ Uporabniški profil z role-based access control in per-user limiti.
 | `maxRunsPerDay` | Int? | Per-user dnevni limit (null = globalni default) |
 | `maxMonthlyCostCents` | Int? | Mesečni limit stroškov v **centih** (integer) |
 | `allowedModels` | Json? | JSON array model ID stringov (null = vsi modeli) |
+| `activeWorkspaceId` | String? | Trenutno aktivni workspace |
 | `lastLoginAt` | DateTime | Zadnja prijava (posodobljeno max 1x/uro) |
 
-Relacije: `runs`, `files`, `usageEvents`, `accounts`, `sessions`, `conversations`, `promptTemplates`, `knowledgeBases`, `recipes`, `recipeExecutions`
+Relacije: `runs`, `files`, `usageEvents`, `accounts`, `sessions`, `conversations`, `promptTemplates`, `knowledgeBases`, `recipes`, `recipeExecutions`, `workspaceMemberships`, `templateVersions`
 
 #### Conversation
 Multi-turn LLM pogovori.
@@ -237,12 +273,13 @@ Multi-turn LLM pogovori.
 |-------|-----|------|
 | `id` | String (cuid) | Primarni ključ |
 | `userId` | String | FK na User |
+| `workspaceId` | String? | FK na Workspace |
 | `title` | String | Naslov pogovora |
 | `modelId` | String | ID izbranega modela |
 | `templateId` | String? | FK na PromptTemplate |
 | `knowledgeBaseIds` | Json? | JSON array KB ID-jev za RAG |
 
-Relacije: `user`, `messages`
+Relacije: `user`, `messages`, `workspace`
 
 #### Message
 Sporočila znotraj pogovora.
@@ -257,7 +294,7 @@ Sporočila znotraj pogovora.
 | `runId` | String? | FK na Run |
 
 #### PromptTemplate
-Admin-managed prompt predloge za LLM chat.
+Admin-managed prompt predloge za LLM chat z versioniranjem.
 
 | Polje | Tip | Opis |
 |-------|-----|------|
@@ -269,7 +306,23 @@ Admin-managed prompt predloge za LLM chat.
 | `knowledgeText` | Text? | Statično referenčno besedilo |
 | `isActive` | Boolean | Ali je template aktiven |
 | `sortOrder` | Int | Vrstni red prikaza |
+| `workspaceId` | String? | FK na Workspace |
 | `createdBy` | String | FK na User (admin) |
+
+Relacije: `creator`, `versions`, `workspace`
+
+#### PromptTemplateVersion
+Verzije prompt templateov (audit trail).
+
+| Polje | Tip | Opis |
+|-------|-----|------|
+| `templateId` | String | FK na PromptTemplate |
+| `version` | Int | Verzija (auto-increment per template) |
+| `systemPrompt` | Text | System prompt v tej verziji |
+| `userPromptTemplate` | Text? | User prompt template v tej verziji |
+| `knowledgeText` | Text? | Knowledge text v tej verziji |
+| `changedBy` | String | FK na User (admin ki je spremenil) |
+| `changeNote` | String? | Opis spremembe |
 
 #### KnowledgeBase
 RAG knowledge base za kontekstualizacijo LLM odgovorov.
@@ -279,9 +332,10 @@ RAG knowledge base za kontekstualizacijo LLM odgovorov.
 | `name` | String | Ime KB |
 | `description` | Text? | Opis |
 | `isActive` | Boolean | Ali je KB aktivna |
+| `workspaceId` | String? | FK na Workspace |
 | `createdBy` | String | FK na User (admin) |
 
-Relacije: `creator`, `documents`
+Relacije: `creator`, `documents`, `workspace`
 
 #### Document
 Dokumenti znotraj knowledge base.
@@ -308,16 +362,23 @@ Chunki dokumentov z vektorskimi embeddingi.
 | `embedding` | vector(1536) | pgvector embedding (via raw SQL) |
 
 #### Recipe
-Multi-step AI pipeline definicije.
+Multi-step AI pipeline definicije z input konfiguracijami.
 
 | Polje | Tip | Opis |
 |-------|-----|------|
 | `name` | String | Ime recepta |
 | `slug` | String (unique) | URL-friendly identifikator |
 | `status` | RecipeStatus | `draft`, `active`, `archived` |
+| `isPreset` | Boolean | Ali je recept iz preseta (read-only identifikator) |
+| `presetKey` | String? (unique) | Unikaten preset ključ (npr. "novinar") |
+| `inputKind` | String | Tip vhoda: `text`, `audio`, `image`, `none` |
+| `inputModes` | Json? | Dovoljeni input načini: `["file", "url", "text"]` |
+| `defaultLang` | String? | Privzeti jezik (npr. `sl`, `en`) |
+| `uiHints` | Json? | UI namigi za frontend (npr. acceptAudio, maxFileSizeMB) |
+| `workspaceId` | String? | FK na Workspace |
 | `createdBy` | String | FK na User (admin) |
 
-Relacije: `creator`, `steps`, `executions`
+Relacije: `creator`, `steps`, `executions`, `workspace`
 
 #### RecipeStep
 Posamezni koraki recepta.
@@ -328,7 +389,14 @@ Posamezni koraki recepta.
 | `stepIndex` | Int | Vrstni red koraka |
 | `name` | String | Ime koraka |
 | `type` | String | `stt`, `llm`, `tts`, `image`, `output_format` |
-| `config` | Json | Step-specific konfiguracija |
+| `config` | Json | Step-specific konfiguracija (glej spodaj) |
+
+**Config po tipu:**
+- **`stt`:** `{ provider, language, description }`
+- **`llm`:** `{ modelId, systemPrompt, userPromptTemplate, templateId?, knowledgeBaseIds? }`
+- **`tts`:** `{ voiceId }`
+- **`image`:** `{ promptTemplate }`
+- **`output_format`:** `{ formats: ["markdown", "html", "json", "drupal_json"] }`
 
 #### RecipeExecution
 Izvedbe receptov.
@@ -341,7 +409,7 @@ Izvedbe receptov.
 | `progress` | Int | Napredek v % |
 | `currentStep` | Int | Trenutni korak |
 | `totalSteps` | Int | Skupno korakov |
-| `inputData` | Json? | Vhodni podatki |
+| `inputData` | Json? | Vhodni podatki (text, transcriptText, audioStorageKey, audioUrl, language) |
 
 Relacije: `recipe`, `user`, `stepResults`
 
@@ -387,11 +455,22 @@ Indeksi: `email`, `createdAt`, `event`
 |----------|--------|------|
 | `/api/auth/[...nextauth]` | * | NextAuth Google OAuth handler |
 
+### Workspaces
+
+| Endpoint | Metoda | Opis |
+|----------|--------|------|
+| `/api/workspaces` | GET | Seznam workspaceov uporabnika + activeWorkspaceId |
+| `/api/workspaces` | POST | Preklopi aktivni workspace (body: `{ workspaceId }`) |
+| `/api/admin/workspaces` | GET | Vsi workspacei s člani (admin) |
+| `/api/admin/workspaces` | POST | Ustvari workspace (admin) |
+| `/api/admin/workspaces/[id]` | PATCH | Posodobi workspace (admin) |
+| `/api/admin/workspaces/[id]/members` | POST | Dodaj/odstrani člana (admin) |
+
 ### LLM Chat
 
 | Endpoint | Metoda | CSRF | Opis |
 |----------|--------|------|------|
-| `/api/conversations` | GET | — | Seznam pogovorov uporabnika |
+| `/api/conversations` | GET | — | Seznam pogovorov uporabnika (workspace-scoped) |
 | `/api/conversations` | POST | ✅ | Ustvari nov pogovor (z modelId, templateId, knowledgeBaseIds) |
 | `/api/conversations/[id]` | GET | — | Podrobnosti pogovora z sporočili |
 | `/api/conversations/[id]` | PATCH | ✅ | Posodobi model, template, knowledgeBaseIds |
@@ -412,16 +491,16 @@ Indeksi: `email`, `createdAt`, `event`
 
 | Endpoint | Metoda | Opis |
 |----------|--------|------|
-| `/api/templates` | GET | Seznam aktivnih templateov (public) |
+| `/api/templates` | GET | Seznam aktivnih templateov (public, workspace-scoped) |
 | `/api/admin/templates` | GET | Vsi templati (admin) |
 | `/api/admin/templates` | POST | Ustvari template (admin) |
-| `/api/admin/templates/[id]` | GET, PATCH, DELETE | CRUD za posamezen template (admin) |
+| `/api/admin/templates/[id]` | GET, PATCH, DELETE | CRUD za posamezen template (admin). PATCH avtomatsko ustvari verzijo. |
 
 ### Knowledge Base (RAG)
 
 | Endpoint | Metoda | Opis |
 |----------|--------|------|
-| `/api/knowledge` | GET | Seznam aktivnih KB (public) |
+| `/api/knowledge` | GET | Seznam aktivnih KB (public, workspace-scoped) |
 | `/api/admin/knowledge` | GET, POST | Seznam / ustvari KB (admin) |
 | `/api/admin/knowledge/[id]` | GET, PATCH, DELETE | CRUD za KB (admin) |
 | `/api/admin/knowledge/[id]/documents` | GET, POST | Seznam / upload dokument (admin, maxDuration: 120s) |
@@ -431,11 +510,13 @@ Indeksi: `email`, `createdAt`, `event`
 
 | Endpoint | Metoda | Opis |
 |----------|--------|------|
-| `/api/recipes` | GET | Seznam receptov (active za userje, vsi za admin) |
-| `/api/recipes` | POST | Ustvari recept (admin) |
+| `/api/recipes` | GET | Seznam receptov (active za userje, vsi za admin; workspace-scoped) |
+| `/api/recipes` | POST | Ustvari recept z inputKind, inputModes, defaultLang, uiHints (admin) |
 | `/api/recipes/[id]` | GET, PATCH, DELETE | CRUD za recept (admin) |
 | `/api/recipes/[id]/steps` | PUT | Zamenjaj vse korake recepta (admin) |
-| `/api/recipes/[id]/execute` | POST | Zaženi izvedbo (maxDuration: 300s) |
+| `/api/recipes/[id]/execute` | POST | Zaženi izvedbo (maxDuration: 300s). Podpira JSON in multipart/form-data za audio upload. **Execution je sinhrona** — endpoint vrne šele ko se pipeline zaključi. |
+| `/api/recipes/presets` | GET | Seznam dostopnih presetov (admin) |
+| `/api/recipes/presets` | POST | Instantiiraj preset kot recept (admin, body: `{ presetKey }`) |
 | `/api/recipes/executions` | GET | Seznam uporabnikovih izvedb |
 | `/api/recipes/executions/[id]` | GET | Podrobnosti izvedbe |
 | `/api/recipes/executions/[id]` | POST | Cancel izvedbo |
@@ -511,6 +592,7 @@ Async transkripcija prek Soniox REST API:
 3. Polling do zaključka (max 3 min)
 4. Preberi transkript
 5. Cleanup uploada
+6. Na timeout: cancela job in pobriše upload
 
 **Model:** `stt-async-v4` | **Jeziki:** SL, EN | **Cena:** $0.35/min
 
@@ -538,7 +620,7 @@ Za RAG knowledge base. Uporablja `text-embedding-3-small` (1536 dimenzij).
 
 ## Prompt Template System
 
-**Admin:** `/admin/templates` — CRUD za prompt template
+**Admin:** `/admin/templates` — CRUD za prompt template z versioniranjem
 
 Template vsebuje:
 - **System prompt** — nativno poslan LLM-u (ne kot user message)
@@ -547,6 +629,8 @@ Template vsebuje:
 - **Kategorija** — za organizacijo (general, creative, technical...)
 
 Uporabnik izbere template v LLM chat headerju. Template se shrani na conversacijo (`templateId`). System prompt se vsakič naloži iz DB in inject-a v LLM klic.
+
+**Versioniranje:** Ob vsaki spremembi (PATCH) se avtomatsko ustvari `PromptTemplateVersion` z verzijo, starimi vrednostmi in `changedBy`. Admin lahko pregleduje zgodovino sprememb.
 
 ---
 
@@ -618,35 +702,130 @@ Real-time ocena stroškov pred izvedbo operacije:
 
 ---
 
+## Workspace Multi-Tenancy
+
+### Koncept
+
+Workspace omogoča izolacijo podatkov med različnimi ekipami ali projekti. Vsak uporabnik je lahko član več workspaceov.
+
+### Struktura
+
+- **Workspace** — entiteta z imenom, slugom in opcijskimi limiti (mesečni cost cap, allowed models)
+- **WorkspaceMember** — many-to-many med User in Workspace z role (`member` ali `admin`)
+- **Active workspace** — User ima `activeWorkspaceId` ki se shrani v DB in cookie; preklop z workspace switcherjem v nav baru
+
+### Scoping
+
+Workspace-scoped entitete (imajo `workspaceId`): Conversation, PromptTemplate, KnowledgeBase, Recipe, Run, UsageEvent
+
+### Admin UI (`/admin/workspaces`)
+
+- Ustvari/uredi workspace
+- Dodaj/odstrani člane
+- Nastavi workspace-level limite
+
+### Workspace switcher (Nav)
+
+Desktop: orange "Default ▼" dropdown pred user dropdownom (prikazan samo ko > 1 workspace).
+Mobile: workspace buttons v account sekciji hamburger menija.
+
+---
+
 ## AI Recipes (Pipeline Builder)
 
 ### Koncept
 
-Recipe je multi-step AI pipeline. Admin definira korake (npr. STT → LLM summarize → TTS), uporabnik zažene z vhodnimi podatki. Koraki se izvajajo sekvenčno, output enega koraka je input naslednjega.
+Recipe je multi-step AI pipeline. Admin definira korake (npr. STT → LLM članek → LLM SEO → Drupal output), uporabnik zažene z vhodnimi podatki. Koraki se izvajajo sekvenčno, output enega koraka je input naslednjega.
+
+### Input konfiguracija
+
+Vsak recept ima `inputKind` ki določa tip vhoda in `inputModes` ki definira dovoljene načine vnosa:
+
+| inputKind | inputModes | UI |
+|-----------|------------|-----|
+| `text` | `["text"]` | Textarea za paste besedila |
+| `audio` | `["file", "url", "text"]` | Tabs: Upload file / Audio URL / Paste transcript |
+| `image` | `["file", "url"]` | Upload ali URL |
+| `none` | `[]` | Brez vhoda (samo pipeline koraki) |
+
+Za audio recepte (npr. NOVINAR):
+- **File upload:** Audio se uploada na R2 (`recipes/{recipeId}/{uuid}/{filename}`), reference se shrani v `inputData.audioStorageKey`
+- **Audio URL:** URL se shrani v `inputData.audioUrl`
+- **Transcript paste:** Besedilo se shrani v `inputData.transcriptText` — STT korak se avtomatsko preskoči
+
+### Recipe preseti (`src/lib/recipe-presets.ts`)
+
+Preddefinirani pipeline templati za one-click creation:
+
+**NOVINAR preset:**
+```
+Audio → Transkripcija (Soniox SL) → Članek (GPT-4o-mini) → SEO (GPT-4o-mini) → Drupal Output
+```
+- Input: audio file, URL, ali transcript
+- Output: Drupal-ready JSON s člankom, SEO metapodatki, HTML body
+
+Admin vidi presete na `/recipes` in jih lahko instantiira z enim klikom. Preset ustvari Recipe + RecipeSteps v bazi.
 
 ### Execution engine (`src/lib/recipe-engine.ts`)
 
 ```
 executeRecipe(executionId):
   for each step:
-    1. Update progress (step N/total, %)
-    2. Create Run record for cost tracking
-    3. Execute step (LLM, STT, TTS, Image, output_format)
-    4. Pipe output → next step input
-    5. Save step result (inputPreview, outputPreview, outputFull)
+    1. Check if execution was cancelled
+    2. Create step result record (status: running)
+    3. Update execution progress (step N/total, %)
+    4. Execute step based on type:
+       - stt: skip if transcript provided, else fetch audio from R2/URL → Soniox
+       - llm: build prompt from config → runLLMChat → cost tracking
+       - output_format: format text as markdown/html/json/drupal_json
+       - tts/image: placeholder (not yet implemented in pipeline)
+    5. Pipe output → next step input
+    6. Save step result (inputPreview, outputPreview, outputFull)
   Mark execution as done/error
 ```
 
-**Step tipi:**
-- `llm` — LLM klic z system prompt iz config
-- `stt` — Speech-to-text
-- `tts` — Text-to-speech
-- `image` — Image generation
-- `output_format` — Text transformation/formatting
+**STT skip logika:**
+1. Če `inputData.transcriptText` obstaja → preskoči STT, uporabi transcript
+2. Če previousOutput ima besedilo (text input mode) → preskoči STT
+3. Sicer → naloži audio iz R2 ali URL → poženi Soniox STT
 
-**Admin:** `/admin/recipes` — Recipe builder s form-based step management
-**User:** `/recipes` — Seznam receptov, execute z text inputom, execution history z auto-polling
-**Detail:** `/recipes/[id]` — Step-by-step progress, rezultati posameznih korakov
+**Execution je sinhrona:** API endpoint (`/api/recipes/[id]/execute`) čaka na zaključek celotnega pipelinea pred vrnitvijo response (z `maxDuration: 300s`). Frontend prikaže "RUNNING..." stanje med čakanjem, nato redirecta na execution detail stran.
+
+**Cost tracking:** Vsak STT in LLM korak ustvari `Run` zapis za sledenje stroškov. STT koraki logirajo tudi trajanje v minutah za Soniox pricing.
+
+**Output formati:**
+- `markdown` — besedilo kot markdown
+- `html` — pretvori markdown paragrafe v HTML
+- `json` — JSON z vsebino in timestampom
+- `drupal_json` — NOVINAR-specific format: extrahira SEO JSON, sestavi article HTML, združi v Drupal payload
+
+### Admin UI (`/admin/recipes`)
+
+Recipe builder s form-based step management:
+- **Recipe info:** ime, opis, status, inputKind, defaultLang, inputModes
+- **Steps:** add/remove/reorder z up/down puščicami
+- **Step config paneli po tipu:**
+  - LLM: modelId select, systemPrompt textarea, userPromptTemplate textarea
+  - STT: provider, language
+  - TTS: voiceId
+  - Image: promptTemplate
+  - Output format: format checkboxes
+- **Badges:** PRESET, AUDIO, step type badges
+- **Preset instantiation:** one-click creation iz presetov
+
+### User UI (`/recipes`)
+
+- Seznam aktivnih receptov z opisom in step pregledom
+- Input mode tabs za audio recepte (Upload / URL / Transcript)
+- Language selector (SL / EN)
+- File upload z drag-and-click (prikaže ime in velikost)
+- "RUNNING..." stanje z blinking animacijo med čakanjem
+- Avtomatski redirect na execution detail po zaključku
+- Execution history z auto-polling (3s)
+
+### Execution Detail (`/recipes/[id]`)
+
+Step-by-step timeline s statusom, trajanjem, inputom in outputom. Auto-polling za running izvedbe.
 
 ---
 
@@ -670,6 +849,41 @@ Centraliziran pregled vseh recipe izvedb:
 - `GET /api/jobs` — seznam (admin vidi vse)
 - `GET /api/jobs/[id]` — detail s step results
 - `POST /api/jobs/[id]` — cancel ali retry (`{ action: "cancel" | "retry" }`)
+
+---
+
+## Navigacija
+
+### Desktop nav (>950px)
+
+```
+[MORANA] // >LLM >STT >TTS >Image >Recipes >Jobs >History >Usage    Admin▼  Default▼  Mitja▼
+```
+
+- **Primarni linki** (center): LLM, STT, TTS, Image, Recipes, Jobs, History, Usage
+- **Admin dropdown** (desno, rdeč): Recipes, Templates, Knowledge, Auth Logs, Workspaces, Dashboard — vidno samo za admin
+- **Workspace switcher** (desno, oranžen): prikazan samo ko > 1 workspace
+- **User dropdown** (desno, zelen): prikaže first name ali email local-part; vsebuje email in sign_out
+
+### Narrow desktop (769-950px)
+
+History in Usage se skrijeta v "More ▼" dropdown. Vse ostalo enako.
+
+### Mobile (<=768px)
+
+Hamburger meni z grupiranimi sekcijami:
+- **// tools** — vsi primarni linki
+- **// admin** — admin linki (samo za admin)
+- **// account** — workspace switcher + email + sign_out
+
+### Breakpointi
+
+| Breakpoint | Obnašanje |
+|------------|-----------|
+| >950px | Polni desktop: vseh 8 primarnih linkov + Admin/WS/User dropdowni |
+| 769-950px | Narrow desktop: History+Usage v "More ▼" dropdown |
+| <=768px | Mobile: hamburger z grouped sections |
+| <=480px | Small phone: manjša pisava (13px) |
 
 ---
 
@@ -705,7 +919,7 @@ NextAuth z `session: { strategy: "jwt" }`:
 | Vloga | Dostop |
 |-------|--------|
 | `user` | LLM, STT, TTS, Image, Recipes, Jobs, History, Usage |
-| `admin` | Vse kot user + Admin panel, Templates, KB, Recipe Builder, Auth Logs |
+| `admin` | Vse kot user + Admin panel, Templates, KB, Recipe Builder, Workspaces, Auth Logs |
 
 ### Rate limiting (`src/lib/rate-limit.ts`)
 
@@ -735,7 +949,7 @@ Tekstovno polje z counter znakov. Izbira glasu iz ElevenLabs. Audio player (R2 s
 Tekstovni prompt za generiranje. Opcijski upload slike za urejanje. MIME validacija. Cost preview. Sidebar z zgodovino.
 
 ### Recipes (`/recipes`)
-Seznam aktivnih receptov z opisom. Execute z text inputom. Execution history z auto-polling (3s). Expandable detail s step-by-step rezultati.
+Seznam aktivnih receptov z opisom in step badges. Audio recepti imajo input mode tabs (file/URL/transcript), language selector in file upload. Execute gumb z "RUNNING..." blinking animacijo. Avtomatski redirect na detail po zaključku. Execution history z auto-polling (3s).
 
 ### Recipe Detail (`/recipes/[id]`)
 Execution progress bar. Step-by-step timeline s statusom, trajanjem, inputom in outputom. Auto-polling za running izvedbe.
@@ -753,16 +967,19 @@ Statistika porabe po datumu. Stroški po modelu (v centih). Tabelarični pregled
 Tabela uporabnikov z inline urejanjem. Obrazec za dodajanje novih uporabnikov.
 
 ### Admin Templates (`/admin/templates`)
-CRUD za prompt template. Obrazec s system prompt, knowledge text, kategorijo.
+CRUD za prompt template z versioniranjem. Obrazec s system prompt, knowledge text, kategorijo. Pregled verzij.
 
 ### Admin Knowledge (`/admin/knowledge`)
 Knowledge base management. Upload dokumentov (PDF/TXT). Pregled dokumentov in stanja procesiranja.
 
 ### Admin Recipes (`/admin/recipes`)
-Recipe builder. Form-based step management (add, remove, reorder). Step konfiguracija po tipu.
+Recipe builder. Form-based step management (add, remove, reorder z puščicami). Step konfiguracija po tipu (LLM: model/system prompt/user prompt, STT: provider/language, itd.). Input config sekcija (inputKind, inputModes, defaultLang). Preset instantiation. PRESET in AUDIO badges.
 
 ### Admin Auth Logs (`/admin/auth-logs`)
 Tabela vseh auth poskusov. Filtriranje po emailu in event tipu. Statistike (denied 24h/7d, unique IPs). Expandable detajli z IP, user-agent, geo, razlogom.
+
+### Admin Workspaces (`/admin/workspaces`)
+Workspace management. Ustvari/uredi workspace. Dodaj/odstrani člane. Workspace-level limiti.
 
 ---
 
@@ -816,7 +1033,7 @@ Tabela vseh auth poskusov. Filtriranje po emailu in event tipu. Statistike (deni
 | `/api/runs/image` | 60s | Gemini image generiranje |
 | `/api/conversations/[id]/messages` | 60s | LLM chat + URL fetch + RAG |
 | `/api/admin/knowledge/[id]/documents` | 120s | Document processing (extract → chunk → embed) |
-| `/api/recipes/[id]/execute` | 300s | Multi-step recipe execution |
+| `/api/recipes/[id]/execute` | 300s | Multi-step recipe execution (sinhrono — čaka na zaključek) |
 
 ### Database migracije
 
@@ -848,7 +1065,7 @@ npx prisma migrate deploy
 | `next-auth` ^4.24 | Avtentikacija (JWT) |
 | `@auth/prisma-adapter` | NextAuth Prisma adapter |
 | `@anthropic-ai/sdk` | Claude API |
-| `openai` | GPT-4o API |
+| `openai` | GPT-4o API + Embeddings |
 | `@google/generative-ai` | Gemini API |
 | `@mozilla/readability` | Article text extraction (Reader View) |
 | `linkedom` | Server-side DOM za Readability |
@@ -865,3 +1082,23 @@ npx prisma migrate deploy
 | `tailwindcss` ^4 | CSS framework |
 | `eslint` ^9 | Linting |
 | `prisma` ^7.4.0 | Schema management + migracije |
+
+---
+
+## Changelog
+
+### v2.1.0 (2025-02-16)
+
+- **Workspace multi-tenancy:** Workspace model, members, per-workspace scoping za conversations/templates/KB/recipes/runs, workspace switcher v nav, admin workspace management
+- **Template versioniranje:** PromptTemplateVersion model, avtomatske verzije ob PATCH
+- **Recipe audio input:** inputKind/inputModes/defaultLang/uiHints polja na Recipe, multipart file upload na execute endpoint, audio file upload na R2
+- **Recipe STT execution:** Implementacija dejanskega Soniox STT v recipe engine z skip logiko za transcript input
+- **Recipe presets:** NOVINAR preset (Audio → Članek → SEO → Drupal), one-click instantiation
+- **Sinhrona recipe execution:** Execute endpoint sedaj čaka na zaključek (prej fire-and-forget ki je Vercel ubijal)
+- **Nav restructure:** Admin dropdown, user dropdown z sign_out, "More" overflow za narrow desktop, grouped mobile sections
+- **MORANA favicon:** Zeleni terminal square (ico/png/apple-icon)
+- **Admin recipe builder:** Izboljšani step config paneli, reordering, input config sekcija
+
+### v2.0.0
+
+- Začetna verzija z LLM/STT/TTS/Image moduli, prompt templates, RAG knowledge base, recipe builder, background jobs, auth security hardening
