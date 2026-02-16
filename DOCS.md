@@ -1,6 +1,6 @@
 # MORANA — Internal AI Operations Terminal
 
-**Version:** 2.4.0
+**Version:** 2.6.0
 **Stack:** Next.js 16 | React 19 | TypeScript | Prisma 7 | PostgreSQL (Neon) + pgvector | Tailwind CSS 4
 **Hosting:** Vercel (serverless) | Cloudflare R2 (storage)
 **UI Theme:** Dark hacker/terminal aesthetic
@@ -17,7 +17,8 @@ MORANA je interni AI operations terminal za medijsko podjetje. Združuje več AI
 | **LLM** | Anthropic Claude, OpenAI GPT-4o, Google Gemini | Multi-turn chat z URL fetching, RAG, prompt templates, web search |
 | **STT** | Soniox | Transkripcija zvoka (SL, EN) |
 | **TTS** | ElevenLabs | Sinteza govora z voice settings, model izbiro, SFX generiranje |
-| **Image** | Google Gemini 2.5 Flash | Generiranje in urejanje slik |
+| **Image** | Flux (fal.ai), Gemini Flash, Face Swap, FLUX.2 Edit | Generiranje, urejanje, face swap, multi-reference editing |
+| **Video** | Grok Imagine Video (fal.ai) | Text→Video, Image→Video, Video→Video |
 | **Recipes** | Multi-provider | Multi-step AI pipeline builder z audio podporo |
 | **Jobs** | — | Background job dashboard z monitoring |
 
@@ -58,6 +59,10 @@ MORANA je interni AI operations terminal za medijsko podjetje. Združuje več AI
 - Inngest async task queue za dolgotrajne procese (zahteva signing key)
 - Vercel deployment z maxDuration za dolgotrajne API route
 - **MORANA branded favicon** (zeleni terminal square)
+- **fal.ai Image integracija** — Flux Schnell (hiter draft), Flux Dev (kvaliteta), img2img
+- **Face Swap** — dedikiran model (fal-ai/face-swap) za zamenjavo obrazov z ohranjanjem podobe
+- **Multi-reference image editing** — FLUX.2 [dev] Edit za kompozicijo do 4 slik z natural language prompt
+- **Video generiranje** — Grok Imagine Video prek fal.ai (text→video, image→video, video→video), 1-15s, 480p/720p
 
 ---
 
@@ -83,7 +88,7 @@ src/
       models/             # Seznam odobrenih modelov + pricing
       recipes/            # Recipe CRUD, execution, steps, presets API
       files/[id]          # R2 file proxy endpoint (avoids CORS)
-      runs/               # STT, TTS, LLM, Image, SFX run endpoints
+      runs/               # STT, TTS, LLM, Image, SFX, Video run endpoints
       templates/          # Public template endpoint
       usage/              # Statistika porabe
       voices/             # ElevenLabs glasovi
@@ -102,7 +107,8 @@ src/
     llm/                  # LLM chat stran
     stt/                  # STT stran
     tts/                  # TTS stran
-    image/                # Image generiranje stran
+    image/                # Image generiranje stran (Flux, Face Swap, Multi-Edit)
+    video/                # Video generiranje stran (Grok Imagine Video)
     recipes/              # User recipe list + execution detail
     jobs/                 # Background job dashboard
     history/              # Zgodovina stran
@@ -118,6 +124,8 @@ src/
       stt.ts              # Soniox STT
       tts.ts              # ElevenLabs TTS + SFX (voice settings, multi-model, sound effects)
       image.ts            # Gemini Image generiranje
+      fal-image.ts        # fal.ai Image: Flux Schnell/Dev, Face Swap, FLUX.2 Edit, Kontext Multi (legacy)
+      fal-video.ts        # fal.ai Video: Grok Imagine Video (text/img/video→video)
       embeddings.ts       # OpenAI text-embedding-3-small za RAG
     auth.ts               # NextAuth konfiguracija (JWT + auth logging)
     config.ts             # Guardrails, modeli, pricing (DB-driven z ENV fallback)
@@ -226,7 +234,7 @@ Vsi API route catch blocki:
 | Enum | Vrednosti |
 |------|-----------|
 | `Role` | `user`, `admin` |
-| `RunType` | `stt`, `llm`, `tts`, `image`, `sfx` |
+| `RunType` | `stt`, `llm`, `tts`, `image`, `sfx`, `video` |
 | `RunStatus` | `queued`, `running`, `done`, `error` |
 | `FileKind` | `input`, `output` |
 | `DocumentStatus` | `pending`, `processing`, `ready`, `error` |
@@ -539,7 +547,8 @@ Indeksi: `email`, `createdAt`, `event`
 | `/api/runs/stt` | POST | ✅ | 300s | Speech-to-text (file/URL) — zahteva Vercel Pro |
 | `/api/runs/tts` | POST | ✅ | 60s | Text-to-speech z voice settings, model izbiro (body: `text, voiceId, modelId?, outputFormat?, languageCode?, voiceSettings?`) |
 | `/api/runs/sfx` | POST | ✅ | 60s | Sound effect generiranje (body: `prompt, durationSeconds?, promptInfluence?`) |
-| `/api/runs/image` | POST | ✅ | 60s | Generiranje/urejanje slike |
+| `/api/runs/image` | POST | ✅ | 60s | Generiranje/urejanje slike (Flux, Gemini, Face Swap, Multi-Edit) |
+| `/api/runs/video` | POST | ✅ | 300s | Video generiranje (Grok Imagine — text/img/video→video) |
 | `/api/files/[id]` | GET | — | — | Proxy za R2 datoteke (audio, slike) — brez CORS problemov |
 | `/api/runs/[id]` | GET | — | — | Podrobnosti runa z input/output |
 
@@ -714,6 +723,72 @@ Async transkripcija prek Soniox REST API:
 **Datoteka:** `src/lib/providers/image.ts`
 
 **Model:** `gemini-2.5-flash-image` | **Output:** Base64 → R2 | **Cena:** ~$0.039/slika
+
+### Image — fal.ai (Flux, Face Swap, FLUX.2 Edit)
+
+**Datoteka:** `src/lib/providers/fal-image.ts`
+
+Podpira več modelov prek fal.ai Queue API:
+
+**Queue API flow:**
+```
+1. POST https://queue.fal.run/{modelId} → { request_id, status_url, response_url }
+2. GET status_url?logs=1 → poll dokler status !== "COMPLETED"
+3. GET response_url → { images: [{ url, width, height }], seed }
+4. Download slike → upload na R2
+```
+
+**Auth:** `Authorization: Key $FAL_KEY` (podpira `FAL_KEY` in `FALAI_API_KEY`)
+
+**Operacije in modeli:**
+
+| Operacija | Model | Opis | Cena |
+|-----------|-------|------|------|
+| **Generate** | `fal-ai/flux/schnell` | Hitra generacija (1–4 koraki) | $0.025/slika |
+| **Generate** | `fal-ai/flux/dev` | Kvalitetna generacija (28 korakov) | $0.055/slika |
+| **Img2Img** | `fal-ai/flux/dev/image-to-image` | Urejanje obstoječe slike | $0.055/slika |
+| **Face Swap** | `fal-ai/face-swap` | Zamenjava obraza z ohranjanjem podobe | $0.10/slika |
+| **Multi-Edit** | `fal-ai/flux-2/edit` | Multi-reference editing (do 4 slik) | $0.025/slika |
+
+**Face Swap:**
+- Input: `base_image_url` (ciljna scena) + `swap_image_url` (obraz za zamenjavo)
+- Brez prompta — specializiran model za face swapping
+- Output: `{ image: { url, width, height } }` (ena slika, ne array)
+
+**Multi-Edit (FLUX.2 [dev]):**
+- Input: `image_urls` (array do 4 slik) + `prompt` z natural language navodili
+- Parametri: `guidance_scale` (0-20, default 2.5), `num_inference_steps` (4-50, default 28), `image_size`, `seed`
+- Output: `{ images: [...], seed }` (standardni Flux format)
+- Zamenjava za Kontext Max Multi ki je imel slabo kvaliteto
+
+**SSRF zaščita:** Input slike se najprej uploadajo na R2, fal.ai dobi short-TTL signed URL (10 min). Uporabniški URL-ji se nikoli ne posredujejo neposredno.
+
+### Video — fal.ai Grok Imagine Video
+
+**Datoteka:** `src/lib/providers/fal-video.ts`
+
+**Model:** `xai/grok-imagine-video` | **Queue API:** enak flow kot image
+
+**Operacije:**
+
+| Operacija | Endpoint | Input |
+|-----------|----------|-------|
+| **Text→Video** | `xai/grok-imagine-video` | `prompt` |
+| **Image→Video** | `xai/grok-imagine-video/image-to-video` | `prompt` + `image_url` |
+| **Video→Video** | `xai/grok-imagine-video/video-to-video` | `prompt` + `video_url` |
+
+**Parametri:**
+- `duration` — 1-15 sekund
+- `resolution` — `480p` ali `720p`
+- `aspect_ratio` — 16:9, 9:16, 1:1, 4:3, 3:4, 3:2, 2:3
+
+**Pricing:**
+| Resolucija | Cena |
+|------------|------|
+| 480p | $0.05/sekundo |
+| 720p | $0.07/sekundo |
+
+**Vercel maxDuration:** 300s (5 min) — video generacija traja 30-180s.
 
 ### Embeddings — OpenAI
 
@@ -977,10 +1052,10 @@ Centraliziran pregled vseh recipe izvedb:
 ### Desktop nav (>950px)
 
 ```
-[MORANA] // >Recipes >LLM >STT >TTS >Image  [Jobs >History >Usage]    Admin▼  Default▼  Mitja▼
+[MORANA] // >Recipes >LLM >STT >TTS >Image >Video  [Jobs >History >Usage]    Admin▼  Default▼  Mitja▼
 ```
 
-- **Primarni linki** (center): Recipes, LLM, STT, TTS, Image
+- **Primarni linki** (center): Recipes, LLM, STT, TTS, Image, Video
 - **Overflow linki** (v "More" dropdownu na narrow desktop): Jobs, History, Usage
 - **Admin dropdown** (desno, rdeč): Recipes, Templates, Knowledge, Models, Analytics, Auth Logs, Workspaces, Dashboard — vidno samo za admin
 - **Workspace switcher** (desno, oranžen): prikazan samo ko > 1 workspace
@@ -1001,7 +1076,7 @@ Hamburger meni z grupiranimi sekcijami:
 
 | Breakpoint | Obnašanje |
 |------------|-----------|
-| >950px | Polni desktop: vseh 8 primarnih linkov + Admin/WS/User dropdowni |
+| >950px | Polni desktop: vseh 9 primarnih linkov + Admin/WS/User dropdowni |
 | 769-950px | Narrow desktop: History+Usage v "More ▼" dropdown |
 | <=768px | Mobile: hamburger z grouped sections |
 | <=480px | Small phone: manjša pisava (13px) |
@@ -1039,7 +1114,7 @@ NextAuth z `session: { strategy: "jwt" }`:
 
 | Vloga | Dostop |
 |-------|--------|
-| `user` | LLM, STT, TTS, Image, Recipes, Jobs, History, Usage |
+| `user` | LLM, STT, TTS, Image, Video, Recipes, Jobs, History, Usage |
 | `admin` | Vse kot user + Admin panel, Templates, KB, Recipe Builder, Workspaces, Auth Logs |
 
 ### Rate limiting (`src/lib/rate-limit.ts`)
@@ -1067,7 +1142,10 @@ Upload audio datoteke ali URL. Izbira jezika (SL/EN). SSRF zaščita za URL fetc
 Dve modi: **Speech** in **SFX**. Speech: tekst z counter znakov (dinamičen per model), izbira glasu, model selektor (v3/flash/multilingual/turbo), output format (MP3/PCM/Opus), language code, collapsible Voice Settings panel (stability, similarity, style, speed sliderji z Reset Defaults). SFX: text prompt za zvočne efekte, duration slider (0.5–30s), prompt influence slider. Audio player s proxy URL (brez CORS), download link. Cost preview. Sidebar z zgodovino.
 
 ### Image (`/image`)
-Tekstovni prompt za generiranje. Opcijski upload slike za urejanje. MIME validacija. Cost preview. Sidebar z zgodovino.
+Štiri operacije: **Generate** (text→image), **Img2Img** (urejanje slike), **Face Swap** (zamenjava obraza), **Multi-Edit** (FLUX.2 multi-reference). Provider toggle (fal.ai / Gemini). Model selektor za Generate/Img2Img (Flux Schnell — hiter, Flux Dev — kvaliteta). Aspect ratio preseti (1:1, 16:9, 9:16, 4:3, 3:4). Batch count (1-4 slik). Output format (JPEG/PNG). Advanced settings (steps, guidance, seed, strength za img2img). **Face Swap** ima dve ločeni upload polja (obraz + ciljna scena), brez prompta. **Multi-Edit** ima upload do 4 slik + prompt za natural language kompozicijo. Cost preview per operacija. "+ NEW IMAGE" gumb nad zgodovino. Historia prikazuje max 10 vnosov s model badgi (SCH/DEV/SWAP/FX2/GEM). MIME magic-bytes validacija. Max 20MB per slika.
+
+### Video (`/video`)
+Tri operacije: **Text→Video**, **Image→Video**, **Video→Video**. Model: Grok Imagine Video (fal.ai). Prompt vnosno polje. Duration slider (1-15 sekund). Resolution toggle (480p / 720p). Aspect ratio preseti. Upload polje za Image→Video (slika) in Video→Video (video). Video player z autoplay, loop in download gumbom. "Edit Video" gumb za nadaljnje urejanje. Cost preview z per-second pricingom. Historia z video thumbnailom. Pink accent barva (#ff6b9d). maxDuration: 300s (5 min).
 
 ### Recipes (`/recipes`)
 Seznam aktivnih receptov z opisom in step badges. Audio recepti imajo input mode tabs (file/URL/transcript), language selector in file upload. Execute gumb z "RUNNING..." blinking animacijo. Avtomatski redirect na detail po zaključku. Execution history z auto-polling (3s).
@@ -1142,6 +1220,7 @@ Workspace management. Ustvari/uredi workspace. Dodaj/odstrani člane. Workspace-
 | Gemini | `GEMINI_API_KEY`, `GEMINI_MODEL` |
 | Soniox | `SONIOX_API_KEY` |
 | ElevenLabs | `ELEVENLABS_API_KEY` |
+| fal.ai | `FAL_KEY` (ali `FALAI_API_KEY`) — Flux, Face Swap, FLUX.2, Grok Imagine Video |
 | Cloudflare R2 | `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET` |
 | Inngest | `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY` |
 | Guardrails | `MAX_FILE_SIZE_MB`, `MAX_URL_FETCH_SECONDS`, `MAX_TTS_CHARS`, itd. |
@@ -1163,7 +1242,8 @@ Workspace management. Ustvari/uredi workspace. Dodaj/odstrani člane. Workspace-
 | `/api/runs/stt` | 300s | Soniox async transkripcija (polling) |
 | `/api/runs/tts` | 60s | ElevenLabs sinteza + R2 upload |
 | `/api/runs/llm` | 60s | LLM API klic |
-| `/api/runs/image` | 60s | Gemini image generiranje |
+| `/api/runs/image` | 60s | fal.ai Flux + Face Swap + FLUX.2 Edit + Gemini image |
+| `/api/runs/video` | 300s | fal.ai Grok Imagine Video (text/img/video→video) |
 | `/api/conversations/[id]/messages` | 60s | LLM chat + URL fetch + RAG |
 | `/api/admin/knowledge/[id]/documents` | 120s | Document processing (extract → chunk → embed) |
 | `/api/recipes/[id]/execute` | 30s | Recipe execution kick-off (upload + DB + Inngest send) — asinhrono |
@@ -1219,6 +1299,24 @@ npx prisma migrate deploy
 ---
 
 ## Changelog
+
+### v2.6.0 (2026-02-16)
+
+- **Face Swap operacija:** Dedikiran `fal-ai/face-swap` model za zamenjavo obrazov. Upload dveh slik (obraz + ciljna scena), brez prompta. Odlično ohranjanje podobe (likeness). $0.10/slika.
+- **Multi-Edit operacija (FLUX.2):** `fal-ai/flux-2/edit` za multi-reference image editing. Upload do 4 slik + natural language prompt za kompozicijo, style transfer, kontekstno urejanje. $0.025/slika. Zamenjava za Kontext Max Multi ki je imel slabo kvaliteto outputa.
+- **Posodobljen Image UI:** Operation toggle razširjen na 4 mode (Generate / Img2Img / Face Swap / Multi-Edit). Face Swap ima dve ločeni upload polja. Multi-Edit ima upload grid z image numberingom. Model badgi v historiji (SWAP, FX2).
+- **Odstranjen Kontext Max Multi iz UI:** Legacy `fal-ai/flux-pro/kontext/max/multi` je obdržan v backendu za backward compatibility, a ni več dostopen v UI.
+
+### v2.5.0 (2026-02-16)
+
+- **Video stran (`/video`):** Nov modul za video generiranje z Grok Imagine Video prek fal.ai. Tri operacije: Text→Video, Image→Video, Video→Video. Duration slider (1-15s), resolution toggle (480p/720p), aspect ratio preseti. Video player z autoplay, loop, download. Pink accent (#ff6b9d). Cost preview s per-second pricingom ($0.05/s 480p, $0.07/s 720p). maxDuration: 300s.
+- **fal.ai Image integracija:** Flux Schnell (hitra generacija, 1-4 koraki, $0.025) in Flux Dev (kvaliteta, 28 korakov, $0.055). Img2Img z strength kontrolo. Inline polling pattern (submit → poll → download znotraj iste serverless funkcije). Provider toggle (fal.ai / Gemini).
+- **Multi-Image operacija:** FLUX.1 Kontext Max Multi za kompozicijo več slik (do 4). Prompt referencira slike po vrstnem redu. $0.08/slika. (Pozneje zamenjana z Face Swap + Multi-Edit v v2.6.0 zaradi slabe kvalitete.)
+- **fal.ai Queue API integracija:** Upload-first SSRF zaščita (input slike gredo na R2, fal.ai dobi short-TTL signed URLs). Podpora za `status_url`/`response_url` iz submit response. Podpora za `FAL_KEY` in `FALAI_API_KEY` env var.
+- **Image UI izboljšave:** "+ NEW IMAGE" gumb nad zgodovino. Historia omejena na 10 vnosov. Model selektor, batch count, output format, advanced settings (steps, guidance, seed).
+- **Video RunType:** Nov `video` enum v Prisma schema. Migracija `20260216190840_add_video_run_type`.
+- **Nav posodobitev:** Dodan "Video" link v primarno navigacijo.
+- **Pricing konfiguracija:** Per-image in per-second pricing support v `estimateCostCents()`. `videoSeconds` units type.
 
 ### v2.4.0 (2026-02-16)
 
