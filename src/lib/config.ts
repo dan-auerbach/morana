@@ -1,3 +1,5 @@
+import { prisma } from "./prisma";
+
 // Guardrails — all configurable via ENV
 export const config = {
   maxFileSizeMb: parseInt(process.env.MAX_FILE_SIZE_MB || "50", 10),
@@ -18,9 +20,10 @@ export const config = {
     .filter(Boolean),
 };
 
-// Approved models — change via ENV or here
+// Approved models — DB-driven with ENV fallback
 export type ModelEntry = { id: string; label: string; provider: "anthropic" | "gemini" | "openai" };
 
+// ─── ENV-based fallback models (used when DB has no AIModel records) ───
 const defaultModels: ModelEntry[] = [
   {
     id: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-5-20250929",
@@ -54,12 +57,79 @@ const defaultModels: ModelEntry[] = [
     : []),
 ];
 
+// ─── In-memory cache for DB-driven models (60s TTL) ───
+let cachedModels: ModelEntry[] | null = null;
+let cachedPricing: Record<string, { input: number; output: number; unit: string }> | null = null;
+let cacheTimestamp = 0;
+const CACHE_TTL_MS = 60_000; // 60 seconds
+
+function isCacheValid(): boolean {
+  return cachedModels !== null && Date.now() - cacheTimestamp < CACHE_TTL_MS;
+}
+
+/**
+ * Load models from AIModel DB table. If table is empty, fall back to ENV config.
+ * Results are cached in-memory for 60s to avoid per-request DB queries.
+ */
+export async function getApprovedModelsAsync(): Promise<ModelEntry[]> {
+  if (isCacheValid() && cachedModels) return cachedModels;
+
+  try {
+    const dbModels = await prisma.aIModel.findMany({
+      where: { isEnabled: true },
+      orderBy: { sortOrder: "asc" },
+    });
+
+    if (dbModels.length === 0) {
+      // No DB records yet — use ENV fallback
+      cachedModels = defaultModels;
+      cacheTimestamp = Date.now();
+      return defaultModels;
+    }
+
+    cachedModels = dbModels.map((m) => ({
+      id: m.modelId,
+      label: m.label,
+      provider: m.provider as "anthropic" | "gemini" | "openai",
+    }));
+
+    // Also cache pricing from DB
+    cachedPricing = {};
+    for (const m of dbModels) {
+      cachedPricing[m.modelId] = {
+        input: m.pricingInput,
+        output: m.pricingOutput,
+        unit: m.pricingUnit,
+      };
+    }
+
+    cacheTimestamp = Date.now();
+    return cachedModels;
+  } catch {
+    // DB error — fall back to ENV config
+    return defaultModels;
+  }
+}
+
+/**
+ * Synchronous model getter — returns cached DB models if available, else ENV fallback.
+ * Use getApprovedModelsAsync() for guaranteed fresh data.
+ */
 export function getApprovedModels(): ModelEntry[] {
+  if (cachedModels) return cachedModels;
   return defaultModels;
 }
 
-// Pricing map — costs expressed per unit (tokens/chars/minutes)
-export const pricing: Record<string, { input: number; output: number; unit: string }> = {
+/** Invalidate the model cache (call after admin changes) */
+export function invalidateModelCache(): void {
+  cachedModels = null;
+  cachedPricing = null;
+  cacheTimestamp = 0;
+}
+
+// ─── Pricing ───
+// Hardcoded pricing fallback (used when DB has no AIModel records)
+const defaultPricing: Record<string, { input: number; output: number; unit: string }> = {
   "claude-sonnet-4-5-20250929": { input: 3.0, output: 15.0, unit: "1M_tokens" },
   "gemini-2.0-flash": { input: 0.1, output: 0.4, unit: "1M_tokens" },
   "gemini-2.5-flash-image": { input: 0.15, output: 30.0, unit: "1M_tokens" },
@@ -68,6 +138,22 @@ export const pricing: Record<string, { input: number; output: number; unit: stri
   soniox: { input: 0.35, output: 0, unit: "per_minute" },
   elevenlabs: { input: 0.30, output: 0, unit: "1k_chars" },
 };
+
+/** Combined pricing: DB-cached pricing merged with hardcoded defaults */
+export const pricing: Record<string, { input: number; output: number; unit: string }> = new Proxy(
+  defaultPricing,
+  {
+    get(target, prop: string) {
+      // Check DB cache first, then hardcoded default
+      if (cachedPricing && cachedPricing[prop]) return cachedPricing[prop];
+      return target[prop];
+    },
+    has(target, prop: string) {
+      if (cachedPricing && prop in cachedPricing) return true;
+      return prop in target;
+    },
+  }
+);
 
 /**
  * Estimate cost in CENTS (integer).

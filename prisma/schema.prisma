@@ -57,6 +57,7 @@ model User {
   recipeExecutions  RecipeExecution[]
   workspaceMemberships WorkspaceMember[]
   templateVersions  PromptTemplateVersion[]
+  recipeVersions    RecipeVersion[]
 
   activeWorkspace   Workspace? @relation("UserActiveWorkspace", fields: [activeWorkspaceId], references: [id])
 }
@@ -370,26 +371,28 @@ enum RecipeStatus {
 }
 
 model Recipe {
-  id          String       @id @default(cuid())
-  workspaceId String?
-  name        String
-  slug        String       @unique
-  description String?      @db.Text
-  status      RecipeStatus @default(draft)
-  isPreset    Boolean      @default(false)  // true for system presets (e.g. NOVINAR)
-  presetKey   String?      @unique          // unique preset identifier
-  inputKind   String       @default("text") // "text", "audio", "image", "none"
-  inputModes  Json?                         // JSON array: ["file","url","text"] — allowed input modes
-  defaultLang String?                       // default language hint (e.g. "sl", "en")
-  uiHints     Json?                         // UI hints for the recipe frontend
-  createdBy   String
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id             String       @id @default(cuid())
+  workspaceId    String?
+  name           String
+  slug           String       @unique
+  description    String?      @db.Text
+  status         RecipeStatus @default(draft)
+  isPreset       Boolean      @default(false)  // true for system presets (e.g. NOVINAR)
+  presetKey      String?      @unique          // unique preset identifier
+  inputKind      String       @default("text") // "text", "audio", "image", "none"
+  inputModes     Json?                         // JSON array: ["file","url","text"] — allowed input modes
+  defaultLang    String?                       // default language hint (e.g. "sl", "en")
+  uiHints        Json?                         // UI hints for the recipe frontend
+  currentVersion Int          @default(1)      // auto-increment on step changes
+  createdBy      String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   creator    User              @relation(fields: [createdBy], references: [id])
   workspace  Workspace?        @relation(fields: [workspaceId], references: [id])
   steps      RecipeStep[]
   executions RecipeExecution[]
+  versions   RecipeVersion[]
 
   @@index([workspaceId])
   @@index([status])
@@ -418,17 +421,20 @@ enum ExecutionStatus {
 }
 
 model RecipeExecution {
-  id          String          @id @default(cuid())
-  recipeId    String
-  userId      String
-  status      ExecutionStatus @default(pending)
-  progress    Int             @default(0)
-  currentStep Int             @default(0)
-  totalSteps  Int
-  inputData   Json?           // Initial input (e.g. file reference, text)
-  startedAt   DateTime        @default(now())
-  finishedAt  DateTime?
-  errorMessage String?        @db.Text
+  id               String          @id @default(cuid())
+  recipeId         String
+  userId           String
+  status           ExecutionStatus @default(pending)
+  progress         Int             @default(0)
+  currentStep      Int             @default(0)
+  totalSteps       Int
+  inputData        Json?           // Initial input (e.g. file reference, text)
+  recipeVersion    Int?            // Recipe version used for this execution
+  totalCostCents   Int             @default(0)  // Aggregated cost in CENTS
+  costBreakdownJson Json?          // { steps: [{ stepIndex, model, costCents }] }
+  startedAt        DateTime        @default(now())
+  finishedAt       DateTime?
+  errorMessage     String?         @db.Text
 
   recipe      Recipe              @relation(fields: [recipeId], references: [id])
   user        User                @relation(fields: [userId], references: [id])
@@ -439,23 +445,63 @@ model RecipeExecution {
 }
 
 model RecipeStepResult {
-  id            String    @id @default(cuid())
-  executionId   String
-  stepIndex     Int
-  runId         String?
-  status        String    @default("pending")
-  inputPreview  String?   @db.Text
-  outputPreview String?   @db.Text
-  outputFull    Json?
-  startedAt     DateTime?
-  finishedAt    DateTime?
-  errorMessage  String?   @db.Text
+  id                String    @id @default(cuid())
+  executionId       String
+  stepIndex         Int
+  runId             String?
+  status            String    @default("pending")
+  inputPreview      String?   @db.Text
+  outputPreview     String?   @db.Text
+  outputFull        Json?
+  inputHash         String?   // SHA256 of input text (audit trail)
+  outputHash        String?   // SHA256 of output text (audit trail)
+  providerResponseId String?  // Provider's response ID (audit trail)
+  startedAt         DateTime?
+  finishedAt        DateTime?
+  errorMessage      String?   @db.Text
 
   execution RecipeExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
   run       Run?            @relation(fields: [runId], references: [id])
 
   @@unique([executionId, stepIndex])
   @@index([executionId])
+}
+
+// ─── Recipe Versioning ──────────────────────────────────────────
+model RecipeVersion {
+  id            String   @id @default(cuid())
+  recipeId      String
+  versionNumber Int
+  stepsSnapshot Json     // Full snapshot of steps at this version
+  name          String   // Recipe name at this version
+  description   String?  @db.Text
+  changedBy     String
+  changeNote    String?  // Optional description of what changed
+  createdAt     DateTime @default(now())
+
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  author User   @relation(fields: [changedBy], references: [id])
+
+  @@unique([recipeId, versionNumber])
+  @@index([recipeId])
+}
+
+// ─── AI Model Configuration (DB-driven) ────────────────────────
+model AIModel {
+  id            String   @id @default(cuid())
+  modelId       String   @unique    // e.g. "claude-sonnet-4-5-20250929"
+  label         String              // Display name
+  provider      String              // "anthropic", "openai", "gemini"
+  isEnabled     Boolean  @default(true)
+  isDefault     Boolean  @default(false)
+  sortOrder     Int      @default(0)
+  pricingInput  Float    @default(0)   // Per-unit input cost (dollars)
+  pricingOutput Float    @default(0)   // Per-unit output cost (dollars)
+  pricingUnit   String   @default("1M_tokens") // "1M_tokens", "1k_chars", "per_minute"
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([isEnabled, sortOrder])
 }
 
 // ─── Auth Logging ───────────────────────────────────────────────

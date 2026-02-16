@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
-import { executeRecipe } from "@/lib/recipe-engine";
+import { inngest } from "@/lib/inngest/client";
 import { uploadToR2 } from "@/lib/storage";
 import { v4 as uuid } from "uuid";
 
-// Vercel serverless: recipe execution can take a long time
-export const maxDuration = 300;
+// Reduced: only need time for file upload + DB + enqueue (not full execution)
+export const maxDuration = 30;
 
 const ALLOWED_AUDIO_TYPES = [
   "audio/mpeg", "audio/mp3", "audio/wav", "audio/wave", "audio/x-wav",
@@ -103,33 +103,20 @@ export async function POST(
         recipeId,
         userId: user.id,
         totalSteps: recipe.steps.length,
+        recipeVersion: recipe.currentVersion,
         inputData: inputData ? (inputData as Prisma.InputJsonValue) : Prisma.DbNull,
       },
     });
 
-    // Execute recipe synchronously — must await to keep Vercel serverless alive
-    try {
-      await executeRecipe(execution.id);
-    } catch (err) {
-      console.error("[Recipe] Execution error:", err);
-      await prisma.recipeExecution.update({
-        where: { id: execution.id },
-        data: {
-          status: "error",
-          errorMessage: err instanceof Error ? err.message : "Unknown error",
-          finishedAt: new Date(),
-        },
-      }).catch(() => {});
-    }
-
-    // Re-fetch execution to return final status
-    const final = await prisma.recipeExecution.findUnique({
-      where: { id: execution.id },
-      select: { id: true, status: true, progress: true, errorMessage: true },
+    // Enqueue background execution via Inngest (non-blocking)
+    await inngest.send({
+      name: "recipe/execute",
+      data: { executionId: execution.id, userId: user.id },
     });
 
+    // Return immediately — frontend polls for progress
     return NextResponse.json({
-      execution: final || { id: execution.id, status: "pending" },
+      execution: { id: execution.id, status: "pending" },
     }, { status: 201 });
   }, req);
 }

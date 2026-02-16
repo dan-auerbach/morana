@@ -4,6 +4,7 @@ import { runSTT } from "../providers/stt";
 import { runTTS } from "../providers/tts";
 import { uploadToR2, getObjectFromR2 } from "../storage";
 import { logUsage } from "../usage";
+import { executeRecipe } from "../recipe-engine";
 import { v4 as uuid } from "uuid";
 
 export const sttJob = inngest.createFunction(
@@ -130,4 +131,45 @@ export const ttsJob = inngest.createFunction(
   }
 );
 
-export const inngestFunctions = [sttJob, ttsJob];
+// ─── Recipe Execution Job ────────────────────────────────
+export const recipeExecutionJob = inngest.createFunction(
+  { id: "recipe-execute", retries: 1 },
+  { event: "recipe/execute" },
+  async ({ event }) => {
+    const { executionId } = event.data as {
+      executionId: string;
+      userId: string;
+    };
+
+    // Idempotency: skip if already started/done
+    const existing = await prisma.recipeExecution.findUnique({
+      where: { id: executionId },
+      select: { status: true },
+    });
+    if (!existing || existing.status !== "pending") {
+      return { skipped: true, reason: `status=${existing?.status}` };
+    }
+
+    try {
+      await executeRecipe(executionId);
+      return { success: true };
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      console.error("[recipeExecutionJob] error:", message);
+      // Mark as error if engine didn't already
+      await prisma.recipeExecution
+        .update({
+          where: { id: executionId },
+          data: {
+            status: "error",
+            errorMessage: message,
+            finishedAt: new Date(),
+          },
+        })
+        .catch(() => {});
+      throw err; // re-throw so Inngest records the failure
+    }
+  }
+);
+
+export const inngestFunctions = [sttJob, ttsJob, recipeExecutionJob];

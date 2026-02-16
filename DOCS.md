@@ -1,6 +1,6 @@
 # MORANA — Internal AI Operations Terminal
 
-**Version:** 2.1.0
+**Version:** 2.2.0
 **Stack:** Next.js 16 | React 19 | TypeScript | Prisma 7 | PostgreSQL (Neon) + pgvector | Tailwind CSS 4
 **Hosting:** Vercel (serverless) | Cloudflare R2 (storage)
 **UI Theme:** Dark hacker/terminal aesthetic
@@ -39,7 +39,13 @@ MORANA je interni AI operations terminal za medijsko podjetje. Združuje več AI
 - Cost preview pred vsako AI operacijo
 - **Multi-step AI recepti z audio input podporo** (file upload, URL, transcript paste)
 - **Recipe preset sistem** — preddefinirani pipelini (NOVINAR) z one-click instantiation
-- Background job dashboard z cancel/retry
+- **Async recipe execution** — Inngest background processing, non-blocking API
+- **Recipe versioning** — avtomatske verzije ob spremembi korakov
+- **Aggregated cost tracking** — totalCostCents + costBreakdownJson per execution
+- **Audit trail** — SHA256 hashi inputov/outputov, provider response ID-ji
+- **DB-driven AI model config** — admin upravljanje modelov, pricinga, enable/disable
+- **Admin analytics dashboard** — error rates, latency, cost breakdown po modelu/providerju
+- Background job dashboard z cancel/retry, cost display
 - Per-user rate limiting (dnevni runi, mesečni stroški v centih)
 - Globalni mesečni stroškovni cap (GLOBAL_MAX_MONTHLY_COST_CENTS)
 - Workspace-level stroškovni cap in model omejitve
@@ -65,6 +71,9 @@ src/
         users/            # Admin CRUD za uporabnike
         templates/        # Admin CRUD za prompt template
         knowledge/        # Admin CRUD za knowledge base + document upload
+        models/           # Admin AI model CRUD (DB-driven config)
+        analytics/        # Admin analytics aggregation endpoint
+        recipes/[id]/versions/ # Recipe version history
         auth-logs/        # Admin auth log viewer
       conversations/      # LLM multi-turn chat API
       history/            # Zgodovina runov
@@ -84,6 +93,8 @@ src/
       templates/          # Prompt template management
       knowledge/          # Knowledge base management
       recipes/            # Recipe builder z step config paneli
+      models/             # AI model management (enable/disable, pricing)
+      analytics/          # Analytics dashboard (error rates, costs, latency)
       auth-logs/          # Auth log viewer
       workspaces/         # Workspace management
     llm/                  # LLM chat stran
@@ -107,7 +118,7 @@ src/
       image.ts            # Gemini Image generiranje
       embeddings.ts       # OpenAI text-embedding-3-small za RAG
     auth.ts               # NextAuth konfiguracija (JWT + auth logging)
-    config.ts             # Guardrails, modeli, pricing
+    config.ts             # Guardrails, modeli, pricing (DB-driven z ENV fallback)
     cost-preview.ts       # Client-side cost estimation utilities
     csrf.ts               # CSRF Origin/Referer validacija
     document-processor.ts # PDF/TXT/HTML text extraction za RAG
@@ -115,7 +126,7 @@ src/
     prisma.ts             # Prisma client singleton + pg.Pool
     rag.ts                # RAG: chunking, embedding search, context building
     rate-limit.ts         # Per-user rate limiting
-    recipe-engine.ts      # Sequential recipe step execution engine (STT + LLM + output)
+    recipe-engine.ts      # Sequential recipe step execution engine (STT + LLM + output + audit hashes + cost aggregation)
     recipe-presets.ts     # Preddefinirani recipe preseti (NOVINAR)
     session.ts            # Session utilities (withAuth wrapper + CSRF)
     storage.ts            # Cloudflare R2 S3 storage (upload + download)
@@ -362,13 +373,14 @@ Chunki dokumentov z vektorskimi embeddingi.
 | `embedding` | vector(1536) | pgvector embedding (via raw SQL) |
 
 #### Recipe
-Multi-step AI pipeline definicije z input konfiguracijami.
+Multi-step AI pipeline definicije z input konfiguracijami in versioniranjem.
 
 | Polje | Tip | Opis |
 |-------|-----|------|
 | `name` | String | Ime recepta |
 | `slug` | String (unique) | URL-friendly identifikator |
 | `status` | RecipeStatus | `draft`, `active`, `archived` |
+| `currentVersion` | Int | Trenutna verzija (auto-increment ob spremembi korakov) |
 | `isPreset` | Boolean | Ali je recept iz preseta (read-only identifikator) |
 | `presetKey` | String? (unique) | Unikaten preset ključ (npr. "novinar") |
 | `inputKind` | String | Tip vhoda: `text`, `audio`, `image`, `none` |
@@ -378,7 +390,22 @@ Multi-step AI pipeline definicije z input konfiguracijami.
 | `workspaceId` | String? | FK na Workspace |
 | `createdBy` | String | FK na User (admin) |
 
-Relacije: `creator`, `steps`, `executions`, `workspace`
+Relacije: `creator`, `steps`, `executions`, `versions`, `workspace`
+
+#### RecipeVersion
+Verzije receptov (audit trail). Avtomatsko ustvarjene ob spremembi korakov.
+
+| Polje | Tip | Opis |
+|-------|-----|------|
+| `recipeId` | String | FK na Recipe |
+| `versionNumber` | Int | Verzija (unique per recipe) |
+| `stepsSnapshot` | Json | Posnetek korakov v tej verziji |
+| `name` | String | Ime recepta v tej verziji |
+| `description` | String? | Opis recepta v tej verziji |
+| `changedBy` | String | FK na User (admin ki je spremenil) |
+| `changeNote` | String? | Opis spremembe |
+
+Unique constraint: `[recipeId, versionNumber]`
 
 #### RecipeStep
 Posamezni koraki recepta.
@@ -399,7 +426,7 @@ Posamezni koraki recepta.
 - **`output_format`:** `{ formats: ["markdown", "html", "json", "drupal_json"] }`
 
 #### RecipeExecution
-Izvedbe receptov.
+Izvedbe receptov z agregiranim stroškom in verzijo.
 
 | Polje | Tip | Opis |
 |-------|-----|------|
@@ -409,12 +436,15 @@ Izvedbe receptov.
 | `progress` | Int | Napredek v % |
 | `currentStep` | Int | Trenutni korak |
 | `totalSteps` | Int | Skupno korakov |
+| `recipeVersion` | Int? | Verzija recepta ob izvedbi |
+| `totalCostCents` | Int | Skupni strošek v centih (0 = ni podatka) |
+| `costBreakdownJson` | Json? | Per-step cost breakdown: `{ steps: [{ stepIndex, model, costCents }] }` |
 | `inputData` | Json? | Vhodni podatki (text, transcriptText, audioStorageKey, audioUrl, language) |
 
 Relacije: `recipe`, `user`, `stepResults`
 
 #### RecipeStepResult
-Rezultati posameznih korakov izvedbe.
+Rezultati posameznih korakov izvedbe z audit trail hashi.
 
 | Polje | Tip | Opis |
 |-------|-----|------|
@@ -425,6 +455,26 @@ Rezultati posameznih korakov izvedbe.
 | `inputPreview` | Text? | Predogled vhoda |
 | `outputPreview` | Text? | Predogled izhoda |
 | `outputFull` | Json? | Polni izhod |
+| `inputHash` | String? | SHA256 hash vhodnega besedila (audit trail) |
+| `outputHash` | String? | SHA256 hash izhodnega besedila (audit trail) |
+| `providerResponseId` | String? | Provider-ov ID odgovora (Anthropic/OpenAI) |
+
+#### AIModel
+DB-driven AI model konfiguracija (admin-managed).
+
+| Polje | Tip | Opis |
+|-------|-----|------|
+| `modelId` | String (unique) | ID modela (npr. "claude-sonnet-4-5-20250929") |
+| `label` | String | Prikazno ime |
+| `provider` | String | Provider: `anthropic`, `openai`, `gemini` |
+| `isEnabled` | Boolean | Ali je model aktiven |
+| `isDefault` | Boolean | Ali je privzeti model |
+| `sortOrder` | Int | Vrstni red prikaza |
+| `pricingInput` | Float | Cena vnosa (po enoti) |
+| `pricingOutput` | Float | Cena izhoda (po enoti) |
+| `pricingUnit` | String | Enota: `1M_tokens`, `1k_chars`, `per_minute` |
+
+Indeks: `[isEnabled, sortOrder]`
 
 #### AuthLog
 Logiranje vseh poskusov avtentikacije.
@@ -514,7 +564,7 @@ Indeksi: `email`, `createdAt`, `event`
 | `/api/recipes` | POST | Ustvari recept z inputKind, inputModes, defaultLang, uiHints (admin) |
 | `/api/recipes/[id]` | GET, PATCH, DELETE | CRUD za recept (admin) |
 | `/api/recipes/[id]/steps` | PUT | Zamenjaj vse korake recepta (admin) |
-| `/api/recipes/[id]/execute` | POST | Zaženi izvedbo (maxDuration: 300s). Podpira JSON in multipart/form-data za audio upload. **Execution je sinhrona** — endpoint vrne šele ko se pipeline zaključi. |
+| `/api/recipes/[id]/execute` | POST | Zaženi izvedbo (maxDuration: 30s). Podpira JSON in multipart/form-data za audio upload. **Execution je asinhrona** — endpoint shrani inpute, pošlje Inngest event in takoj vrne `{ execution: { id, status: "pending" } }`. Frontend nato polira za napredek. |
 | `/api/recipes/presets` | GET | Seznam dostopnih presetov (admin) |
 | `/api/recipes/presets` | POST | Instantiiraj preset kot recept (admin, body: `{ presetKey }`) |
 | `/api/recipes/executions` | GET | Seznam uporabnikovih izvedb |
@@ -552,6 +602,12 @@ Indeksi: `email`, `createdAt`, `event`
 | `/api/admin/users/[id]` | GET | — | Podrobnosti uporabnika |
 | `/api/admin/users/[id]` | PATCH | ✅ | Posodobi role, limite, active status |
 | `/api/admin/users/[id]` | DELETE | ✅ | Deaktiviraj uporabnika (soft delete) |
+| `/api/admin/models` | GET | — | Seznam vseh AI modelov (admin) |
+| `/api/admin/models` | POST | ✅ | Dodaj nov AI model (admin) |
+| `/api/admin/models/[id]` | PATCH | ✅ | Posodobi model (enable/disable, pricing, default) |
+| `/api/admin/models/[id]` | DELETE | ✅ | Izbriši model (admin) |
+| `/api/admin/analytics` | GET | — | Agregirane metrike za dashboard (admin, ?period=7d\|30d\|90d) |
+| `/api/admin/recipes/[id]/versions` | GET | — | Seznam verzij recepta (admin) |
 | `/api/admin/auth-logs` | GET | — | Auth logi s filtriranjem in statistikami |
 
 ---
@@ -780,7 +836,10 @@ executeRecipe(executionId):
        - output_format: format text as markdown/html/json/drupal_json
        - tts/image: placeholder (not yet implemented in pipeline)
     5. Pipe output → next step input
-    6. Save step result (inputPreview, outputPreview, outputFull)
+    6. Compute SHA256 hashes of input/output (audit trail)
+    7. Save step result (inputPreview, outputPreview, outputFull, inputHash, outputHash, providerResponseId)
+    8. Aggregate step cost from UsageEvent → costBreakdown
+  Write totalCostCents + costBreakdownJson to execution
   Mark execution as done/error
 ```
 
@@ -789,9 +848,13 @@ executeRecipe(executionId):
 2. Če previousOutput ima besedilo (text input mode) → preskoči STT
 3. Sicer → naloži audio iz R2 ali URL → poženi Soniox STT
 
-**Execution je sinhrona:** API endpoint (`/api/recipes/[id]/execute`) čaka na zaključek celotnega pipelinea pred vrnitvijo response (z `maxDuration: 300s`). Frontend prikaže "RUNNING..." stanje med čakanjem, nato redirecta na execution detail stran.
+**Async execution (Inngest):** API endpoint (`/api/recipes/[id]/execute`) shrani inpute, ustvari RecipeExecution zapis in pošlje `recipe/execute` event na Inngest. Vrne takoj s HTTP 201 (`{ execution: { id, status: "pending" } }`). Inngest worker (`recipeExecutionJob`) nato asinhrono izvede recipe engine. Frontend polira za napredek vsake 2-3 sekunde.
 
-**Cost tracking:** Vsak STT in LLM korak ustvari `Run` zapis za sledenje stroškov. STT koraki logirajo tudi trajanje v minutah za Soniox pricing.
+**Idempotency:** Inngest job preveri `execution.status !== "pending"` in preskoči če je že v teku ali zaključen. Retry: 1 (recepti se ne smejo avtomatsko ponavljati — uporabnik lahko ročno ponovi).
+
+**Cost tracking:** Vsak STT in LLM korak ustvari `Run` zapis. Po vsakem koraku se iz `UsageEvent` agregira strošek. Ob zaključku se skupni strošek zapiše v `RecipeExecution.totalCostCents` z per-step breakdownom v `costBreakdownJson`.
+
+**Audit trail:** Vsak korak dobi SHA256 hash vhoda (`inputHash`) in izhoda (`outputHash`). Za LLM korake se shrani tudi `providerResponseId` (Anthropic `resp.id`, OpenAI `resp.id`).
 
 **Output formati:**
 - `markdown` — besedilo kot markdown
@@ -819,13 +882,16 @@ Recipe builder s form-based step management:
 - Input mode tabs za audio recepte (Upload / URL / Transcript)
 - Language selector (SL / EN)
 - File upload z drag-and-click (prikaže ime in velikost)
-- "RUNNING..." stanje z blinking animacijo med čakanjem
-- Avtomatski redirect na execution detail po zaključku
+- "QUEUED..." stanje po kliku na execute
 - Execution history z auto-polling (3s)
+- Cost prikaz per execution (v $)
 
 ### Execution Detail (`/recipes/[id]`)
 
-Step-by-step timeline s statusom, trajanjem, inputom in outputom. Auto-polling za running izvedbe.
+Step-by-step timeline s statusom, trajanjem, inputom in outputom. Auto-polling za running izvedbe. Prikazuje:
+- Verzija recepta (vN badge)
+- Skupni strošek izvedbe (v $)
+- Per-step audit trail (SHA256 hashi, provider response ID) v collapsed "Audit Trail" sekciji
 
 ---
 
@@ -838,11 +904,12 @@ Centraliziran pregled vseh recipe izvedb:
 - **Filtriranje** po statusu: all, running, done, error, cancelled
 - **Summary bar** s štetjem po statusu
 - **Job list** z expandable detajli:
-  - Job ID, user, started/finished, duration
+  - Job ID, user, started/finished, duration, cost
   - Progress bar za running jobe
   - Step timeline z per-step status in trajanjem
   - Error message prikaz
 - **Actions:** View detail, Cancel (running), Retry (failed/cancelled)
+- **Cost display** — totalCostCents per job v rumeni barvi
 - **Auto-polling** — osveži vsake 3s ko so running jobi
 
 **API:**
@@ -857,17 +924,18 @@ Centraliziran pregled vseh recipe izvedb:
 ### Desktop nav (>950px)
 
 ```
-[MORANA] // >LLM >STT >TTS >Image >Recipes >Jobs >History >Usage    Admin▼  Default▼  Mitja▼
+[MORANA] // >Recipes >LLM >STT >TTS >Image  [Jobs >History >Usage]    Admin▼  Default▼  Mitja▼
 ```
 
-- **Primarni linki** (center): LLM, STT, TTS, Image, Recipes, Jobs, History, Usage
-- **Admin dropdown** (desno, rdeč): Recipes, Templates, Knowledge, Auth Logs, Workspaces, Dashboard — vidno samo za admin
+- **Primarni linki** (center): Recipes, LLM, STT, TTS, Image
+- **Overflow linki** (v "More" dropdownu na narrow desktop): Jobs, History, Usage
+- **Admin dropdown** (desno, rdeč): Recipes, Templates, Knowledge, Models, Analytics, Auth Logs, Workspaces, Dashboard — vidno samo za admin
 - **Workspace switcher** (desno, oranžen): prikazan samo ko > 1 workspace
 - **User dropdown** (desno, zelen): prikaže first name ali email local-part; vsebuje email in sign_out
 
 ### Narrow desktop (769-950px)
 
-History in Usage se skrijeta v "More ▼" dropdown. Vse ostalo enako.
+Jobs, History in Usage se skrijejo v "More ▼" dropdown. Vse ostalo enako.
 
 ### Mobile (<=768px)
 
@@ -973,7 +1041,19 @@ CRUD za prompt template z versioniranjem. Obrazec s system prompt, knowledge tex
 Knowledge base management. Upload dokumentov (PDF/TXT). Pregled dokumentov in stanja procesiranja.
 
 ### Admin Recipes (`/admin/recipes`)
-Recipe builder. Form-based step management (add, remove, reorder z puščicami). Step konfiguracija po tipu (LLM: model/system prompt/user prompt, STT: provider/language, itd.). Input config sekcija (inputKind, inputModes, defaultLang). Preset instantiation. PRESET in AUDIO badges.
+Recipe builder. Form-based step management (add, remove, reorder z puščicami). Step konfiguracija po tipu (LLM: model/system prompt/user prompt, STT: provider/language, itd.). Input config sekcija (inputKind, inputModes, defaultLang). Preset instantiation. PRESET in AUDIO badges. **Versioniranje:** ob spremembi korakov se avtomatsko ustvari RecipeVersion snapshot s stepsSnapshot, changedBy in changeNote.
+
+### Admin Models (`/admin/models`)
+DB-driven AI model konfiguracija. Tabela vseh modelov s toggle-i za enable/disable in default. Inline urejanje pricinga. Dodajanje novih modelov (modelId, label, provider, pricing). Spremembe invalidirajo in-memory cache.
+
+### Admin Analytics (`/admin/analytics`)
+Agregirane metrike iz obstoječih Run/UsageEvent/RecipeExecution podatkov:
+- Summary kartice: Total runs, Total cost, Error rate, Avg latency
+- Tabela po providerju: runs, errors, error %, avg latency, cost
+- Tabela po modelu: runs, avg latency, cost
+- Execution metrike: total, avg duration, success rate
+- Period selektor: 7d / 30d / 90d
+- Auto-refresh vsake 30s
 
 ### Admin Auth Logs (`/admin/auth-logs`)
 Tabela vseh auth poskusov. Filtriranje po emailu in event tipu. Statistike (denied 24h/7d, unique IPs). Expandable detajli z IP, user-agent, geo, razlogom.
@@ -1033,7 +1113,7 @@ Workspace management. Ustvari/uredi workspace. Dodaj/odstrani člane. Workspace-
 | `/api/runs/image` | 60s | Gemini image generiranje |
 | `/api/conversations/[id]/messages` | 60s | LLM chat + URL fetch + RAG |
 | `/api/admin/knowledge/[id]/documents` | 120s | Document processing (extract → chunk → embed) |
-| `/api/recipes/[id]/execute` | 300s | Multi-step recipe execution (sinhrono — čaka na zaključek) |
+| `/api/recipes/[id]/execute` | 30s | Recipe execution kick-off (upload + DB + Inngest send) — asinhrono |
 
 ### Database migracije
 
@@ -1086,6 +1166,17 @@ npx prisma migrate deploy
 ---
 
 ## Changelog
+
+### v2.2.0 (2026-02-16)
+
+- **Async recipe execution (Inngest):** Recipe execution je sedaj asinhrona — API vrne takoj, Inngest worker izvede pipeline. maxDuration zmanjšan iz 300s na 30s. Frontend polira za napredek.
+- **Aggregated cost tracking:** RecipeExecution ima totalCostCents + costBreakdownJson s per-step cost breakdown. Cost se prikaže v execution detail in jobs pages.
+- **Recipe versioning:** Ob vsaki spremembi korakov (PUT /api/recipes/[id]/steps) se avtomatsko ustvari RecipeVersion snapshot. Recipe ima currentVersion counter. Execution shrani recipeVersion.
+- **Audit trail hashi:** RecipeStepResult ima inputHash, outputHash (SHA256) in providerResponseId. Prikazano v collapsed "Audit Trail" sekciji na execution detail.
+- **DB-driven AI model config:** AIModel tabela za admin upravljanje modelov, pricinga, enable/disable, default. Admin stran `/admin/models` s CRUD, inline pricing editing, toggli. Config.ts bere iz DB z 60s in-memory cache, fallback na ENV/hardcoded.
+- **Admin analytics dashboard:** `/admin/analytics` z agregiranimi metrikami iz Run/UsageEvent/RecipeExecution. Error rates, latency, cost po providerju in modelu. Period selektor (7d/30d/90d), auto-refresh 30s.
+- **Nav reorder:** Recipes je sedaj prvi primarni link. Jobs premaknjen v overflow (More ▼). Admin dropdown: dodana Models in Analytics.
+- **Recipe version API:** GET `/api/admin/recipes/[id]/versions` za pregled verzij recepta.
 
 ### v2.1.0 (2025-02-16)
 

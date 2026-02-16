@@ -121,14 +121,10 @@ export default function RecipesPage() {
         });
       }
 
-      const data = await resp.json();
+      await resp.json();
       resetInput();
-      // Navigate to execution detail page to see results
-      if (data.execution?.id) {
-        window.location.href = `/recipes/${data.execution.id}`;
-      } else {
-        load();
-      }
+      // Execution is async — reload to show it in the list, polling tracks progress
+      load();
     } catch { /* ignore */ }
     finally { setExecuting(null); }
   }
@@ -317,7 +313,7 @@ export default function RecipesPage() {
                           animation: executing === r.id ? "blink 1.2s step-end infinite" : "none",
                         }}
                       >
-                        {executing === r.id ? "RUNNING..." : "RUN"}
+                        {executing === r.id ? "QUEUED..." : "RUN"}
                       </button>
                       <button
                         onClick={resetInput}

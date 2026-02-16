@@ -4,6 +4,13 @@ import { runLLMChat } from "./providers/llm";
 import { runSTT } from "./providers/stt";
 import { logUsage } from "./usage";
 import { getObjectFromR2 } from "./storage";
+import { createHash } from "crypto";
+
+function sha256(text: string): string {
+  return createHash("sha256").update(text, "utf8").digest("hex");
+}
+
+type CostEntry = { stepIndex: number; model: string; costCents: number };
 
 type StepConfig = {
   modelId?: string;
@@ -27,6 +34,12 @@ type InputData = {
   audioUrl?: string;
   language?: string;
 } | null;
+
+type StepOutput = {
+  text: string;
+  runId: string | null;
+  providerResponseId: string | null;
+};
 
 /**
  * Execute a recipe, processing steps sequentially.
@@ -68,6 +81,7 @@ export async function executeRecipe(executionId: string): Promise<void> {
   }
 
   const steps = execution.recipe.steps;
+  const costBreakdown: CostEntry[] = [];
 
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i];
@@ -78,7 +92,11 @@ export async function executeRecipe(executionId: string): Promise<void> {
       where: { id: executionId },
       select: { status: true },
     });
-    if (currentExec?.status === "cancelled") return;
+    if (currentExec?.status === "cancelled") {
+      // Write partial cost before exiting
+      await writeCostToExecution(executionId, costBreakdown);
+      return;
+    }
 
     // Create step result record
     const stepResult = await prisma.recipeStepResult.create({
@@ -101,31 +119,53 @@ export async function executeRecipe(executionId: string): Promise<void> {
     });
 
     try {
-      let output = "";
+      let stepOut: StepOutput;
 
       if (step.type === "stt") {
-        output = await executeSTTStep(execution.userId, config, inputData, previousOutput);
+        stepOut = await executeSTTStep(execution.userId, config, inputData, previousOutput);
       } else if (step.type === "llm") {
-        output = await executeLLMStep(execution.userId, config, previousOutput);
+        stepOut = await executeLLMStep(execution.userId, config, previousOutput);
       } else if (step.type === "output_format") {
-        output = formatOutput(previousOutput, config.formats || ["markdown"]);
+        stepOut = { text: formatOutput(previousOutput, config.formats || ["markdown"]), runId: null, providerResponseId: null };
       } else {
         // TTS, Image — not yet implemented
-        output = previousOutput || `[Step ${step.name}: ${step.type} processing not implemented]`;
+        stepOut = { text: previousOutput || `[Step ${step.name}: ${step.type} processing not implemented]`, runId: null, providerResponseId: null };
       }
 
-      // Update step result
+      // Compute audit hashes
+      const inputHashVal = previousOutput ? sha256(previousOutput) : null;
+      const outputHashVal = stepOut.text ? sha256(stepOut.text) : null;
+
+      // Update step result with output, hashes, and run link
       await prisma.recipeStepResult.update({
         where: { id: stepResult.id },
         data: {
           status: "done",
-          outputPreview: output.substring(0, 500),
-          outputFull: { text: output },
+          outputPreview: stepOut.text.substring(0, 500),
+          outputFull: { text: stepOut.text },
+          runId: stepOut.runId,
+          inputHash: inputHashVal,
+          outputHash: outputHashVal,
+          providerResponseId: stepOut.providerResponseId,
           finishedAt: new Date(),
         },
       });
 
-      previousOutput = output;
+      // Aggregate step cost from UsageEvent linked to Run
+      if (stepOut.runId) {
+        const usageEvents = await prisma.usageEvent.findMany({
+          where: { runId: stepOut.runId },
+          select: { costEstimateCents: true, model: true },
+        });
+        const stepCost = usageEvents.reduce((sum, u) => sum + u.costEstimateCents, 0);
+        costBreakdown.push({
+          stepIndex: step.stepIndex,
+          model: usageEvents[0]?.model || config.modelId || "unknown",
+          costCents: stepCost,
+        });
+      }
+
+      previousOutput = stepOut.text;
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Step failed";
 
@@ -138,7 +178,8 @@ export async function executeRecipe(executionId: string): Promise<void> {
         },
       });
 
-      // Mark execution as error
+      // Mark execution as error with accumulated cost
+      await writeCostToExecution(executionId, costBreakdown);
       await prisma.recipeExecution.update({
         where: { id: executionId },
         data: {
@@ -152,7 +193,8 @@ export async function executeRecipe(executionId: string): Promise<void> {
     }
   }
 
-  // All steps completed
+  // All steps completed — write final cost and mark done
+  await writeCostToExecution(executionId, costBreakdown);
   await prisma.recipeExecution.update({
     where: { id: executionId },
     data: {
@@ -162,6 +204,20 @@ export async function executeRecipe(executionId: string): Promise<void> {
       finishedAt: new Date(),
     },
   });
+}
+
+/**
+ * Persist aggregated cost to RecipeExecution.
+ */
+async function writeCostToExecution(executionId: string, breakdown: CostEntry[]): Promise<void> {
+  const totalCostCents = breakdown.reduce((sum, e) => sum + e.costCents, 0);
+  await prisma.recipeExecution.update({
+    where: { id: executionId },
+    data: {
+      totalCostCents,
+      costBreakdownJson: { steps: breakdown },
+    },
+  }).catch(() => {});
 }
 
 /**
@@ -177,15 +233,15 @@ async function executeSTTStep(
   config: StepConfig,
   inputData: InputData,
   previousOutput: string
-): Promise<string> {
+): Promise<StepOutput> {
   // SKIP: transcript already provided by user
   if (inputData?.transcriptText) {
-    return inputData.transcriptText;
+    return { text: inputData.transcriptText, runId: null, providerResponseId: null };
   }
 
   // SKIP: previous output has text (text input mode, no audio)
   if (previousOutput && previousOutput.length > 10) {
-    return previousOutput;
+    return { text: previousOutput, runId: null, providerResponseId: null };
   }
 
   // Determine language
@@ -246,7 +302,7 @@ async function executeSTTStep(
       throw new Error("STT returned empty transcript. The audio may be silent or in an unsupported format.");
     }
 
-    return result.text;
+    return { text: result.text, runId: run.id, providerResponseId: null };
   } catch (err) {
     await prisma.run.update({
       where: { id: run.id },
@@ -257,13 +313,13 @@ async function executeSTTStep(
 }
 
 /**
- * Execute a single LLM step.
+ * Execute a single LLM step. Returns text, runId, and providerResponseId.
  */
 async function executeLLMStep(
   userId: string,
   config: StepConfig,
   input: string
-): Promise<string> {
+): Promise<StepOutput> {
   const models = getApprovedModels();
   const modelEntry = models.find((m) => m.id === config.modelId) || models[0];
 
@@ -307,7 +363,11 @@ async function executeLLMStep(
       latencyMs: result.latencyMs,
     });
 
-    return result.text;
+    return {
+      text: result.text,
+      runId: run.id,
+      providerResponseId: result.responseId || null,
+    };
   } catch (err) {
     await prisma.run.update({
       where: { id: run.id },

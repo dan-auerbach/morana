@@ -22,6 +22,7 @@ type Job = {
   startedAt: string;
   finishedAt: string | null;
   errorMessage: string | null;
+  totalCostCents: number;
   recipe: { name: string; slug: string };
   user: { email: string };
   stepResults: StepResult[];
@@ -261,6 +262,13 @@ export default function JobsPage() {
                   <span style={{ color: "#ffcc00", fontSize: "10px" }}>
                     {job.progress}% — step {job.currentStep + 1}/
                     {job.totalSteps}
+                  </span>
+                )}
+
+                {/* Cost */}
+                {job.totalCostCents > 0 && (
+                  <span style={{ color: "#ffcc00", fontSize: "10px", fontWeight: 700 }}>
+                    ${(job.totalCostCents / 100).toFixed(2)}
                   </span>
                 )}
 

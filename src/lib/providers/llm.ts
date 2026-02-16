@@ -33,6 +33,7 @@ export type LLMResult = {
   inputTokens: number;
   outputTokens: number;
   latencyMs: number;
+  responseId?: string; // Provider response ID for audit trail
 };
 
 /**
@@ -74,6 +75,7 @@ export async function runLLMChat(
       inputTokens: resp.usage.input_tokens,
       outputTokens: resp.usage.output_tokens,
       latencyMs: Date.now() - start,
+      responseId: resp.id,
     };
   }
 
@@ -96,6 +98,7 @@ export async function runLLMChat(
       inputTokens: resp.usage?.prompt_tokens || 0,
       outputTokens: resp.usage?.completion_tokens || 0,
       latencyMs: Date.now() - start,
+      responseId: resp.id,
     };
   }
 

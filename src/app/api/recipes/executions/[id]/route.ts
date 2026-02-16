@@ -19,6 +19,7 @@ export async function GET(
           select: {
             id: true, stepIndex: true, status: true,
             inputPreview: true, outputPreview: true, outputFull: true,
+            inputHash: true, outputHash: true, providerResponseId: true,
             startedAt: true, finishedAt: true, errorMessage: true,
           },
         },

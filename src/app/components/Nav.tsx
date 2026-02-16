@@ -8,16 +8,16 @@ import { useState, useEffect, useCallback, useRef } from "react";
 /* ── Link definitions ────────────────────────────────────── */
 
 const primaryLinks = [
+  { href: "/recipes", label: "Recipes" },
   { href: "/llm", label: "LLM" },
   { href: "/stt", label: "STT" },
   { href: "/tts", label: "TTS" },
   { href: "/image", label: "Image" },
-  { href: "/recipes", label: "Recipes" },
-  { href: "/jobs", label: "Jobs" },
 ];
 
 // Overflow items — visible at wider breakpoints, collapsed into "More" on narrow
 const overflowLinks = [
+  { href: "/jobs", label: "Jobs" },
   { href: "/history", label: "History" },
   { href: "/usage", label: "Usage" },
 ];
@@ -26,6 +26,8 @@ const adminLinks = [
   { href: "/admin/recipes", label: "Recipes" },
   { href: "/admin/templates", label: "Templates" },
   { href: "/admin/knowledge", label: "Knowledge" },
+  { href: "/admin/models", label: "Models" },
+  { href: "/admin/analytics", label: "Analytics" },
   { href: "/admin/auth-logs", label: "Auth Logs" },
   { href: "/admin/workspaces", label: "Workspaces" },
   { href: "/admin", label: "Dashboard" },
