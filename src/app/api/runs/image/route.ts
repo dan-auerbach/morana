@@ -364,12 +364,14 @@ async function handleFalRequest(params: {
     });
   } catch (err) {
     const internalMsg = err instanceof Error ? err.message : "fal.ai submission failed";
-    console.error("[Image/Fal] Submit error:", internalMsg);
+    console.error("[Image/Fal] error:", internalMsg);
     await prisma.run.update({
       where: { id: run.id },
       data: { status: "error", errorMessage: internalMsg, finishedAt: new Date() },
     });
-    return NextResponse.json({ error: "Image generation failed. Please try again." }, { status: 500 });
+    // Surface real error for debugging (sanitize sensitive info)
+    const safeMsg = internalMsg.replace(/Key [a-f0-9-]+/gi, "Key ***");
+    return NextResponse.json({ error: safeMsg }, { status: 500 });
   }
 }
 

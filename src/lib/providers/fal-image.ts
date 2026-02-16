@@ -102,8 +102,8 @@ export const ASPECT_RATIO_MAP: Record<string, FalImageSize> = {
 const QUEUE_BASE = "https://queue.fal.run";
 
 function getApiKey(): string {
-  const key = process.env.FALAI_API_KEY;
-  if (!key) throw new Error("FALAI_API_KEY is not configured");
+  const key = process.env.FAL_KEY || process.env.FALAI_API_KEY;
+  if (!key) throw new Error("FAL_KEY (or FALAI_API_KEY) is not configured. Set it in your environment variables.");
   return key;
 }
 
