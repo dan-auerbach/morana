@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { getSignedDownloadUrl } from "@/lib/storage";
 
 /**
  * Strip base64 data URIs and other huge values from payloadJson
@@ -49,25 +48,15 @@ export async function GET(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Generate signed URLs for output files (if R2 is configured)
-    let filesWithUrls: { id: string; mime: string; size: number; url: string | null }[] = [];
-    try {
-      filesWithUrls = await Promise.all(
-        run.files
-          .filter((f) => f.kind === "output")
-          .map(async (f) => ({
-            id: f.id,
-            mime: f.mime,
-            size: f.size,
-            url: process.env.R2_ENDPOINT ? await getSignedDownloadUrl(f.storageKey) : null,
-          }))
-      );
-    } catch {
-      // R2 not configured — skip file URLs
-      filesWithUrls = run.files
-        .filter((f) => f.kind === "output")
-        .map((f) => ({ id: f.id, mime: f.mime, size: f.size, url: null }));
-    }
+    // Return file metadata with proxy URLs (served via /api/files/:id)
+    const filesWithUrls = run.files
+      .filter((f) => f.kind === "output")
+      .map((f) => ({
+        id: f.id,
+        mime: f.mime,
+        size: f.size,
+        url: `/api/files/${f.id}`,
+      }));
 
     return NextResponse.json({
       id: run.id,

@@ -19,7 +19,7 @@ export async function runTTS(
   const apiKey = getApiKey();
 
   const resp = await fetch(
-    `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
+    `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`,
     {
       method: "POST",
       headers: {
@@ -39,10 +39,22 @@ export async function runTTS(
     throw new Error(`ElevenLabs API error ${resp.status}: ${errText}`);
   }
 
+  // Verify response is actually audio (not JSON error wrapped in 200)
+  const contentType = resp.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    const errData = await resp.json();
+    throw new Error(`ElevenLabs returned JSON instead of audio: ${JSON.stringify(errData).slice(0, 500)}`);
+  }
+
   const arrayBuffer = await resp.arrayBuffer();
+  if (arrayBuffer.byteLength === 0) {
+    throw new Error("ElevenLabs returned empty audio response");
+  }
+
+  const mimeType = contentType.includes("audio/") ? contentType.split(";")[0].trim() : "audio/mpeg";
   return {
     audioBuffer: Buffer.from(arrayBuffer),
-    mimeType: "audio/mpeg",
+    mimeType,
     chars: text.length,
     latencyMs: Date.now() - start,
   };

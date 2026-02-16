@@ -143,9 +143,9 @@ export default function ImagePage() {
       if (data.input?.prompt) setPrompt(data.input.prompt);
       if (data.output?.text) setResponseText(data.output.text);
       if (data.output?.latencyMs) setStats({ latencyMs: data.output.latencyMs });
-      // Load image from R2 signed URL if available
-      if (data.files?.length > 0 && data.files[0].url) {
-        setImageUrl(data.files[0].url);
+      // Load image via proxy endpoint (avoids R2 CORS issues)
+      if (data.files?.length > 0 && data.files[0].id) {
+        setImageUrl(`/api/files/${data.files[0].id}`);
       }
       if (data.errorMessage) {
         setError(data.errorMessage);

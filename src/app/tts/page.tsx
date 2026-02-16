@@ -92,10 +92,13 @@ export default function TTSPage() {
       setRunId(data.id);
       setStatus(data.status);
       setError("");
+      setAudioUrl("");
       if (data.input?.text) setText(data.input.text);
       if (data.input?.voiceId) setVoiceId(data.input.voiceId);
-      if (data.output?.audioUrl) {
-        setAudioUrl(data.output.audioUrl);
+      // Audio URL via proxy endpoint (avoids R2 CORS issues)
+      const audioFile = data.files?.find((f: { id: string; mime: string }) => f.mime?.startsWith("audio/"));
+      if (audioFile) {
+        setAudioUrl(`/api/files/${audioFile.id}`);
       }
       if (data.output?.latencyMs) {
         setStats({ latencyMs: data.output.latencyMs, chars: data.output.chars || 0 });

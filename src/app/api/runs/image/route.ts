@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { runImageGeneration } from "@/lib/providers/image";
 import { logUsage } from "@/lib/usage";
 import { validateMime } from "@/lib/mime-validate";
-import { uploadToR2, getSignedDownloadUrl } from "@/lib/storage";
+import { uploadToR2 } from "@/lib/storage";
 import { v4 as uuid } from "uuid";
 
 // Vercel serverless: Gemini image generation can take 20-60s
@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
         try {
           await uploadToR2(storageKey, imageBuffer, result.mimeType, imageBuffer.length);
           // Create a File record in DB
-          await prisma.file.create({
+          const file = await prisma.file.create({
             data: {
               userId: user.id,
               runId: run.id,
@@ -120,8 +120,8 @@ export async function POST(req: NextRequest) {
               storageKey,
             },
           });
-          // Generate signed URL for immediate display
-          imageUrl = await getSignedDownloadUrl(storageKey);
+          // Serve via proxy endpoint (avoids R2 CORS issues)
+          imageUrl = `/api/files/${file.id}`;
         } catch (r2Err) {
           // R2 not configured or upload failed — fall back to data URI
           console.warn("[Image] R2 upload failed, falling back to data URI:", r2Err);

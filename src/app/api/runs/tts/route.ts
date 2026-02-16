@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { config } from "@/lib/config";
 import { runTTS } from "@/lib/providers/tts";
 import { logUsage } from "@/lib/usage";
-import { uploadToR2, getSignedDownloadUrl } from "@/lib/storage";
+import { uploadToR2 } from "@/lib/storage";
 import { v4 as uuid } from "uuid";
 import crypto from "crypto";
 
@@ -40,16 +40,18 @@ export async function POST(req: NextRequest) {
     const existingRun = await prisma.run.findUnique({ where: { idempotencyKey } });
     if (existingRun) {
       if (existingRun.status === "done") {
-        // Return cached result
+        // Return cached result with proxy audio URL
         const output = await prisma.runOutput.findFirst({ where: { runId: existingRun.id } });
         const payload = output?.payloadJson as Record<string, unknown> | null;
+        const file = await prisma.file.findFirst({
+          where: { runId: existingRun.id, kind: "output" },
+        });
         return NextResponse.json({
           runId: existingRun.id,
           status: "done",
           latencyMs: payload?.latencyMs ?? 0,
           chars: payload?.chars ?? 0,
-          // Audio not cached, user needs to re-run for audio
-          message: "Cached result (audio not stored). Change text to re-synthesize.",
+          ...(file && { audioUrl: `/api/files/${file.id}` }),
         });
       }
       // Delete stale queued/error/running runs so we can retry
@@ -77,13 +79,13 @@ export async function POST(req: NextRequest) {
     try {
       const result = await runTTS(text, voiceId);
 
-      // Upload audio to R2 storage (avoid huge base64 in JSON response)
+      // Upload audio to R2 storage and serve via proxy endpoint
       let audioUrl: string;
       const storageKey = `tts/output/${run.id}/${uuid()}.mp3`;
 
       try {
         await uploadToR2(storageKey, result.audioBuffer, result.mimeType, result.audioBuffer.length);
-        await prisma.file.create({
+        const file = await prisma.file.create({
           data: {
             userId: user.id,
             runId: run.id,
@@ -93,7 +95,7 @@ export async function POST(req: NextRequest) {
             storageKey,
           },
         });
-        audioUrl = await getSignedDownloadUrl(storageKey);
+        audioUrl = `/api/files/${file.id}`;
       } catch (r2Err) {
         // R2 not configured or upload failed — fall back to data URI
         console.warn("[TTS] R2 upload failed, falling back to data URI:", r2Err instanceof Error ? r2Err.message : r2Err);
