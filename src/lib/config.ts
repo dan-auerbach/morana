@@ -139,6 +139,7 @@ const defaultPricing: Record<string, { input: number; output: number; unit: stri
   elevenlabs: { input: 0.30, output: 0, unit: "1k_chars" },
   "fal-ai/flux/schnell": { input: 0.025, output: 0, unit: "per_image" },
   "fal-ai/flux/dev": { input: 0.055, output: 0, unit: "per_image" },
+  "fal-ai/flux-pro/kontext/max/multi": { input: 0.08, output: 0, unit: "per_image" },
   // Video: Grok Imagine — cost per second of output video
   "grok-imagine-video-480p": { input: 0.05, output: 0, unit: "per_second" },
   "grok-imagine-video-720p": { input: 0.07, output: 0, unit: "per_second" },

@@ -45,7 +45,7 @@ export default function ImagePage() {
 
   // Provider & mode
   const [provider, setProvider] = useState<"fal" | "gemini">("fal");
-  const [operation, setOperation] = useState<"generate" | "img2img">("generate");
+  const [operation, setOperation] = useState<"generate" | "img2img" | "multi">("generate");
 
   // Model
   const [modelId, setModelId] = useState("fal-ai/flux/dev");
@@ -70,6 +70,10 @@ export default function ImagePage() {
   const [uploadedImageName, setUploadedImageName] = useState("");
   const [uploadedImageMime, setUploadedImageMime] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Multi-image upload (for multi operation)
+  const [multiImages, setMultiImages] = useState<Array<{ dataUri: string; name: string; mime: string }>>([]);
+  const multiFileRef = useRef<HTMLInputElement>(null);
 
   // Results
   const [loading, setLoading] = useState(false);
@@ -150,6 +154,41 @@ export default function ImagePage() {
     if (fileRef.current) fileRef.current.value = "";
   }
 
+  // ─── Multi-image handling ─────────────────────────────
+
+  function handleMultiFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    const allowedTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
+    const remaining = 4 - multiImages.length;
+    const toAdd = files.slice(0, remaining);
+
+    for (const file of toAdd) {
+      if (!allowedTypes.includes(file.type)) {
+        setError(`Unsupported format: ${file.type}. Use PNG, JPEG, or WebP.`);
+        continue;
+      }
+      if (file.size > 20 * 1024 * 1024) {
+        setError(`"${file.name}" exceeds 20MB limit`);
+        continue;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        setMultiImages((prev) => {
+          if (prev.length >= 4) return prev;
+          return [...prev, { dataUri: reader.result as string, name: file.name, mime: file.type }];
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+    if (multiFileRef.current) multiFileRef.current.value = "";
+  }
+
+  function removeMultiImage(idx: number) {
+    setMultiImages((prev) => prev.filter((_, i) => i !== idx));
+  }
+
   // ─── Polling for async runs ──────────────────────────────
 
   function startPolling(id: string) {
@@ -194,6 +233,7 @@ export default function ImagePage() {
 
   async function handleSubmit() {
     if (!prompt.trim() || loading) return;
+    if (operation === "multi" && multiImages.length === 0) return;
     setLoading(true);
     setError("");
     setOutputImages([]);
@@ -208,7 +248,7 @@ export default function ImagePage() {
       formData.append("prompt", prompt);
 
       if (provider === "fal") {
-        formData.append("modelId", modelId);
+        formData.append("modelId", operation === "multi" ? "fal-ai/flux-pro/kontext/max/multi" : modelId);
         formData.append("aspectRatio", aspectRatio);
         formData.append("numImages", String(numImages));
         formData.append("outputFormat", outputFormat);
@@ -218,8 +258,22 @@ export default function ImagePage() {
         if (operation === "img2img") formData.append("strength", String(strength));
       }
 
-      // Attach image file if present
-      if (uploadedImage && uploadedImageMime) {
+      // Attach multi images
+      if (operation === "multi" && multiImages.length > 0) {
+        for (const img of multiImages) {
+          const base64Data = img.dataUri.split(",")[1];
+          const binaryStr = atob(base64Data);
+          const bytes = new Uint8Array(binaryStr.length);
+          for (let i = 0; i < binaryStr.length; i++) {
+            bytes[i] = binaryStr.charCodeAt(i);
+          }
+          const blob = new Blob([bytes], { type: img.mime });
+          formData.append("images", blob, img.name || "image.png");
+        }
+      }
+
+      // Attach single image file if present (img2img / gemini)
+      if (operation !== "multi" && uploadedImage && uploadedImageMime) {
         const base64Data = uploadedImage.split(",")[1];
         const binaryStr = atob(base64Data);
         const bytes = new Uint8Array(binaryStr.length);
@@ -391,6 +445,7 @@ export default function ImagePage() {
               setStats(null);
               setPrompt("");
               removeUploadedImage();
+              setMultiImages([]);
             }}
             style={{
               width: "100%",
@@ -503,40 +558,49 @@ export default function ImagePage() {
               ))}
             </div>
 
-            {/* Operation toggle (only for fal with dev model) */}
+            {/* Operation toggle (only for fal) */}
             {provider === "fal" && (
               <div style={{ display: "flex", border: "1px solid #1e2a3a", overflow: "hidden" }}>
-                {(["generate", "img2img"] as const).map((op) => (
+                {([
+                  { id: "generate" as const, label: "Generate" },
+                  { id: "img2img" as const, label: "Img2Img" },
+                  { id: "multi" as const, label: "Multi-Image" },
+                ]).map((op, idx) => (
                   <button
-                    key={op}
+                    key={op.id}
                     onClick={() => {
-                      setOperation(op);
-                      if (op === "img2img") setModelId("fal-ai/flux/dev");
+                      setOperation(op.id);
+                      if (op.id === "img2img") setModelId("fal-ai/flux/dev");
+                      if (op.id === "multi") {
+                        setModelId("fal-ai/flux-pro/kontext/max/multi");
+                        removeUploadedImage();
+                      }
+                      if (op.id === "generate") setMultiImages([]);
                     }}
-                    disabled={op === "img2img" && modelId === "fal-ai/flux/schnell"}
+                    disabled={op.id === "img2img" && modelId === "fal-ai/flux/schnell"}
                     style={{
                       padding: "6px 14px",
-                      background: operation === op ? "rgba(0, 255, 136, 0.12)" : "transparent",
+                      background: operation === op.id ? "rgba(0, 255, 136, 0.12)" : "transparent",
                       border: "none",
-                      borderRight: op === "generate" ? "1px solid #1e2a3a" : "none",
-                      color: operation === op ? "#00ff88" : "#5a6a7a",
+                      borderRight: idx < 2 ? "1px solid #1e2a3a" : "none",
+                      color: operation === op.id ? "#00ff88" : "#5a6a7a",
                       fontFamily: "inherit",
                       fontSize: "12px",
-                      fontWeight: operation === op ? 700 : 400,
-                      cursor: op === "img2img" && modelId === "fal-ai/flux/schnell" ? "not-allowed" : "pointer",
-                      opacity: op === "img2img" && modelId === "fal-ai/flux/schnell" ? 0.3 : 1,
+                      fontWeight: operation === op.id ? 700 : 400,
+                      cursor: op.id === "img2img" && modelId === "fal-ai/flux/schnell" ? "not-allowed" : "pointer",
+                      opacity: op.id === "img2img" && modelId === "fal-ai/flux/schnell" ? 0.3 : 1,
                       textTransform: "uppercase",
                     }}
                   >
-                    {op === "generate" ? "Generate" : "Img2Img"}
+                    {op.label}
                   </button>
                 ))}
               </div>
             )}
           </div>
 
-          {/* Model selector (fal only) */}
-          {provider === "fal" && (
+          {/* Model selector (fal only, not for multi) */}
+          {provider === "fal" && operation !== "multi" && (
             <div>
               <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#00e5ff", textTransform: "uppercase", letterSpacing: "0.1em" }}>--model</label>
               <select
@@ -610,8 +674,8 @@ export default function ImagePage() {
             </div>
           )}
 
-          {/* Batch count + output format (fal only) */}
-          {provider === "fal" && (
+          {/* Batch count + output format (fal only, not multi) */}
+          {provider === "fal" && operation !== "multi" && (
             <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
               <div>
                 <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#00e5ff", textTransform: "uppercase", letterSpacing: "0.1em" }}>--count</label>
@@ -728,6 +792,68 @@ export default function ImagePage() {
             </div>
           )}
 
+          {/* Multi-image upload */}
+          {operation === "multi" && provider === "fal" && (
+            <div>
+              <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#00ff88", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                --input-images <span style={{ color: "#e0e0e0", fontWeight: 400, textTransform: "none" }}>({multiImages.length}/4)</span>
+              </label>
+              <input
+                ref={multiFileRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                multiple
+                onChange={handleMultiFileSelect}
+                style={{ display: "none" }}
+              />
+
+              {/* Image grid */}
+              {multiImages.length > 0 && (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "8px", marginBottom: "8px" }}>
+                  {multiImages.map((img, idx) => (
+                    <div key={idx} style={{ border: "1px solid #1e2a3a", backgroundColor: "#111820", padding: "8px", position: "relative" }}>
+                      <div style={{ color: "#00e5ff", fontSize: "10px", fontWeight: 700, marginBottom: "4px", textTransform: "uppercase" }}>Image {idx + 1}</div>
+                      <img src={img.dataUri} alt={`Input ${idx + 1}`} style={{ width: "100%", height: "100px", objectFit: "cover", border: "1px solid #1e2a3a" }} />
+                      <div style={{ color: "#5a6a7a", fontSize: "10px", marginTop: "4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{img.name}</div>
+                      <button
+                        onClick={() => removeMultiImage(idx)}
+                        style={{ position: "absolute", top: "4px", right: "4px", background: "rgba(0,0,0,0.7)", border: "1px solid #ff4444", color: "#ff4444", padding: "1px 5px", fontFamily: "inherit", fontSize: "10px", cursor: "pointer" }}
+                      >
+                        x
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {multiImages.length < 4 && (
+                <button
+                  onClick={() => multiFileRef.current?.click()}
+                  style={{
+                    padding: "10px 20px",
+                    background: "transparent",
+                    border: "1px dashed #1e2a3a",
+                    color: "#5a6a7a",
+                    fontFamily: "inherit",
+                    fontSize: "12px",
+                    cursor: "pointer",
+                    width: "100%",
+                    textAlign: "center",
+                    transition: "all 0.2s",
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(0, 255, 136, 0.4)"; e.currentTarget.style.color = "#00ff88"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#1e2a3a"; e.currentTarget.style.color = "#5a6a7a"; }}
+                >
+                  [  + ADD IMAGE{multiImages.length > 0 ? "S" : ""}  ] — PNG, JPEG, WebP (max 20MB each, up to 4)
+                </button>
+              )}
+
+              <div style={{ fontSize: "10px", color: "#5a6a7a", marginTop: "6px", fontStyle: "italic" }}>
+                Reference images by number in your prompt: &quot;person from image 1 in scene from image 2&quot;
+              </div>
+            </div>
+          )}
+
           {/* Strength slider (img2img only) */}
           {operation === "img2img" && provider === "fal" && (
             <div>
@@ -750,8 +876,8 @@ export default function ImagePage() {
             </div>
           )}
 
-          {/* Advanced settings (fal only) */}
-          {provider === "fal" && (
+          {/* Advanced settings (fal only, not multi) */}
+          {provider === "fal" && operation !== "multi" && (
             <div>
               <button
                 onClick={() => setShowAdvanced(!showAdvanced)}
@@ -820,7 +946,27 @@ export default function ImagePage() {
           )}
 
           {/* Cost preview */}
-          {prompt.trim() && (
+          {prompt.trim() && operation === "multi" && (
+            <div
+              style={{
+                fontSize: "10px",
+                fontFamily: "inherit",
+                color: "#ffcc00",
+                padding: "4px 8px",
+                backgroundColor: "rgba(255, 204, 0, 0.06)",
+                border: "1px solid rgba(255, 204, 0, 0.15)",
+                borderRadius: "2px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                alignSelf: "flex-start",
+              }}
+            >
+              <span style={{ color: "#00ff88", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>COST</span>
+              <span>~$0.08 per image | Kontext Max Multi ({multiImages.length} input{multiImages.length !== 1 ? "s" : ""})</span>
+            </div>
+          )}
+          {prompt.trim() && operation !== "multi" && (
             <div style={{ alignSelf: "flex-start" }}>
               <CostPreview
                 type="image"
@@ -833,7 +979,7 @@ export default function ImagePage() {
           <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
             <button
               onClick={handleSubmit}
-              disabled={loading || !prompt.trim() || (operation === "img2img" && !uploadedImage)}
+              disabled={loading || !prompt.trim() || (operation === "img2img" && !uploadedImage) || (operation === "multi" && multiImages.length === 0)}
               style={{
                 padding: "8px 24px",
                 background: "transparent",

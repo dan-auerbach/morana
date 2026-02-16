@@ -2,9 +2,10 @@
  * fal.ai Image Provider
  *
  * Supports Flux models via fal.ai queue API:
- *   - fal-ai/flux/schnell  (fast draft, 1–4 steps)
- *   - fal-ai/flux/dev      (quality, 28 steps)
- *   - fal-ai/flux/dev/image-to-image
+ *   - fal-ai/flux/schnell                    (fast draft, 1–4 steps)
+ *   - fal-ai/flux/dev                        (quality, 28 steps)
+ *   - fal-ai/flux/dev/image-to-image         (single img2img)
+ *   - fal-ai/flux-pro/kontext/max/multi      (multi-image composition)
  *
  * Queue flow: submit → poll status → get result
  * All requests go through https://queue.fal.run/{modelId}
@@ -33,6 +34,17 @@ export type FalSubmitParams = {
   // img2img-specific
   image_url?: string;
   strength?: number;
+};
+
+export type FalMultiImageParams = {
+  prompt: string;
+  image_urls: string[];
+  aspect_ratio?: string;
+  seed?: number;
+  num_images?: number;
+  output_format?: "jpeg" | "png";
+  guidance_scale?: number;
+  safety_tolerance?: string;
 };
 
 export type FalQueueResponse = {
@@ -241,4 +253,36 @@ export async function downloadFalImage(
     buffer: Buffer.from(arrayBuffer),
     contentType,
   };
+}
+
+// ─── Multi-image (Kontext Max Multi) ───────────────────────
+
+const KONTEXT_MULTI_ENDPOINT = "fal-ai/flux-pro/kontext/max/multi";
+
+/**
+ * Submit a multi-image composition job to FLUX.1 Kontext Max Multi.
+ * Accepts multiple image_urls and a prompt referencing them by number.
+ */
+export async function submitMultiImageJob(
+  params: FalMultiImageParams
+): Promise<FalQueueResponse> {
+  const endpoint = `${QUEUE_BASE}/${KONTEXT_MULTI_ENDPOINT}`;
+
+  const resp = await fetch(endpoint, {
+    method: "POST",
+    headers: falHeaders(),
+    body: JSON.stringify(params),
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(`fal.ai multi-image submit failed (${resp.status}): ${text.slice(0, 500)}`);
+  }
+
+  const data = await resp.json();
+  if (!data.request_id) {
+    throw new Error("fal.ai multi-image submit: missing request_id");
+  }
+
+  return data as FalQueueResponse;
 }
