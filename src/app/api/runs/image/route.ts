@@ -9,8 +9,13 @@ import {
   getImageJobResult,
   downloadFalImage,
   submitMultiImageJob,
+  submitFaceSwapJob,
+  getFaceSwapResult,
+  submitFlux2EditJob,
   type FalSubmitParams,
   type FalMultiImageParams,
+  type FalFaceSwapParams,
+  type FalFlux2EditParams,
 } from "@/lib/providers/fal-image";
 import { logUsage } from "@/lib/usage";
 import { validateMime } from "@/lib/mime-validate";
@@ -42,6 +47,8 @@ export async function POST(req: NextRequest) {
     let inputImageMime: string | undefined;
     let inputImageStorageKey: string | undefined;
     let multiImageStorageKeys: string[] = [];
+    let faceImageStorageKey: string | undefined;
+    let targetImageStorageKey: string | undefined;
     // fal-specific params
     let aspectRatio: string | undefined;
     let width: number | undefined;
@@ -69,11 +76,45 @@ export async function POST(req: NextRequest) {
       strength = formData.get("strength") ? parseFloat(formData.get("strength") as string) : undefined;
       outputFormat = (formData.get("outputFormat") as "jpeg" | "png") || undefined;
 
-      // Multi-image: parse "images" array for multi operation
-      if (operation === "multi") {
+      // Face swap: parse "faceImage" + "targetImage"
+      if (operation === "face-swap") {
+        const allowedTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
+
+        const faceFile = formData.get("faceImage") as File | null;
+        const targetFile = formData.get("targetImage") as File | null;
+
+        if (!faceFile || faceFile.size === 0) {
+          return NextResponse.json({ error: "Face image is required for Face Swap" }, { status: 400 });
+        }
+        if (!targetFile || targetFile.size === 0) {
+          return NextResponse.json({ error: "Target image is required for Face Swap" }, { status: 400 });
+        }
+
+        for (const [label, file] of [["Face", faceFile], ["Target", targetFile]] as const) {
+          if (file.size > MAX_IMAGE_SIZE) {
+            return NextResponse.json({ error: `${label} image exceeds 20MB limit` }, { status: 400 });
+          }
+          if (!allowedTypes.includes(file.type)) {
+            return NextResponse.json({ error: `${label}: unsupported format ${file.type}. Use PNG, JPEG, or WebP.` }, { status: 400 });
+          }
+          const buffer = Buffer.from(await file.arrayBuffer());
+          const mimeCheck = validateMime(buffer, file.type);
+          if (!mimeCheck.valid) {
+            return NextResponse.json({ error: `${label}: ${mimeCheck.message || "content-type mismatch"}` }, { status: 400 });
+          }
+          const ext = file.type.includes("png") ? "png" : file.type.includes("webp") ? "webp" : "jpg";
+          const storageKey = `image/input/${uuid()}.${ext}`;
+          await uploadToR2(storageKey, buffer, file.type, buffer.length);
+          if (label === "Face") faceImageStorageKey = storageKey;
+          else targetImageStorageKey = storageKey;
+        }
+      }
+
+      // Multi-edit (FLUX.2) or legacy multi: parse "images" array
+      if (operation === "multi-edit" || operation === "multi") {
         const images = formData.getAll("images") as File[];
         if (images.length === 0) {
-          return NextResponse.json({ error: "At least 1 image required for Multi-Image" }, { status: 400 });
+          return NextResponse.json({ error: "At least 1 image required" }, { status: 400 });
         }
         if (images.length > 4) {
           return NextResponse.json({ error: "Maximum 4 images allowed" }, { status: 400 });
@@ -151,6 +192,29 @@ export async function POST(req: NextRequest) {
 
     // ─── Route to provider ─────────────────────────────────
 
+    if (operation === "face-swap" && faceImageStorageKey && targetImageStorageKey) {
+      return handleFaceSwapRequest({
+        userId: user.id,
+        faceImageStorageKey,
+        targetImageStorageKey,
+      });
+    }
+
+    if (operation === "multi-edit" && multiImageStorageKeys.length > 0) {
+      return handleFlux2EditRequest({
+        userId: user.id,
+        prompt,
+        multiImageStorageKeys,
+        aspectRatio,
+        seed,
+        numImages,
+        steps,
+        guidanceScale,
+        outputFormat,
+      });
+    }
+
+    // Legacy multi-image (Kontext Max Multi) — kept for backward compat
     if (operation === "multi" && multiImageStorageKeys.length > 0) {
       return handleMultiImageRequest({
         userId: user.id,
@@ -422,7 +486,334 @@ async function handleFalRequest(params: {
   }
 }
 
-// ─── Multi-image handler (Kontext Max Multi) ───────────────
+// ─── Face Swap handler ──────────────────────────────────────
+
+async function handleFaceSwapRequest(params: {
+  userId: string;
+  faceImageStorageKey: string;
+  targetImageStorageKey: string;
+}) {
+  const { userId, faceImageStorageKey, targetImageStorageKey } = params;
+
+  const modelId = "fal-ai/face-swap";
+  const workspaceId = await getActiveWorkspaceId(userId);
+
+  const run = await prisma.run.create({
+    data: {
+      userId,
+      type: "image",
+      status: "queued",
+      provider: "fal",
+      model: modelId,
+      workspaceId: workspaceId || undefined,
+    },
+  });
+
+  await prisma.runInput.create({
+    data: {
+      runId: run.id,
+      payloadJson: {
+        operation: "face-swap",
+        modelId,
+        faceImageStorageKey,
+        targetImageStorageKey,
+      },
+    },
+  });
+
+  try {
+    // Generate signed URLs for both input images
+    const swapImageUrl = await getSignedDownloadUrl(faceImageStorageKey, 600);
+    const baseImageUrl = await getSignedDownloadUrl(targetImageStorageKey, 600);
+
+    const falParams: FalFaceSwapParams = {
+      base_image_url: baseImageUrl,
+      swap_image_url: swapImageUrl,
+    };
+
+    const queueResult = await submitFaceSwapJob(falParams);
+    const requestId = queueResult.request_id;
+    const statusUrl = queueResult.status_url;
+    const responseUrl = queueResult.response_url;
+
+    await prisma.run.update({
+      where: { id: run.id },
+      data: { status: "running", providerJobId: requestId },
+    });
+
+    // Inline poll — face swap is typically fast (5-15s)
+    const start = Date.now();
+    const MAX_POLL_MS = 55_000;
+    let pollInterval = 1000;
+    let completed = false;
+
+    while (Date.now() - start < MAX_POLL_MS) {
+      await new Promise((r) => setTimeout(r, pollInterval));
+      pollInterval = Math.min(pollInterval * 1.3, 5000);
+
+      const status = await getImageJobStatus(modelId, requestId, statusUrl);
+      if (status.status === "COMPLETED") {
+        completed = true;
+        break;
+      }
+    }
+
+    if (!completed) {
+      await prisma.run.update({
+        where: { id: run.id },
+        data: { status: "error", errorMessage: "Face swap timed out", finishedAt: new Date() },
+      });
+      return NextResponse.json({ error: "Face swap timed out." }, { status: 504 });
+    }
+
+    // Face swap returns { image: { url, ... } } instead of { images: [...] }
+    const result = await getFaceSwapResult(requestId, responseUrl);
+    const latencyMs = Date.now() - start;
+
+    const { buffer, contentType } = await downloadFalImage(result.image.url);
+    const ext = contentType.includes("png") ? "png" : "jpg";
+    const storageKey = `image/output/${run.id}/${uuid()}.${ext}`;
+    await uploadToR2(storageKey, buffer, contentType, buffer.length);
+
+    const file = await prisma.file.create({
+      data: {
+        userId,
+        runId: run.id,
+        kind: "output",
+        mime: contentType,
+        size: buffer.length,
+        storageKey,
+      },
+    });
+
+    await prisma.runOutput.create({
+      data: {
+        runId: run.id,
+        payloadJson: { latencyMs },
+      },
+    });
+
+    await prisma.run.update({
+      where: { id: run.id },
+      data: { status: "done", finishedAt: new Date() },
+    });
+
+    await logUsage({
+      runId: run.id,
+      userId,
+      provider: "fal",
+      model: modelId,
+      units: { images: 1 },
+      latencyMs,
+      workspaceId: workspaceId || undefined,
+    });
+
+    return NextResponse.json({
+      runId: run.id,
+      status: "done",
+      imageUrl: `/api/files/${file.id}`,
+      files: [{ id: file.id, url: `/api/files/${file.id}` }],
+      latencyMs,
+    });
+  } catch (err) {
+    const internalMsg = err instanceof Error ? err.message : "Face swap failed";
+    console.error("[Image/FaceSwap] error:", internalMsg);
+    await prisma.run.update({
+      where: { id: run.id },
+      data: { status: "error", errorMessage: internalMsg, finishedAt: new Date() },
+    });
+    const safeMsg = internalMsg.replace(/Key [a-f0-9-]+/gi, "Key ***");
+    return NextResponse.json({ error: safeMsg }, { status: 500 });
+  }
+}
+
+// ─── FLUX.2 [dev] Edit handler (multi-reference) ────────────
+
+async function handleFlux2EditRequest(params: {
+  userId: string;
+  prompt: string;
+  multiImageStorageKeys: string[];
+  aspectRatio?: string;
+  seed?: number;
+  numImages?: number;
+  steps?: number;
+  guidanceScale?: number;
+  outputFormat?: "jpeg" | "png";
+}) {
+  const { userId, prompt, multiImageStorageKeys, aspectRatio, seed, numImages, steps, guidanceScale, outputFormat } = params;
+
+  if (!prompt || prompt.trim().length === 0) {
+    return NextResponse.json({ error: "prompt is required" }, { status: 400 });
+  }
+  if (prompt.length > 10000) {
+    return NextResponse.json({ error: "Prompt exceeds 10,000 character limit" }, { status: 400 });
+  }
+
+  const modelId = "fal-ai/flux-2/edit";
+  const workspaceId = await getActiveWorkspaceId(userId);
+
+  const run = await prisma.run.create({
+    data: {
+      userId,
+      type: "image",
+      status: "queued",
+      provider: "fal",
+      model: modelId,
+      workspaceId: workspaceId || undefined,
+    },
+  });
+
+  await prisma.runInput.create({
+    data: {
+      runId: run.id,
+      payloadJson: {
+        operation: "multi-edit",
+        modelId,
+        prompt,
+        numInputImages: multiImageStorageKeys.length,
+        aspectRatio,
+        seed,
+        numImages,
+        steps,
+        guidanceScale,
+        outputFormat,
+      },
+    },
+  });
+
+  try {
+    // Generate signed URLs for all input images
+    const imageUrls: string[] = [];
+    for (const key of multiImageStorageKeys) {
+      const signedUrl = await getSignedDownloadUrl(key, 600);
+      imageUrls.push(signedUrl);
+    }
+
+    // Resolve image_size from aspect ratio
+    let imageSize: import("@/lib/providers/fal-image").FalImageSize | undefined;
+    if (aspectRatio) {
+      const { ASPECT_RATIO_MAP } = await import("@/lib/providers/fal-image");
+      imageSize = ASPECT_RATIO_MAP[aspectRatio];
+    }
+
+    const falParams: FalFlux2EditParams = {
+      prompt,
+      image_urls: imageUrls,
+      output_format: outputFormat || "png",
+      enable_safety_checker: true,
+      ...(imageSize ? { image_size: imageSize } : {}),
+      ...(seed !== undefined ? { seed } : {}),
+      ...(numImages ? { num_images: Math.min(numImages, 4) } : {}),
+      ...(steps ? { num_inference_steps: Math.min(Math.max(steps, 4), 50) } : {}),
+      ...(guidanceScale !== undefined ? { guidance_scale: guidanceScale } : {}),
+    };
+
+    const queueResult = await submitFlux2EditJob(falParams);
+    const requestId = queueResult.request_id;
+    const statusUrl = queueResult.status_url;
+    const responseUrl = queueResult.response_url;
+
+    await prisma.run.update({
+      where: { id: run.id },
+      data: { status: "running", providerJobId: requestId },
+    });
+
+    // Inline poll — FLUX.2 dev edit: ~10-40s
+    const start = Date.now();
+    const MAX_POLL_MS = 55_000;
+    let pollInterval = 1500;
+    let completed = false;
+
+    while (Date.now() - start < MAX_POLL_MS) {
+      await new Promise((r) => setTimeout(r, pollInterval));
+      pollInterval = Math.min(pollInterval * 1.3, 5000);
+
+      const status = await getImageJobStatus(modelId, requestId, statusUrl);
+      if (status.status === "COMPLETED") {
+        completed = true;
+        break;
+      }
+    }
+
+    if (!completed) {
+      await prisma.run.update({
+        where: { id: run.id },
+        data: { status: "error", errorMessage: "Multi-edit generation timed out", finishedAt: new Date() },
+      });
+      return NextResponse.json({ error: "Multi-edit generation timed out." }, { status: 504 });
+    }
+
+    const result = await getImageJobResult(modelId, requestId, responseUrl);
+    const latencyMs = Date.now() - start;
+
+    const outputFiles: Array<{ id: string; url: string }> = [];
+    for (const img of result.images) {
+      const { buffer, contentType } = await downloadFalImage(img.url);
+      const ext = contentType.includes("png") ? "png" : "jpg";
+      const storageKey = `image/output/${run.id}/${uuid()}.${ext}`;
+      await uploadToR2(storageKey, buffer, contentType, buffer.length);
+
+      const file = await prisma.file.create({
+        data: {
+          userId,
+          runId: run.id,
+          kind: "output",
+          mime: contentType,
+          size: buffer.length,
+          storageKey,
+        },
+      });
+      outputFiles.push({ id: file.id, url: `/api/files/${file.id}` });
+    }
+
+    await prisma.runOutput.create({
+      data: {
+        runId: run.id,
+        payloadJson: {
+          seed: result.seed,
+          timings: result.timings || {},
+          hasNsfwConcepts: result.has_nsfw_concepts || [],
+          latencyMs,
+        },
+      },
+    });
+
+    await prisma.run.update({
+      where: { id: run.id },
+      data: { status: "done", finishedAt: new Date() },
+    });
+
+    await logUsage({
+      runId: run.id,
+      userId,
+      provider: "fal",
+      model: modelId,
+      units: { images: result.images.length },
+      latencyMs,
+      workspaceId: workspaceId || undefined,
+    });
+
+    return NextResponse.json({
+      runId: run.id,
+      status: "done",
+      imageUrl: outputFiles[0]?.url || null,
+      files: outputFiles,
+      seed: result.seed,
+      latencyMs,
+    });
+  } catch (err) {
+    const internalMsg = err instanceof Error ? err.message : "Multi-edit generation failed";
+    console.error("[Image/Flux2Edit] error:", internalMsg);
+    await prisma.run.update({
+      where: { id: run.id },
+      data: { status: "error", errorMessage: internalMsg, finishedAt: new Date() },
+    });
+    const safeMsg = internalMsg.replace(/Key [a-f0-9-]+/gi, "Key ***");
+    return NextResponse.json({ error: safeMsg }, { status: 500 });
+  }
+}
+
+// ─── Multi-image handler (Kontext Max Multi — legacy) ────────
 
 async function handleMultiImageRequest(params: {
   userId: string;

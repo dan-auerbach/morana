@@ -5,7 +5,9 @@
  *   - fal-ai/flux/schnell                    (fast draft, 1–4 steps)
  *   - fal-ai/flux/dev                        (quality, 28 steps)
  *   - fal-ai/flux/dev/image-to-image         (single img2img)
- *   - fal-ai/flux-pro/kontext/max/multi      (multi-image composition)
+ *   - fal-ai/face-swap                       (dedicated face swapping)
+ *   - fal-ai/flux-2/edit                     (multi-reference image editing)
+ *   - fal-ai/flux-pro/kontext/max/multi      (legacy multi-image, deprecated)
  *
  * Queue flow: submit → poll status → get result
  * All requests go through https://queue.fal.run/{modelId}
@@ -73,6 +75,29 @@ export type FalResultResponse = {
   seed: number;
   timings?: Record<string, number>;
   has_nsfw_concepts?: boolean[];
+};
+
+// Face Swap types
+export type FalFaceSwapParams = {
+  base_image_url: string;   // target scene image
+  swap_image_url: string;   // face source image
+};
+
+export type FalFaceSwapResult = {
+  image: FalOutputImage;
+};
+
+// FLUX.2 [dev] Edit types
+export type FalFlux2EditParams = {
+  prompt: string;
+  image_urls: string[];           // up to 4 reference images
+  guidance_scale?: number;        // 0-20, default 2.5
+  seed?: number;
+  num_inference_steps?: number;   // 4-50, default 28
+  image_size?: FalImageSize;
+  num_images?: number;
+  output_format?: "jpeg" | "png";
+  enable_safety_checker?: boolean;
 };
 
 // ─── Model registry ────────────────────────────────────────
@@ -255,13 +280,13 @@ export async function downloadFalImage(
   };
 }
 
-// ─── Multi-image (Kontext Max Multi) ───────────────────────
+// ─── Multi-image (Kontext Max Multi — legacy, kept for backward compat) ──
 
 const KONTEXT_MULTI_ENDPOINT = "fal-ai/flux-pro/kontext/max/multi";
 
 /**
  * Submit a multi-image composition job to FLUX.1 Kontext Max Multi.
- * Accepts multiple image_urls and a prompt referencing them by number.
+ * @deprecated Use submitFlux2EditJob() for better quality multi-image editing.
  */
 export async function submitMultiImageJob(
   params: FalMultiImageParams
@@ -282,6 +307,93 @@ export async function submitMultiImageJob(
   const data = await resp.json();
   if (!data.request_id) {
     throw new Error("fal.ai multi-image submit: missing request_id");
+  }
+
+  return data as FalQueueResponse;
+}
+
+// ─── Face Swap ──────────────────────────────────────────────
+
+/**
+ * Submit a face swap job to fal.ai.
+ * Swaps the face from swap_image onto the person in base_image.
+ * Specialized model with excellent face preservation / likeness.
+ */
+export async function submitFaceSwapJob(
+  params: FalFaceSwapParams
+): Promise<FalQueueResponse> {
+  const endpoint = `${QUEUE_BASE}/fal-ai/face-swap`;
+
+  const resp = await fetch(endpoint, {
+    method: "POST",
+    headers: falHeaders(),
+    body: JSON.stringify(params),
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(`fal.ai face-swap submit failed (${resp.status}): ${text.slice(0, 500)}`);
+  }
+
+  const data = await resp.json();
+  if (!data.request_id) {
+    throw new Error("fal.ai face-swap submit: missing request_id");
+  }
+
+  return data as FalQueueResponse;
+}
+
+/**
+ * Get result of a face swap job.
+ * Face swap returns a single image (not an array).
+ */
+export async function getFaceSwapResult(
+  requestId: string,
+  responseUrl?: string
+): Promise<FalFaceSwapResult> {
+  const endpoint = responseUrl
+    || `${QUEUE_BASE}/fal-ai/face-swap/requests/${requestId}`;
+
+  const resp = await fetch(endpoint, {
+    method: "GET",
+    headers: { Authorization: `Key ${getApiKey()}` },
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(`fal.ai face-swap result failed (${resp.status}): ${text.slice(0, 500)}`);
+  }
+
+  return (await resp.json()) as FalFaceSwapResult;
+}
+
+// ─── FLUX.2 [dev] Edit (multi-reference) ────────────────────
+
+/**
+ * Submit a multi-reference image editing job to FLUX.2 [dev].
+ * Accepts up to 4 reference images and a natural language prompt
+ * describing how to combine/edit them.
+ * Superior quality to Kontext Max Multi for compositing tasks.
+ */
+export async function submitFlux2EditJob(
+  params: FalFlux2EditParams
+): Promise<FalQueueResponse> {
+  const endpoint = `${QUEUE_BASE}/fal-ai/flux-2/edit`;
+
+  const resp = await fetch(endpoint, {
+    method: "POST",
+    headers: falHeaders(),
+    body: JSON.stringify(params),
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(`fal.ai flux-2/edit submit failed (${resp.status}): ${text.slice(0, 500)}`);
+  }
+
+  const data = await resp.json();
+  if (!data.request_id) {
+    throw new Error("fal.ai flux-2/edit submit: missing request_id");
   }
 
   return data as FalQueueResponse;

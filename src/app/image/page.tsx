@@ -45,7 +45,7 @@ export default function ImagePage() {
 
   // Provider & mode
   const [provider, setProvider] = useState<"fal" | "gemini">("fal");
-  const [operation, setOperation] = useState<"generate" | "img2img" | "multi">("generate");
+  const [operation, setOperation] = useState<"generate" | "img2img" | "face-swap" | "multi-edit">("generate");
 
   // Model
   const [modelId, setModelId] = useState("fal-ai/flux/dev");
@@ -71,7 +71,13 @@ export default function ImagePage() {
   const [uploadedImageMime, setUploadedImageMime] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Multi-image upload (for multi operation)
+  // Face swap uploads
+  const [faceImage, setFaceImage] = useState<{ dataUri: string; name: string; mime: string } | null>(null);
+  const [targetImage, setTargetImage] = useState<{ dataUri: string; name: string; mime: string } | null>(null);
+  const faceFileRef = useRef<HTMLInputElement>(null);
+  const targetFileRef = useRef<HTMLInputElement>(null);
+
+  // Multi-edit upload (for multi-edit operation)
   const [multiImages, setMultiImages] = useState<Array<{ dataUri: string; name: string; mime: string }>>([]);
   const multiFileRef = useRef<HTMLInputElement>(null);
 
@@ -154,6 +160,32 @@ export default function ImagePage() {
     if (fileRef.current) fileRef.current.value = "";
   }
 
+  // ─── Face swap image handling ─────────────────────────
+
+  function handleFaceSwapFileSelect(target: "face" | "target", e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const allowedTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      setError(`Unsupported format: ${file.type}. Use PNG, JPEG, or WebP.`);
+      return;
+    }
+    if (file.size > 20 * 1024 * 1024) {
+      setError("Image exceeds 20MB limit");
+      return;
+    }
+    setError("");
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const data = { dataUri: reader.result as string, name: file.name, mime: file.type };
+      if (target === "face") setFaceImage(data);
+      else setTargetImage(data);
+    };
+    reader.readAsDataURL(file);
+  }
+
   // ─── Multi-image handling ─────────────────────────────
 
   function handleMultiFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
@@ -232,8 +264,15 @@ export default function ImagePage() {
   // ─── Submit ──────────────────────────────────────────────
 
   async function handleSubmit() {
-    if (!prompt.trim() || loading) return;
-    if (operation === "multi" && multiImages.length === 0) return;
+    // Validation per operation
+    if (loading) return;
+    if (operation === "face-swap") {
+      if (!faceImage || !targetImage) return;
+    } else {
+      if (!prompt.trim()) return;
+    }
+    if (operation === "multi-edit" && multiImages.length === 0) return;
+
     setLoading(true);
     setError("");
     setOutputImages([]);
@@ -248,7 +287,10 @@ export default function ImagePage() {
       formData.append("prompt", prompt);
 
       if (provider === "fal") {
-        formData.append("modelId", operation === "multi" ? "fal-ai/flux-pro/kontext/max/multi" : modelId);
+        const activeModelId = operation === "face-swap" ? "fal-ai/face-swap"
+          : operation === "multi-edit" ? "fal-ai/flux-2/edit"
+          : modelId;
+        formData.append("modelId", activeModelId);
         formData.append("aspectRatio", aspectRatio);
         formData.append("numImages", String(numImages));
         formData.append("outputFormat", outputFormat);
@@ -258,8 +300,22 @@ export default function ImagePage() {
         if (operation === "img2img") formData.append("strength", String(strength));
       }
 
-      // Attach multi images
-      if (operation === "multi" && multiImages.length > 0) {
+      // Attach face swap images
+      if (operation === "face-swap" && faceImage && targetImage) {
+        for (const [fieldName, img] of [["faceImage", faceImage], ["targetImage", targetImage]] as const) {
+          const base64Data = img.dataUri.split(",")[1];
+          const binaryStr = atob(base64Data);
+          const bytes = new Uint8Array(binaryStr.length);
+          for (let i = 0; i < binaryStr.length; i++) {
+            bytes[i] = binaryStr.charCodeAt(i);
+          }
+          const blob = new Blob([bytes], { type: img.mime });
+          formData.append(fieldName, blob, img.name || "image.png");
+        }
+      }
+
+      // Attach multi-edit images
+      if (operation === "multi-edit" && multiImages.length > 0) {
         for (const img of multiImages) {
           const base64Data = img.dataUri.split(",")[1];
           const binaryStr = atob(base64Data);
@@ -273,7 +329,7 @@ export default function ImagePage() {
       }
 
       // Attach single image file if present (img2img / gemini)
-      if (operation !== "multi" && uploadedImage && uploadedImageMime) {
+      if (operation !== "face-swap" && operation !== "multi-edit" && uploadedImage && uploadedImageMime) {
         const base64Data = uploadedImage.split(",")[1];
         const binaryStr = atob(base64Data);
         const bytes = new Uint8Array(binaryStr.length);
@@ -293,7 +349,10 @@ export default function ImagePage() {
 
       setRunId(data.runId);
       setStatus(data.status);
-      setStats({ model: provider === "fal" ? modelId : "gemini-2.5-flash-image" });
+      const activeModelId = operation === "face-swap" ? "fal-ai/face-swap"
+        : operation === "multi-edit" ? "fal-ai/flux-2/edit"
+        : provider === "fal" ? modelId : "gemini-2.5-flash-image";
+      setStats({ model: activeModelId });
 
       if (data.status === "done") {
         setLoading(false);
@@ -446,6 +505,8 @@ export default function ImagePage() {
               setPrompt("");
               removeUploadedImage();
               setMultiImages([]);
+              setFaceImage(null);
+              setTargetImage(null);
             }}
             style={{
               width: "100%",
@@ -494,8 +555,8 @@ export default function ImagePage() {
                 <span style={{ color: "#444", fontSize: "9px" }}>
                   {new Date(r.createdAt).toLocaleString("sl-SI", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
                 </span>
-                <span style={{ color: r.model?.includes("flux") ? "#00e5ff" : "#ffcc00", fontSize: "9px" }}>
-                  {r.model?.includes("schnell") ? "SCH" : r.model?.includes("dev") ? "DEV" : "GEM"}
+                <span style={{ color: r.model?.includes("flux") || r.model?.includes("face") ? "#00e5ff" : "#ffcc00", fontSize: "9px" }}>
+                  {r.model?.includes("schnell") ? "SCH" : r.model?.includes("face-swap") ? "SWAP" : r.model?.includes("flux-2") ? "FX2" : r.model?.includes("dev") ? "DEV" : r.model?.includes("kontext") ? "KTX" : "GEM"}
                 </span>
               </div>
             </div>
@@ -564,25 +625,37 @@ export default function ImagePage() {
                 {([
                   { id: "generate" as const, label: "Generate" },
                   { id: "img2img" as const, label: "Img2Img" },
-                  { id: "multi" as const, label: "Multi-Image" },
+                  { id: "face-swap" as const, label: "Face Swap" },
+                  { id: "multi-edit" as const, label: "Multi-Edit" },
                 ]).map((op, idx) => (
                   <button
                     key={op.id}
                     onClick={() => {
                       setOperation(op.id);
                       if (op.id === "img2img") setModelId("fal-ai/flux/dev");
-                      if (op.id === "multi") {
-                        setModelId("fal-ai/flux-pro/kontext/max/multi");
+                      if (op.id === "face-swap") {
+                        setModelId("fal-ai/face-swap");
                         removeUploadedImage();
+                        setMultiImages([]);
                       }
-                      if (op.id === "generate") setMultiImages([]);
+                      if (op.id === "multi-edit") {
+                        setModelId("fal-ai/flux-2/edit");
+                        removeUploadedImage();
+                        setFaceImage(null);
+                        setTargetImage(null);
+                      }
+                      if (op.id === "generate") {
+                        setMultiImages([]);
+                        setFaceImage(null);
+                        setTargetImage(null);
+                      }
                     }}
                     disabled={op.id === "img2img" && modelId === "fal-ai/flux/schnell"}
                     style={{
                       padding: "6px 14px",
                       background: operation === op.id ? "rgba(0, 255, 136, 0.12)" : "transparent",
                       border: "none",
-                      borderRight: idx < 2 ? "1px solid #1e2a3a" : "none",
+                      borderRight: idx < 3 ? "1px solid #1e2a3a" : "none",
                       color: operation === op.id ? "#00ff88" : "#5a6a7a",
                       fontFamily: "inherit",
                       fontSize: "12px",
@@ -599,8 +672,8 @@ export default function ImagePage() {
             )}
           </div>
 
-          {/* Model selector (fal only, not for multi) */}
-          {provider === "fal" && operation !== "multi" && (
+          {/* Model selector (fal only, not for face-swap or multi-edit) */}
+          {provider === "fal" && operation !== "face-swap" && operation !== "multi-edit" && (
             <div>
               <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#00e5ff", textTransform: "uppercase", letterSpacing: "0.1em" }}>--model</label>
               <select
@@ -621,14 +694,19 @@ export default function ImagePage() {
             </div>
           )}
 
-          {/* Prompt input */}
+          {/* Prompt input (not shown for face-swap) */}
+          {operation !== "face-swap" && (
           <div>
             <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#00ff88", textTransform: "uppercase", letterSpacing: "0.1em" }}>--prompt</label>
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               rows={4}
-              placeholder={operation === "img2img" ? "Describe the edit to apply to the uploaded image..." : "Describe the image to generate..."}
+              placeholder={
+                operation === "img2img" ? "Describe the edit to apply to the uploaded image..." :
+                operation === "multi-edit" ? "Describe how to combine/edit the reference images..." :
+                "Describe the image to generate..."
+              }
               style={{ width: "100%", padding: "8px 12px", backgroundColor: "#111820", border: "1px solid #1e2a3a", color: "#e0e0e0", fontFamily: "inherit", fontSize: "13px", resize: "vertical" }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
@@ -646,9 +724,10 @@ export default function ImagePage() {
               </div>
             </div>
           </div>
+          )}
 
-          {/* Aspect ratio (fal only) */}
-          {provider === "fal" && (
+          {/* Aspect ratio (fal only, not for face-swap) */}
+          {provider === "fal" && operation !== "face-swap" && (
             <div>
               <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#00e5ff", textTransform: "uppercase", letterSpacing: "0.1em" }}>--aspect-ratio</label>
               <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
@@ -674,8 +753,8 @@ export default function ImagePage() {
             </div>
           )}
 
-          {/* Batch count + output format (fal only, not multi) */}
-          {provider === "fal" && operation !== "multi" && (
+          {/* Batch count + output format (fal only, not face-swap or multi-edit) */}
+          {provider === "fal" && operation !== "face-swap" && operation !== "multi-edit" && (
             <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
               <div>
                 <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#00e5ff", textTransform: "uppercase", letterSpacing: "0.1em" }}>--count</label>
@@ -792,11 +871,77 @@ export default function ImagePage() {
             </div>
           )}
 
-          {/* Multi-image upload */}
-          {operation === "multi" && provider === "fal" && (
+          {/* Face Swap upload — two separate image inputs */}
+          {operation === "face-swap" && provider === "fal" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <input ref={faceFileRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => handleFaceSwapFileSelect("face", e)} style={{ display: "none" }} />
+              <input ref={targetFileRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => handleFaceSwapFileSelect("target", e)} style={{ display: "none" }} />
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                {/* Face source */}
+                <div>
+                  <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#00e5ff", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                    --face-image <span style={{ color: "#5a6a7a", fontWeight: 400, textTransform: "none" }}>(your face)</span>
+                  </label>
+                  {faceImage ? (
+                    <div style={{ border: "1px solid #1e2a3a", backgroundColor: "#111820", padding: "8px", position: "relative" }}>
+                      <img src={faceImage.dataUri} alt="Face" style={{ width: "100%", height: "140px", objectFit: "cover", border: "1px solid #1e2a3a" }} />
+                      <div style={{ color: "#5a6a7a", fontSize: "10px", marginTop: "4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{faceImage.name}</div>
+                      <button
+                        onClick={() => { setFaceImage(null); if (faceFileRef.current) faceFileRef.current.value = ""; }}
+                        style={{ position: "absolute", top: "4px", right: "4px", background: "rgba(0,0,0,0.7)", border: "1px solid #ff4444", color: "#ff4444", padding: "1px 5px", fontFamily: "inherit", fontSize: "10px", cursor: "pointer" }}
+                      >x</button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => faceFileRef.current?.click()}
+                      style={{ padding: "30px 10px", background: "transparent", border: "1px dashed #1e2a3a", color: "#5a6a7a", fontFamily: "inherit", fontSize: "11px", cursor: "pointer", width: "100%", textAlign: "center", transition: "all 0.2s" }}
+                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(0, 229, 255, 0.4)"; e.currentTarget.style.color = "#00e5ff"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#1e2a3a"; e.currentTarget.style.color = "#5a6a7a"; }}
+                    >
+                      [  UPLOAD FACE  ]
+                    </button>
+                  )}
+                </div>
+
+                {/* Target scene */}
+                <div>
+                  <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#00e5ff", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                    --target-image <span style={{ color: "#5a6a7a", fontWeight: 400, textTransform: "none" }}>(scene)</span>
+                  </label>
+                  {targetImage ? (
+                    <div style={{ border: "1px solid #1e2a3a", backgroundColor: "#111820", padding: "8px", position: "relative" }}>
+                      <img src={targetImage.dataUri} alt="Target" style={{ width: "100%", height: "140px", objectFit: "cover", border: "1px solid #1e2a3a" }} />
+                      <div style={{ color: "#5a6a7a", fontSize: "10px", marginTop: "4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{targetImage.name}</div>
+                      <button
+                        onClick={() => { setTargetImage(null); if (targetFileRef.current) targetFileRef.current.value = ""; }}
+                        style={{ position: "absolute", top: "4px", right: "4px", background: "rgba(0,0,0,0.7)", border: "1px solid #ff4444", color: "#ff4444", padding: "1px 5px", fontFamily: "inherit", fontSize: "10px", cursor: "pointer" }}
+                      >x</button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => targetFileRef.current?.click()}
+                      style={{ padding: "30px 10px", background: "transparent", border: "1px dashed #1e2a3a", color: "#5a6a7a", fontFamily: "inherit", fontSize: "11px", cursor: "pointer", width: "100%", textAlign: "center", transition: "all 0.2s" }}
+                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(0, 229, 255, 0.4)"; e.currentTarget.style.color = "#00e5ff"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#1e2a3a"; e.currentTarget.style.color = "#5a6a7a"; }}
+                    >
+                      [  UPLOAD SCENE  ]
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ fontSize: "10px", color: "#5a6a7a", fontStyle: "italic" }}>
+                Upload your face photo and a target scene. The face will be swapped onto the person in the scene.
+              </div>
+            </div>
+          )}
+
+          {/* Multi-edit upload (FLUX.2) */}
+          {operation === "multi-edit" && provider === "fal" && (
             <div>
               <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#00ff88", textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                --input-images <span style={{ color: "#e0e0e0", fontWeight: 400, textTransform: "none" }}>({multiImages.length}/4)</span>
+                --reference-images <span style={{ color: "#e0e0e0", fontWeight: 400, textTransform: "none" }}>({multiImages.length}/4)</span>
               </label>
               <input
                 ref={multiFileRef}
@@ -849,7 +994,7 @@ export default function ImagePage() {
               )}
 
               <div style={{ fontSize: "10px", color: "#5a6a7a", marginTop: "6px", fontStyle: "italic" }}>
-                Reference images by number in your prompt: &quot;person from image 1 in scene from image 2&quot;
+                Reference images by order in your prompt. FLUX.2 multi-reference editing for compositing, style transfer, and context-aware edits.
               </div>
             </div>
           )}
@@ -876,8 +1021,8 @@ export default function ImagePage() {
             </div>
           )}
 
-          {/* Advanced settings (fal only, not multi) */}
-          {provider === "fal" && operation !== "multi" && (
+          {/* Advanced settings (fal only, not face-swap) */}
+          {provider === "fal" && operation !== "face-swap" && (
             <div>
               <button
                 onClick={() => setShowAdvanced(!showAdvanced)}
@@ -946,7 +1091,7 @@ export default function ImagePage() {
           )}
 
           {/* Cost preview */}
-          {prompt.trim() && operation === "multi" && (
+          {operation === "face-swap" && faceImage && targetImage && (
             <div
               style={{
                 fontSize: "10px",
@@ -963,10 +1108,30 @@ export default function ImagePage() {
               }}
             >
               <span style={{ color: "#00ff88", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>COST</span>
-              <span>~$0.08 per image | Kontext Max Multi ({multiImages.length} input{multiImages.length !== 1 ? "s" : ""})</span>
+              <span>~$0.10 per swap | Face Swap</span>
             </div>
           )}
-          {prompt.trim() && operation !== "multi" && (
+          {operation === "multi-edit" && prompt.trim() && multiImages.length > 0 && (
+            <div
+              style={{
+                fontSize: "10px",
+                fontFamily: "inherit",
+                color: "#ffcc00",
+                padding: "4px 8px",
+                backgroundColor: "rgba(255, 204, 0, 0.06)",
+                border: "1px solid rgba(255, 204, 0, 0.15)",
+                borderRadius: "2px",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                alignSelf: "flex-start",
+              }}
+            >
+              <span style={{ color: "#00ff88", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>COST</span>
+              <span>~$0.025 per image | FLUX.2 Edit ({multiImages.length} input{multiImages.length !== 1 ? "s" : ""})</span>
+            </div>
+          )}
+          {prompt.trim() && operation !== "face-swap" && operation !== "multi-edit" && (
             <div style={{ alignSelf: "flex-start" }}>
               <CostPreview
                 type="image"
@@ -979,7 +1144,12 @@ export default function ImagePage() {
           <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
             <button
               onClick={handleSubmit}
-              disabled={loading || !prompt.trim() || (operation === "img2img" && !uploadedImage) || (operation === "multi" && multiImages.length === 0)}
+              disabled={
+                loading ||
+                (operation === "face-swap" ? (!faceImage || !targetImage) : !prompt.trim()) ||
+                (operation === "img2img" && !uploadedImage) ||
+                (operation === "multi-edit" && multiImages.length === 0)
+              }
               style={{
                 padding: "8px 24px",
                 background: "transparent",
@@ -988,20 +1158,24 @@ export default function ImagePage() {
                 fontFamily: "inherit",
                 fontSize: "13px",
                 fontWeight: 700,
-                cursor: loading || !prompt.trim() ? "not-allowed" : "pointer",
+                cursor: "pointer",
                 textTransform: "uppercase",
                 letterSpacing: "0.1em",
-                opacity: loading || !prompt.trim() ? 0.5 : 1,
+                opacity: loading ? 0.5 : 1,
                 transition: "all 0.2s",
               }}
-              onMouseEnter={(e) => { if (!loading && prompt.trim()) { e.currentTarget.style.background = "rgba(0, 255, 136, 0.1)"; e.currentTarget.style.boxShadow = "0 0 15px rgba(0, 255, 136, 0.2)"; } }}
+              onMouseEnter={(e) => { if (!loading) { e.currentTarget.style.background = "rgba(0, 255, 136, 0.1)"; e.currentTarget.style.boxShadow = "0 0 15px rgba(0, 255, 136, 0.2)"; } }}
               onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.boxShadow = "none"; }}
             >
               {loading
                 ? "[  GENERATING...  ]"
-                : operation === "img2img"
-                  ? "[  EDIT IMAGE  ]"
-                  : `[  GENERATE ${numImages > 1 ? `(${numImages})` : ""}  ]`}
+                : operation === "face-swap"
+                  ? "[  SWAP FACE  ]"
+                  : operation === "img2img"
+                    ? "[  EDIT IMAGE  ]"
+                    : operation === "multi-edit"
+                      ? "[  MULTI-EDIT  ]"
+                      : `[  GENERATE ${numImages > 1 ? `(${numImages})` : ""}  ]`}
             </button>
 
             {loading && (

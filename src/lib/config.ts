@@ -140,6 +140,8 @@ const defaultPricing: Record<string, { input: number; output: number; unit: stri
   "fal-ai/flux/schnell": { input: 0.025, output: 0, unit: "per_image" },
   "fal-ai/flux/dev": { input: 0.055, output: 0, unit: "per_image" },
   "fal-ai/flux-pro/kontext/max/multi": { input: 0.08, output: 0, unit: "per_image" },
+  "fal-ai/face-swap": { input: 0.10, output: 0, unit: "per_image" },
+  "fal-ai/flux-2/edit": { input: 0.025, output: 0, unit: "per_image" },
   // Video: Grok Imagine — cost per second of output video
   "grok-imagine-video-480p": { input: 0.05, output: 0, unit: "per_second" },
   "grok-imagine-video-720p": { input: 0.07, output: 0, unit: "per_second" },
