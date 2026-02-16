@@ -380,11 +380,43 @@ export default function ImagePage() {
           transition: "all 0.2s",
         }}
       >
-        <div style={{ padding: "12px", fontSize: "11px", fontWeight: 700, color: "#ffcc00", textTransform: "uppercase", letterSpacing: "0.1em", borderBottom: "1px solid #1e2a3a" }}>
-          Image History
+        <div style={{ padding: "8px", borderBottom: "1px solid #1e2a3a" }}>
+          <button
+            onClick={() => {
+              setRunId("");
+              setStatus("");
+              setError("");
+              setOutputImages([]);
+              setResponseText("");
+              setStats(null);
+              setPrompt("");
+              removeUploadedImage();
+            }}
+            style={{
+              width: "100%",
+              padding: "7px 12px",
+              background: "transparent",
+              border: "1px solid #00ff88",
+              color: "#00ff88",
+              fontFamily: "inherit",
+              fontSize: "11px",
+              fontWeight: 700,
+              cursor: "pointer",
+              textTransform: "uppercase",
+              letterSpacing: "0.1em",
+              transition: "all 0.2s",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0, 255, 136, 0.1)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+          >
+            + New Image
+          </button>
+        </div>
+        <div style={{ padding: "8px 12px 4px", fontSize: "11px", fontWeight: 700, color: "#ffcc00", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+          History
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: "4px 8px" }}>
-          {history.map((r) => (
+          {history.slice(0, 10).map((r) => (
             <div
               key={r.id}
               onClick={() => loadHistoryItem(r.id)}
