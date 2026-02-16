@@ -154,13 +154,17 @@ export async function submitImageJob(
 
 /**
  * Poll the status of a fal.ai queue job.
+ * Uses the status_url returned by the submit response for reliability.
+ * Falls back to constructed URL if statusUrl not provided.
  */
 export async function getImageJobStatus(
   modelId: string,
-  requestId: string
+  requestId: string,
+  statusUrl?: string
 ): Promise<FalStatusResponse> {
-  // For img2img, the status URL still uses the base model path
-  const endpoint = `${QUEUE_BASE}/${modelId}/requests/${requestId}/status?logs=1`;
+  const endpoint = statusUrl
+    ? `${statusUrl}?logs=1`
+    : `${QUEUE_BASE}/${modelId}/requests/${requestId}/status?logs=1`;
 
   const resp = await fetch(endpoint, {
     method: "GET",
@@ -177,12 +181,16 @@ export async function getImageJobStatus(
 
 /**
  * Get the result of a completed fal.ai queue job.
+ * Uses the response_url returned by the submit response for reliability.
+ * Falls back to constructed URL if responseUrl not provided.
  */
 export async function getImageJobResult(
   modelId: string,
-  requestId: string
+  requestId: string,
+  responseUrl?: string
 ): Promise<FalResultResponse> {
-  const endpoint = `${QUEUE_BASE}/${modelId}/requests/${requestId}`;
+  const endpoint = responseUrl
+    || `${QUEUE_BASE}/${modelId}/requests/${requestId}`;
 
   const resp = await fetch(endpoint, {
     method: "GET",

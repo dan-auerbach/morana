@@ -265,6 +265,8 @@ async function handleFalRequest(params: {
     // Submit to fal.ai queue
     const queueResult = await submitImageJob(modelId, falParams);
     const requestId = queueResult.request_id;
+    const statusUrl = queueResult.status_url;
+    const responseUrl = queueResult.response_url;
 
     // Store providerJobId
     await prisma.run.update({
@@ -286,7 +288,7 @@ async function handleFalRequest(params: {
       await new Promise((r) => setTimeout(r, pollInterval));
       pollInterval = Math.min(pollInterval * 1.3, 5000);
 
-      const status = await getImageJobStatus(modelId, requestId);
+      const status = await getImageJobStatus(modelId, requestId, statusUrl);
       if (status.status === "COMPLETED") {
         completed = true;
         break;
@@ -302,7 +304,7 @@ async function handleFalRequest(params: {
     }
 
     // ─── Download result ───────────────────────────────
-    const result = await getImageJobResult(modelId, requestId);
+    const result = await getImageJobResult(modelId, requestId, responseUrl);
     const latencyMs = Date.now() - start;
 
     const outputFiles: Array<{ id: string; url: string }> = [];
