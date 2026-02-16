@@ -13,6 +13,7 @@ const primaryLinks = [
   { href: "/stt", label: "STT" },
   { href: "/tts", label: "TTS" },
   { href: "/image", label: "Image" },
+  { href: "/video", label: "Video" },
 ];
 
 // Overflow items — visible at wider breakpoints, collapsed into "More" on narrow

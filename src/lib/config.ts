@@ -139,6 +139,9 @@ const defaultPricing: Record<string, { input: number; output: number; unit: stri
   elevenlabs: { input: 0.30, output: 0, unit: "1k_chars" },
   "fal-ai/flux/schnell": { input: 0.025, output: 0, unit: "per_image" },
   "fal-ai/flux/dev": { input: 0.055, output: 0, unit: "per_image" },
+  // Video: Grok Imagine — cost per second of output video
+  "grok-imagine-video-480p": { input: 0.05, output: 0, unit: "per_second" },
+  "grok-imagine-video-720p": { input: 0.07, output: 0, unit: "per_second" },
 };
 
 /** Combined pricing: DB-cached pricing merged with hardcoded defaults */
@@ -163,7 +166,7 @@ export const pricing: Record<string, { input: number; output: number; unit: stri
  */
 export function estimateCostCents(
   model: string,
-  units: { inputTokens?: number; outputTokens?: number; chars?: number; seconds?: number; images?: number }
+  units: { inputTokens?: number; outputTokens?: number; chars?: number; seconds?: number; images?: number; videoSeconds?: number }
 ): number {
   const p = pricing[model];
   if (!p) return 0;
@@ -176,6 +179,8 @@ export function estimateCostCents(
     dollars = ((units.seconds || 0) / 60) * p.input;
   } else if (p.unit === "per_image") {
     dollars = (units.images || 0) * p.input;
+  } else if (p.unit === "per_second") {
+    dollars = (units.videoSeconds || 0) * p.input;
   }
   return Math.round(dollars * 100);
 }

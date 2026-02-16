@@ -80,6 +80,8 @@ export async function GET(req: NextRequest) {
             previews[r.id] = inputPrompts[r.id];
           } else if (r.type === "image" && inputPrompts[r.id]) {
             previews[r.id] = inputPrompts[r.id];
+          } else if (r.type === "video" && inputPrompts[r.id]) {
+            previews[r.id] = inputPrompts[r.id];
           }
         }
       } catch {

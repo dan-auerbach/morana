@@ -18,6 +18,7 @@ enum RunType {
   tts
   image
   sfx
+  video
 }
 
 enum RunStatus {
