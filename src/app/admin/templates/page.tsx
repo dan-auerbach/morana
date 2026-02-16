@@ -15,9 +15,24 @@ type Template = {
   knowledgeText: string | null;
   isActive: boolean;
   sortOrder: number;
+  currentVersion: number;
   createdAt: string;
   creator: { email: string; name: string | null };
 };
+
+type TemplateVersion = {
+  id: string;
+  versionNumber: number;
+  systemPrompt: string;
+  userPromptTemplate: string | null;
+  knowledgeText: string | null;
+  category: string;
+  description: string | null;
+  createdAt: string;
+  author: { email: string; name: string | null };
+};
+
+type DiffLine = { type: "same" | "add" | "remove"; text: string };
 
 const CATEGORIES = ["general", "journalism", "seo", "social", "legal", "email", "analysis"];
 
@@ -56,6 +71,12 @@ export default function AdminTemplatesPage() {
 
   // Expand detail
   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  // Versioning state
+  const [versions, setVersions] = useState<TemplateVersion[]>([]);
+  const [showVersions, setShowVersions] = useState<string | null>(null);
+  const [diffData, setDiffData] = useState<{ systemPrompt: DiffLine[] } | null>(null);
+  const [diffVersions, setDiffVersions] = useState<[number, number] | null>(null);
 
   const loadTemplates = useCallback(async () => {
     setLoading(true);
@@ -138,6 +159,41 @@ export default function AdminTemplatesPage() {
         body: JSON.stringify({ isActive: !currentActive }),
       });
       loadTemplates();
+    } catch { /* ignore */ }
+  }
+
+  async function loadVersions(templateId: string) {
+    try {
+      const resp = await fetch(`/api/admin/templates/${templateId}/versions`);
+      const data = await resp.json();
+      setVersions(data.versions || []);
+      setShowVersions(templateId);
+      setDiffData(null);
+      setDiffVersions(null);
+    } catch { /* ignore */ }
+  }
+
+  async function handleDiff(templateId: string, vA: number, vB: number) {
+    try {
+      const resp = await fetch(`/api/admin/templates/${templateId}/versions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ versionA: vA, versionB: vB }),
+      });
+      const data = await resp.json();
+      setDiffData(data.diff);
+      setDiffVersions([vA, vB]);
+    } catch { /* ignore */ }
+  }
+
+  async function handleRollback(templateId: string, versionId: string) {
+    if (!confirm("Rollback to this version? A new version will be created.")) return;
+    try {
+      await fetch(`/api/admin/templates/${templateId}/versions/${versionId}`, {
+        method: "POST",
+      });
+      loadTemplates();
+      loadVersions(templateId);
     } catch { /* ignore */ }
   }
 
@@ -302,9 +358,78 @@ export default function AdminTemplatesPage() {
                               <div style={{ padding: "8px", backgroundColor: "#0a0e14", border: "1px solid #1e2a3a", fontSize: "11px", color: "#e0e0e0", whiteSpace: "pre-wrap", maxHeight: "150px", overflowY: "auto" }}>{t.knowledgeText.substring(0, 500)}{t.knowledgeText.length > 500 ? "..." : ""}</div>
                             </div>
                           )}
-                          <div style={{ fontSize: "10px", color: "#5a6a7a" }}>
-                            Created by <span style={{ color: "#e0e0e0" }}>{t.creator.email}</span> on {new Date(t.createdAt).toLocaleDateString("sl-SI")}
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px" }}>
+                            <div style={{ fontSize: "10px", color: "#5a6a7a" }}>
+                              Created by <span style={{ color: "#e0e0e0" }}>{t.creator.email}</span> on {new Date(t.createdAt).toLocaleDateString("sl-SI")}
+                              <span style={{ marginLeft: "12px", color: "#ffcc00" }}>v{t.currentVersion}</span>
+                            </div>
+                            <button
+                              onClick={() => { showVersions === t.id ? setShowVersions(null) : loadVersions(t.id); }}
+                              style={{ padding: "3px 10px", background: "transparent", border: "1px solid #ffcc00", color: "#ffcc00", fontFamily: "inherit", fontSize: "10px", fontWeight: 700, cursor: "pointer" }}
+                            >
+                              {showVersions === t.id ? "HIDE VERSIONS" : "VERSION HISTORY"}
+                            </button>
                           </div>
+
+                          {/* Version history panel */}
+                          {showVersions === t.id && versions.length > 0 && (
+                            <div style={{ marginTop: "12px", padding: "12px", backgroundColor: "#0a0e14", border: "1px solid rgba(255, 204, 0, 0.2)" }}>
+                              <div style={{ fontSize: "10px", fontWeight: 700, color: "#ffcc00", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "8px" }}>
+                                VERSION HISTORY ({versions.length} versions)
+                              </div>
+                              <div style={{ display: "flex", flexDirection: "column", gap: "4px", maxHeight: "200px", overflowY: "auto" }}>
+                                {versions.map((v) => (
+                                  <div key={v.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 8px", backgroundColor: v.versionNumber === t.currentVersion ? "rgba(255, 204, 0, 0.08)" : "transparent", border: `1px solid ${v.versionNumber === t.currentVersion ? "rgba(255, 204, 0, 0.3)" : "#1e2a3a"}` }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                      <span style={{ color: v.versionNumber === t.currentVersion ? "#ffcc00" : "#5a6a7a", fontSize: "11px", fontWeight: 700, minWidth: "30px" }}>v{v.versionNumber}</span>
+                                      <span style={{ color: "#8b949e", fontSize: "10px" }}>{new Date(v.createdAt).toLocaleString("sl-SI", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+                                      <span style={{ color: "#5a6a7a", fontSize: "10px" }}>{v.author.email}</span>
+                                      {v.description && <span style={{ color: "#5a6a7a", fontSize: "9px", fontStyle: "italic" }}>{v.description.substring(0, 40)}</span>}
+                                    </div>
+                                    <div style={{ display: "flex", gap: "4px" }}>
+                                      {versions.length > 1 && v.versionNumber > 1 && (
+                                        <button
+                                          onClick={() => handleDiff(t.id, v.versionNumber - 1, v.versionNumber)}
+                                          style={{ padding: "1px 6px", background: "transparent", border: "1px solid #00e5ff", color: "#00e5ff", fontFamily: "inherit", fontSize: "9px", cursor: "pointer" }}
+                                        >
+                                          DIFF
+                                        </button>
+                                      )}
+                                      {v.versionNumber !== t.currentVersion && (
+                                        <button
+                                          onClick={() => handleRollback(t.id, v.id)}
+                                          style={{ padding: "1px 6px", background: "transparent", border: "1px solid #ff8800", color: "#ff8800", fontFamily: "inherit", fontSize: "9px", cursor: "pointer" }}
+                                        >
+                                          ROLLBACK
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+
+                              {/* Diff view */}
+                              {diffData && diffVersions && (
+                                <div style={{ marginTop: "8px", padding: "8px", backgroundColor: "#111820", border: "1px solid #1e2a3a" }}>
+                                  <div style={{ fontSize: "10px", fontWeight: 700, color: "#00e5ff", marginBottom: "4px" }}>
+                                    DIFF: v{diffVersions[0]} → v{diffVersions[1]}
+                                  </div>
+                                  <div style={{ fontSize: "11px", fontFamily: "monospace", maxHeight: "200px", overflowY: "auto" }}>
+                                    {diffData.systemPrompt.map((line, i) => (
+                                      <div key={i} style={{
+                                        padding: "1px 4px",
+                                        backgroundColor: line.type === "add" ? "rgba(0, 255, 136, 0.08)" : line.type === "remove" ? "rgba(255, 68, 68, 0.08)" : "transparent",
+                                        color: line.type === "add" ? "#00ff88" : line.type === "remove" ? "#ff4444" : "#5a6a7a",
+                                      }}>
+                                        <span style={{ marginRight: "4px" }}>{line.type === "add" ? "+" : line.type === "remove" ? "-" : " "}</span>
+                                        {line.text}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       )}
                     </td>

@@ -222,8 +222,89 @@ function formatOutput(text: string, formats: string[]): string {
       sections.push(
         `## JSON\n\n\`\`\`json\n${JSON.stringify({ content: text, generatedAt: new Date().toISOString() }, null, 2)}\n\`\`\``
       );
+    } else if (fmt === "drupal_json") {
+      sections.push(formatDrupalOutput(text));
     }
   }
 
   return sections.join("\n\n---\n\n");
+}
+
+/**
+ * NOVINAR Drupal-ready output format.
+ * Expects the input to contain an article (from LLM step) followed by
+ * SEO JSON (from the SEO step). Combines them into a structured Drupal payload.
+ */
+function formatDrupalOutput(text: string): string {
+  // The input contains the article text followed by SEO JSON from the previous step
+  // Try to parse SEO JSON from the input
+  let seo: {
+    titles?: { type: string; text: string }[];
+    metaDescription?: string;
+    keywords?: string[];
+    tags?: string[];
+    slug?: string;
+  } = {};
+  let articleText = text;
+
+  // Try to extract JSON from the text (SEO step output)
+  const jsonMatch = text.match(/\{[\s\S]*"titles"[\s\S]*\}/);
+  if (jsonMatch) {
+    try {
+      seo = JSON.parse(jsonMatch[0]);
+      // The article was in the previous step; SEO step got the full article as input
+      // So the current text IS the SEO JSON output
+      // We need to reconstruct: use the article from before SEO
+    } catch {
+      // Not valid JSON — treat whole text as article
+    }
+  }
+
+  // Build article HTML from the non-JSON part
+  const articlePart = text.replace(/```json[\s\S]*?```/g, "").replace(/\{[\s\S]*"titles"[\s\S]*\}/, "").trim();
+
+  // Convert markdown-ish article to HTML
+  const bodyHtml = articlePart
+    ? articlePart
+        .split("\n\n")
+        .map((block) => {
+          const trimmed = block.trim();
+          if (!trimmed) return "";
+          if (trimmed.startsWith("# ")) return `<h1>${trimmed.slice(2)}</h1>`;
+          if (trimmed.startsWith("## ")) return `<h2>${trimmed.slice(3)}</h2>`;
+          if (trimmed.startsWith("### ")) return `<h3>${trimmed.slice(4)}</h3>`;
+          if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+            const items = trimmed.split("\n").map((l) => `<li>${l.replace(/^[-*]\s*/, "")}</li>`);
+            return `<ul>${items.join("")}</ul>`;
+          }
+          return `<p>${trimmed}</p>`;
+        })
+        .filter(Boolean)
+        .join("\n")
+    : `<p>${articleText}</p>`;
+
+  // Extract title from article (first h1 or first line)
+  const titleMatch = articlePart.match(/^#\s+(.+)/m);
+  const mainTitle = titleMatch?.[1] || seo.titles?.[0]?.text || "Untitled";
+
+  // Extract lead/subtitle (first paragraph after title)
+  const leadMatch = articlePart.match(/^#\s+.+\n\n(.+)/m);
+  const lead = leadMatch?.[1] || seo.metaDescription || "";
+
+  const drupalPayload = {
+    title: mainTitle,
+    subtitle: lead,
+    body: bodyHtml,
+    seo: {
+      titleVariants: seo.titles || [],
+      metaDescription: seo.metaDescription || "",
+      keywords: seo.keywords || [],
+      tags: seo.tags || [],
+      slug: seo.slug || "",
+    },
+    format: "drupal_article",
+    generatedAt: new Date().toISOString(),
+  };
+
+  return JSON.stringify(drupalPayload, null, 2);
 }

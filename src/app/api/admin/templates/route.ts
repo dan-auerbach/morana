@@ -68,7 +68,20 @@ export async function POST(req: NextRequest) {
         knowledgeText: knowledgeText?.trim() || null,
         isActive: isActive !== false,
         sortOrder: typeof sortOrder === "number" ? sortOrder : 0,
+        currentVersion: 1,
         createdBy: user.id,
+        // Create initial version snapshot (v1)
+        versions: {
+          create: {
+            versionNumber: 1,
+            systemPrompt: systemPrompt.trim(),
+            userPromptTemplate: userPromptTemplate?.trim() || null,
+            knowledgeText: knowledgeText?.trim() || null,
+            category: category?.trim() || "general",
+            description: description?.trim() || null,
+            createdBy: user.id,
+          },
+        },
       },
     });
 

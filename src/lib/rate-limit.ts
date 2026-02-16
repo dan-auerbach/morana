@@ -1,7 +1,11 @@
 import { prisma } from "./prisma";
 import { config } from "./config";
+import { checkWorkspaceCostCap } from "./workspace";
 
-export async function checkRateLimit(userId: string): Promise<{ allowed: boolean; remaining: number; reason?: string }> {
+export async function checkRateLimit(
+  userId: string,
+  workspaceId?: string | null
+): Promise<{ allowed: boolean; remaining: number; reason?: string }> {
   // Fetch user to check active status and per-user limits
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -42,6 +46,14 @@ export async function checkRateLimit(userId: string): Promise<{ allowed: boolean
     const monthlyCostCents = monthlyUsage._sum.costEstimateCents || 0;
     if (monthlyCostCents >= user.maxMonthlyCostCents) {
       return { allowed: false, remaining: 0, reason: `Monthly cost limit reached ($${(user.maxMonthlyCostCents / 100).toFixed(2)})` };
+    }
+  }
+
+  // Workspace monthly cost cap (if workspace is set)
+  if (workspaceId) {
+    const wsCheck = await checkWorkspaceCostCap(workspaceId);
+    if (!wsCheck.allowed) {
+      return { allowed: false, remaining: 0, reason: wsCheck.reason };
     }
   }
 

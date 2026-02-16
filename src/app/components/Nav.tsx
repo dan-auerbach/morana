@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signIn, signOut } from "next-auth/react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 const baseLinks = [
   { href: "/llm", label: "LLM" },
@@ -16,19 +16,54 @@ const baseLinks = [
   { href: "/usage", label: "Usage" },
 ];
 
+type WsInfo = { id: string; name: string; slug: string; role: string };
+
 export default function Nav() {
   const pathname = usePathname();
   const { data: session } = useSession();
   const isAdmin = (session?.user as Record<string, unknown>)?.role === "admin";
   const links = isAdmin
-    ? [...baseLinks, { href: "/admin/templates", label: "Templates" }, { href: "/admin/knowledge", label: "KB" }, { href: "/admin/auth-logs", label: "Logs" }, { href: "/admin", label: "Admin" }]
+    ? [...baseLinks, { href: "/admin/templates", label: "Templates" }, { href: "/admin/knowledge", label: "KB" }, { href: "/admin/auth-logs", label: "Logs" }, { href: "/admin/workspaces", label: "WS" }, { href: "/admin", label: "Admin" }]
     : baseLinks;
   const [menuOpen, setMenuOpen] = useState(false);
+  const [workspaces, setWorkspaces] = useState<WsInfo[]>([]);
+  const [activeWsId, setActiveWsId] = useState<string | null>(null);
+  const [wsOpen, setWsOpen] = useState(false);
+
+  const loadWorkspaces = useCallback(async () => {
+    try {
+      const resp = await fetch("/api/workspaces");
+      const data = await resp.json();
+      setWorkspaces(data.workspaces || []);
+      setActiveWsId(data.activeWorkspaceId || null);
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    if (session) loadWorkspaces();
+  }, [session, loadWorkspaces]);
 
   // Close menu on route change
   useEffect(() => {
     setMenuOpen(false);
+    setWsOpen(false);
   }, [pathname]);
+
+  async function switchWs(wsId: string) {
+    try {
+      await fetch("/api/workspaces", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspaceId: wsId }),
+      });
+      setActiveWsId(wsId);
+      setWsOpen(false);
+      // Reload page to refresh workspace-scoped data
+      window.location.reload();
+    } catch { /* ignore */ }
+  }
+
+  const activeWs = workspaces.find((w) => w.id === activeWsId);
 
   return (
     <nav
@@ -87,10 +122,53 @@ export default function Nav() {
             </div>
           )}
 
-          {/* Right: user + hamburger */}
+          {/* Right: workspace switcher + user + hamburger */}
           <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
             {session ? (
               <>
+                {/* Workspace switcher */}
+                {workspaces.length > 1 && (
+                  <div style={{ position: "relative" }}>
+                    <button
+                      onClick={() => setWsOpen(!wsOpen)}
+                      className="nav-email"
+                      style={{
+                        padding: "3px 8px", borderRadius: "4px", backgroundColor: "rgba(255, 136, 0, 0.08)",
+                        color: "#ff8800", border: "1px solid rgba(255, 136, 0, 0.3)",
+                        fontFamily: "inherit", fontSize: "11px", fontWeight: 700, cursor: "pointer",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {activeWs?.name || "Workspace"}
+                      <span style={{ marginLeft: "4px", fontSize: "8px" }}>{wsOpen ? "▲" : "▼"}</span>
+                    </button>
+                    {wsOpen && (
+                      <div style={{
+                        position: "absolute", top: "100%", right: 0, marginTop: "4px",
+                        backgroundColor: "#0d1117", border: "1px solid #1e2a3a", borderRadius: "4px",
+                        minWidth: "160px", zIndex: 200, boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
+                      }}>
+                        {workspaces.map((ws) => (
+                          <button
+                            key={ws.id}
+                            onClick={() => switchWs(ws.id)}
+                            style={{
+                              display: "block", width: "100%", padding: "8px 12px", border: "none",
+                              backgroundColor: ws.id === activeWsId ? "rgba(255, 136, 0, 0.1)" : "transparent",
+                              color: ws.id === activeWsId ? "#ff8800" : "#8b949e",
+                              fontFamily: "inherit", fontSize: "12px", cursor: "pointer", textAlign: "left",
+                              borderBottom: "1px solid #1e2a3a",
+                            }}
+                          >
+                            {ws.id === activeWsId && <span style={{ marginRight: "4px" }}>*</span>}
+                            {ws.name}
+                            <span style={{ float: "right", fontSize: "9px", color: "#5a6a7a" }}>{ws.role}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
                 <span className="nav-email" style={{ fontSize: "13px", color: "#00ff88", opacity: 0.8 }}>
                   <span style={{ color: "#555" }}>user@</span>{session.user?.email}
                 </span>

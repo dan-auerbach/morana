@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
+import { getActiveWorkspaceId } from "@/lib/workspace";
 
 function requireAdmin(role: string) {
   if (role !== "admin") {
@@ -18,12 +19,19 @@ function slugify(text: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
-// GET /api/recipes — list active recipes (for users) or all (for admin)
+// GET /api/recipes — list active recipes (scoped to workspace + global)
 export async function GET() {
   return withAuth(async (user) => {
     const isAdmin = user.role === "admin";
+    const workspaceId = await getActiveWorkspaceId(user.id);
+
     const recipes = await prisma.recipe.findMany({
-      where: isAdmin ? {} : { status: "active" },
+      where: {
+        ...(isAdmin ? {} : { status: "active" }),
+        ...(workspaceId
+          ? { OR: [{ workspaceId }, { workspaceId: null }] }
+          : {}),
+      },
       orderBy: { createdAt: "desc" },
       include: {
         steps: { orderBy: { stepIndex: "asc" }, select: { id: true, stepIndex: true, name: true, type: true } },
@@ -54,6 +62,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Slug "${finalSlug}" already exists` }, { status: 409 });
     }
 
+    const workspaceId = await getActiveWorkspaceId(user.id);
+
     const recipe = await prisma.recipe.create({
       data: {
         name: name.trim(),
@@ -61,6 +71,7 @@ export async function POST(req: NextRequest) {
         description: description?.trim() || null,
         status: status || "draft",
         createdBy: user.id,
+        workspaceId,
       },
     });
 

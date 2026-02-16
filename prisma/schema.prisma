@@ -42,6 +42,9 @@ model User {
   maxMonthlyCostCents   Int?   // monthly cost cap in CENTS (integer, no float rounding)
   allowedModels         Json?  // JSON array of model ID strings, null = all models allowed
 
+  // Active workspace selection (cookie-backed, DB persisted)
+  activeWorkspaceId     String?
+
   runs              Run[]
   files             File[]
   usageEvents       UsageEvent[]
@@ -52,6 +55,54 @@ model User {
   knowledgeBases    KnowledgeBase[]
   recipes           Recipe[]
   recipeExecutions  RecipeExecution[]
+  workspaceMemberships WorkspaceMember[]
+  templateVersions  PromptTemplateVersion[]
+
+  activeWorkspace   Workspace? @relation("UserActiveWorkspace", fields: [activeWorkspaceId], references: [id])
+}
+
+// ─── Workspace / Multi-tenancy ────────────────────────────────
+model Workspace {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Workspace-level policy
+  maxMonthlyCostCents Int?   // workspace monthly cost cap in CENTS
+  allowedModels       Json?  // JSON array of model IDs; null = all allowed
+
+  members         WorkspaceMember[]
+  conversations   Conversation[]
+  promptTemplates PromptTemplate[]
+  knowledgeBases  KnowledgeBase[]
+  recipes         Recipe[]
+  runs            Run[]
+  usageEvents     UsageEvent[]
+  usersActive     User[]  @relation("UserActiveWorkspace")
+
+  @@index([slug])
+}
+
+enum WorkspaceRole {
+  member
+  admin
+}
+
+model WorkspaceMember {
+  id          String        @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        WorkspaceRole @default(member)
+  createdAt   DateTime      @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
 }
 
 model Account {
@@ -93,6 +144,7 @@ model VerificationToken {
 model Conversation {
   id               String   @id @default(cuid())
   userId           String
+  workspaceId      String?
   title            String   @default("New conversation")
   modelId          String   @default("claude-sonnet-4-5-20250929")
   templateId       String?
@@ -100,10 +152,12 @@ model Conversation {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  user     User      @relation(fields: [userId], references: [id])
-  messages Message[]
+  user      User       @relation(fields: [userId], references: [id])
+  workspace Workspace? @relation(fields: [workspaceId], references: [id])
+  messages  Message[]
 
   @@index([userId, updatedAt])
+  @@index([workspaceId])
 }
 
 model Message {
@@ -126,6 +180,7 @@ model Message {
 model Run {
   id             String    @id @default(cuid())
   userId         String
+  workspaceId    String?
   type           RunType
   status         RunStatus @default(queued)
   provider       String
@@ -136,6 +191,7 @@ model Run {
   idempotencyKey String?   @unique
 
   user             User               @relation(fields: [userId], references: [id])
+  workspace        Workspace?         @relation(fields: [workspaceId], references: [id])
   input            RunInput?
   output           RunOutput?
   files            File[]
@@ -144,6 +200,7 @@ model Run {
   recipeStepResults RecipeStepResult[]
 
   @@index([userId, createdAt])
+  @@index([workspaceId])
   @@index([status])
 }
 
@@ -189,6 +246,7 @@ model UsageEvent {
   id                String   @id @default(cuid())
   runId             String?
   userId            String
+  workspaceId       String?
   provider          String
   model             String
   unitsJson         Json
@@ -196,15 +254,18 @@ model UsageEvent {
   latencyMs         Int      @default(0)
   createdAt         DateTime @default(now())
 
-  run  Run?  @relation(fields: [runId], references: [id])
-  user User  @relation(fields: [userId], references: [id])
+  run       Run?       @relation(fields: [runId], references: [id])
+  user      User       @relation(fields: [userId], references: [id])
+  workspace Workspace? @relation(fields: [workspaceId], references: [id])
 
   @@index([userId, createdAt])
+  @@index([workspaceId, createdAt])
   @@index([provider])
 }
 
 model PromptTemplate {
   id                 String   @id @default(cuid())
+  workspaceId        String?
   name               String
   slug               String   @unique
   description        String?  @db.Text
@@ -214,18 +275,43 @@ model PromptTemplate {
   knowledgeText      String?  @db.Text
   isActive           Boolean  @default(true)
   sortOrder          Int      @default(0)
+  currentVersion     Int      @default(1)
   createdBy          String
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  creator User @relation(fields: [createdBy], references: [id])
+  creator   User                    @relation(fields: [createdBy], references: [id])
+  workspace Workspace?              @relation(fields: [workspaceId], references: [id])
+  versions  PromptTemplateVersion[]
 
+  @@index([workspaceId])
   @@index([category])
   @@index([isActive, sortOrder])
 }
 
+// ─── Prompt Template Versioning ─────────────────────────────
+model PromptTemplateVersion {
+  id                 String   @id @default(cuid())
+  templateId         String
+  versionNumber      Int
+  systemPrompt       String   @db.Text
+  userPromptTemplate String?  @db.Text
+  knowledgeText      String?  @db.Text
+  category           String   @default("general")
+  description        String?  @db.Text
+  createdBy          String
+  createdAt          DateTime @default(now())
+
+  template PromptTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  author   User           @relation(fields: [createdBy], references: [id])
+
+  @@unique([templateId, versionNumber])
+  @@index([templateId])
+}
+
 model KnowledgeBase {
   id          String   @id @default(cuid())
+  workspaceId String?
   name        String
   description String?  @db.Text
   isActive    Boolean  @default(true)
@@ -234,7 +320,10 @@ model KnowledgeBase {
   updatedAt   DateTime @updatedAt
 
   creator   User       @relation(fields: [createdBy], references: [id])
+  workspace Workspace? @relation(fields: [workspaceId], references: [id])
   documents Document[]
+
+  @@index([workspaceId])
 }
 
 enum DocumentStatus {
@@ -282,18 +371,23 @@ enum RecipeStatus {
 
 model Recipe {
   id          String       @id @default(cuid())
+  workspaceId String?
   name        String
   slug        String       @unique
   description String?      @db.Text
   status      RecipeStatus @default(draft)
+  isPreset    Boolean      @default(false)  // true for system presets (e.g. NOVINAR)
+  presetKey   String?      @unique          // unique preset identifier
   createdBy   String
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
   creator    User              @relation(fields: [createdBy], references: [id])
+  workspace  Workspace?        @relation(fields: [workspaceId], references: [id])
   steps      RecipeStep[]
   executions RecipeExecution[]
 
+  @@index([workspaceId])
   @@index([status])
 }
 

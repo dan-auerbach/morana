@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
+import { getActiveWorkspaceId } from "@/lib/workspace";
 
 export async function GET(req: NextRequest) {
   return withAuth(async (user) => {
@@ -10,6 +11,7 @@ export async function GET(req: NextRequest) {
     const provider = url.searchParams.get("provider");
     const model = url.searchParams.get("model");
     const targetUserId = url.searchParams.get("userId");
+    const wsFilter = url.searchParams.get("workspaceId");
 
     const where: Record<string, unknown> = {};
 
@@ -17,6 +19,14 @@ export async function GET(req: NextRequest) {
       where.userId = user.id;
     } else if (targetUserId) {
       where.userId = targetUserId;
+    }
+
+    // Workspace filtering
+    if (wsFilter) {
+      where.workspaceId = wsFilter;
+    } else {
+      const activeWs = await getActiveWorkspaceId(user.id);
+      if (activeWs) where.workspaceId = activeWs;
     }
 
     if (provider) where.provider = provider;

@@ -16,28 +16,35 @@ type Execution = {
   recipe: { name: string; slug: string };
 };
 
+type Preset = {
+  key: string; name: string; description: string; stepsCount: number; stepTypes: string[]; alreadyCreated: boolean;
+};
+
 export default function RecipesPage() {
   const { data: session } = useSession();
+  const isAdmin = (session?.user as Record<string, unknown>)?.role === "admin";
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [executions, setExecutions] = useState<Execution[]>([]);
   const [loading, setLoading] = useState(false);
   const [executing, setExecuting] = useState<string | null>(null);
   const [inputText, setInputText] = useState("");
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
+  const [presets, setPresets] = useState<Preset[]>([]);
+  const [creatingPreset, setCreatingPreset] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [recipeResp, execResp] = await Promise.all([
-        fetch("/api/recipes"),
-        fetch("/api/recipes/executions"),
-      ]);
-      const [recipeData, execData] = await Promise.all([recipeResp.json(), execResp.json()]);
-      setRecipes(recipeData.recipes || []);
-      setExecutions(execData.executions || []);
+      const fetches = [fetch("/api/recipes"), fetch("/api/recipes/executions")];
+      if (isAdmin) fetches.push(fetch("/api/recipes/presets"));
+      const responses = await Promise.all(fetches);
+      const data = await Promise.all(responses.map(r => r.json()));
+      setRecipes(data[0].recipes || []);
+      setExecutions(data[1].executions || []);
+      if (data[2]) setPresets(data[2].presets || []);
     } catch { /* ignore */ }
     finally { setLoading(false); }
-  }, []);
+  }, [isAdmin]);
 
   useEffect(() => {
     if (session) load();
@@ -83,6 +90,48 @@ export default function RecipesPage() {
       </div>
 
       {loading && <div style={{ color: "#00ff88", fontSize: "13px", marginBottom: "12px" }}>Loading...</div>}
+
+      {/* Admin: Create from preset */}
+      {isAdmin && presets.filter(p => !p.alreadyCreated).length > 0 && (
+        <div style={{ marginBottom: "24px", padding: "12px 16px", border: "1px dashed rgba(255, 136, 0, 0.4)", backgroundColor: "rgba(255, 136, 0, 0.03)" }}>
+          <div style={{ fontSize: "11px", fontWeight: 700, color: "#ff8800", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "8px" }}>
+            RECIPE PRESETS (Admin)
+          </div>
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            {presets.filter(p => !p.alreadyCreated).map((p) => (
+              <button
+                key={p.key}
+                disabled={creatingPreset}
+                onClick={async () => {
+                  setCreatingPreset(true);
+                  try {
+                    await fetch("/api/recipes/presets", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ presetKey: p.key }),
+                    });
+                    load();
+                  } catch { /* ignore */ }
+                  finally { setCreatingPreset(false); }
+                }}
+                style={{
+                  padding: "8px 16px", background: "transparent", border: "1px solid #ff8800",
+                  color: "#ff8800", fontFamily: "inherit", fontSize: "11px", fontWeight: 700,
+                  cursor: creatingPreset ? "wait" : "pointer", textTransform: "uppercase",
+                }}
+              >
+                + {p.name}
+                <span style={{ fontSize: "9px", color: "#5a6a7a", marginLeft: "6px" }}>
+                  ({p.stepTypes.join(" → ")})
+                </span>
+              </button>
+            ))}
+          </div>
+          <div style={{ fontSize: "10px", color: "#5a6a7a", marginTop: "6px" }}>
+            Click to create a ready-to-use recipe from a preset template.
+          </div>
+        </div>
+      )}
 
       {/* Available recipes */}
       <div style={{ marginBottom: "32px" }}>

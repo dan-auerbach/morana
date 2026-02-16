@@ -32,7 +32,7 @@ export async function GET(
   });
 }
 
-// PATCH /api/admin/templates/:id — update template
+// PATCH /api/admin/templates/:id — update template (creates new version for content changes)
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -69,6 +69,32 @@ export async function PATCH(
     if (body.knowledgeText !== undefined) data.knowledgeText = body.knowledgeText?.trim() || null;
     if (body.isActive !== undefined) data.isActive = Boolean(body.isActive);
     if (body.sortOrder !== undefined) data.sortOrder = parseInt(body.sortOrder) || 0;
+
+    // Detect content changes that warrant a new version
+    const contentChanged =
+      (body.systemPrompt !== undefined && body.systemPrompt.trim() !== existing.systemPrompt) ||
+      (body.userPromptTemplate !== undefined && (body.userPromptTemplate?.trim() || null) !== existing.userPromptTemplate) ||
+      (body.knowledgeText !== undefined && (body.knowledgeText?.trim() || null) !== existing.knowledgeText) ||
+      (body.category !== undefined && body.category.trim() !== existing.category);
+
+    if (contentChanged) {
+      const newVersion = existing.currentVersion + 1;
+      data.currentVersion = newVersion;
+
+      // Create version snapshot
+      await prisma.promptTemplateVersion.create({
+        data: {
+          templateId: id,
+          versionNumber: newVersion,
+          systemPrompt: (body.systemPrompt?.trim() ?? existing.systemPrompt),
+          userPromptTemplate: (body.userPromptTemplate?.trim() ?? existing.userPromptTemplate) || null,
+          knowledgeText: (body.knowledgeText?.trim() ?? existing.knowledgeText) || null,
+          category: (body.category?.trim() ?? existing.category),
+          description: body.description?.trim() ?? existing.description,
+          createdBy: user.id,
+        },
+      });
+    }
 
     const template = await prisma.promptTemplate.update({
       where: { id },
