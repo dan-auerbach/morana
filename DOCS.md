@@ -1,6 +1,6 @@
 # MORANA — Internal AI Operations Terminal
 
-**Version:** 2.2.0
+**Version:** 2.3.0
 **Stack:** Next.js 16 | React 19 | TypeScript | Prisma 7 | PostgreSQL (Neon) + pgvector | Tailwind CSS 4
 **Hosting:** Vercel (serverless) | Cloudflare R2 (storage)
 **UI Theme:** Dark hacker/terminal aesthetic
@@ -14,7 +14,7 @@ MORANA je interni AI operations terminal za medijsko podjetje. Združuje več AI
 
 | Modul | Provider | Opis |
 |-------|----------|------|
-| **LLM** | Anthropic Claude, OpenAI GPT-4o, Google Gemini | Multi-turn chat z URL fetching, RAG, prompt templates |
+| **LLM** | Anthropic Claude, OpenAI GPT-4o, Google Gemini | Multi-turn chat z URL fetching, RAG, prompt templates, web search |
 | **STT** | Soniox | Transkripcija zvoka (SL, EN) |
 | **TTS** | ElevenLabs | Sinteza govora z izbiro glasov |
 | **Image** | Google Gemini 2.5 Flash | Generiranje in urejanje slik |
@@ -43,6 +43,7 @@ MORANA je interni AI operations terminal za medijsko podjetje. Združuje več AI
 - **Recipe versioning** — avtomatske verzije ob spremembi korakov
 - **Aggregated cost tracking** — totalCostCents + costBreakdownJson per execution
 - **Audit trail** — SHA256 hashi inputov/outputov, provider response ID-ji
+- **Web Search mode** — OpenAI Responses API z web_search_preview za aktualne podatke s citati
 - **DB-driven AI model config** — admin upravljanje modelov, pricinga, enable/disable
 - **Admin analytics dashboard** — error rates, latency, cost breakdown po modelu/providerju
 - Background job dashboard z cancel/retry, cost display
@@ -289,6 +290,7 @@ Multi-turn LLM pogovori.
 | `modelId` | String | ID izbranega modela |
 | `templateId` | String? | FK na PromptTemplate |
 | `knowledgeBaseIds` | Json? | JSON array KB ID-jev za RAG |
+| `webSearchEnabled` | Boolean | Web search mode (OpenAI Responses API) |
 
 Relacije: `user`, `messages`, `workspace`
 
@@ -303,6 +305,7 @@ Sporočila znotraj pogovora.
 | `outputTokens` | Int? | Izhodni tokeni |
 | `latencyMs` | Int? | Latenca odgovora |
 | `runId` | String? | FK na Run |
+| `citationsJson` | Json? | Web search citati `[{ url, title }]` |
 
 #### PromptTemplate
 Admin-managed prompt predloge za LLM chat z versioniranjem.
@@ -637,6 +640,15 @@ Gemini je na voljo samo če je `GEMINI_API_KEY` nastavljen.
 - Anthropic: `system` parameter
 - OpenAI: `role: "system"` message
 - Gemini: `systemInstruction` parameter
+
+**Web Search mode** (`runLLMWebSearch`):
+- Uporablja OpenAI Responses API (`openai.responses.create()`) z `web_search_preview` toolom
+- Vedno uporablja GPT-4o (hardcoded) — web search ni podprt na vseh modelih
+- `search_context_size: "low"` za stroškovno optimizacijo (~$25/1K klicev)
+- Citati se ekstrahirajo iz `url_citation` anotacij in shranijo v `Message.citationsJson`
+- Fallback: če Responses API vrne napako, pad nazaj na standardni `runLLMChat()` brez web searcha
+- Toggle je viden samo za OpenAI modele v LLM chat headerju
+- Ob prehodu na non-OpenAI model se web search avtomatsko izklopi
 
 ### STT — Soniox
 
@@ -1166,6 +1178,10 @@ npx prisma migrate deploy
 ---
 
 ## Changelog
+
+### v2.3.0 (2026-02-16)
+
+- **Web Search mode (OpenAI Responses API):** Opcijski web search za LLM chat z GPT-4o. Uporablja `web_search_preview` tool z `search_context_size: "low"` za stroškovno optimizacijo. Citati (URL + title) se ekstrahirajo iz `url_citation` anotacij in shranijo v `Message.citationsJson`. Toggle v LLM header (viden samo za OpenAI modele), modra (#0096ff) barva. Fallback na standardni chat ob napaki Responses API. Per-conversation `webSearchEnabled` flag + per-message `webSearch` flag.
 
 ### v2.2.0 (2026-02-16)
 

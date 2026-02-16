@@ -150,6 +150,7 @@ model Conversation {
   modelId          String   @default("claude-sonnet-4-5-20250929")
   templateId       String?
   knowledgeBaseIds Json?    // JSON array of KnowledgeBase IDs
+  webSearchEnabled Boolean  @default(false)  // OpenAI web search mode
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -170,6 +171,7 @@ model Message {
   outputTokens   Int?
   latencyMs      Int?
   runId          String?
+  citationsJson  Json?    // [{ url, title }] — web search citations
   createdAt      DateTime @default(now())
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)

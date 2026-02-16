@@ -27,6 +27,7 @@ type ConversationSummary = {
   updatedAt: string;
   _count: { messages: number };
 };
+type Citation = { url: string; title: string };
 type Message = {
   id: string;
   role: "user" | "assistant";
@@ -34,6 +35,8 @@ type Message = {
   inputTokens?: number;
   outputTokens?: number;
   latencyMs?: number;
+  citations?: Citation[];
+  citationsJson?: Citation[];
   createdAt: string;
 };
 
@@ -52,6 +55,7 @@ export default function LLMPage() {
   const [error, setError] = useState("");
   const [selectedModelId, setSelectedModelId] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
+  const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -100,6 +104,7 @@ export default function LLMPage() {
           setSelectedModelId(d.conversation.modelId);
           setSelectedTemplateId(d.conversation.templateId || "");
           setSelectedKBIds(d.conversation.knowledgeBaseIds || []);
+          setWebSearchEnabled(!!d.conversation.webSearchEnabled);
         }
       });
   }, [activeConvId]);
@@ -137,6 +142,7 @@ export default function LLMPage() {
         modelId: selectedModelId,
         templateId: selectedTemplateId || null,
         knowledgeBaseIds: selectedKBIds.length > 0 ? selectedKBIds : null,
+        webSearchEnabled,
       }),
     });
     const d = await resp.json();
@@ -178,6 +184,7 @@ export default function LLMPage() {
         body: JSON.stringify({
           modelId: selectedModelId,
           templateId: selectedTemplateId || null,
+          webSearchEnabled,
         }),
       });
       const d = await resp.json();
@@ -203,7 +210,7 @@ export default function LLMPage() {
       const resp = await fetch(`/api/conversations/${convId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: userContent }),
+        body: JSON.stringify({ content: userContent, webSearch: webSearchEnabled }),
       });
       const data = await resp.json();
 
@@ -236,6 +243,18 @@ export default function LLMPage() {
 
   async function handleModelChange(newModelId: string) {
     setSelectedModelId(newModelId);
+    // Disable web search if switching to non-OpenAI model
+    const newModel = models.find((m) => m.id === newModelId);
+    if (newModel?.provider !== "openai" && webSearchEnabled) {
+      setWebSearchEnabled(false);
+      if (activeConvId) {
+        fetch(`/api/conversations/${activeConvId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ webSearchEnabled: false }),
+        }).catch(() => {});
+      }
+    }
     if (activeConvId) {
       try {
         await fetch(`/api/conversations/${activeConvId}`, {
@@ -265,6 +284,8 @@ export default function LLMPage() {
   }
 
   const activeConv = conversations.find((c) => c.id === activeConvId);
+  const selectedModel = models.find((m) => m.id === selectedModelId);
+  const isOpenAIModel = selectedModel?.provider === "openai";
 
   return (
     <div className="page-with-sidebar" style={{ display: "flex", gap: "0", margin: "-24px -16px", height: "calc(100vh - 57px)" }}>
@@ -507,6 +528,53 @@ export default function LLMPage() {
             </>
           )}
 
+          {isOpenAIModel && (
+            <>
+              <span style={{ color: "#333" }}>|</span>
+              <button
+                onClick={() => {
+                  const next = !webSearchEnabled;
+                  setWebSearchEnabled(next);
+                  if (activeConvId) {
+                    fetch(`/api/conversations/${activeConvId}`, {
+                      method: "PATCH",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ webSearchEnabled: next }),
+                    }).catch(() => {});
+                  }
+                }}
+                style={{
+                  padding: "4px 10px",
+                  backgroundColor: webSearchEnabled ? "rgba(0, 150, 255, 0.12)" : "transparent",
+                  border: `1px solid ${webSearchEnabled ? "rgba(0, 150, 255, 0.5)" : "#1e2a3a"}`,
+                  color: webSearchEnabled ? "#0096ff" : "#5a6a7a",
+                  fontFamily: "inherit",
+                  fontSize: "11px",
+                  fontWeight: webSearchEnabled ? 700 : 400,
+                  cursor: "pointer",
+                  transition: "all 0.2s",
+                  whiteSpace: "nowrap",
+                  letterSpacing: "0.03em",
+                }}
+                onMouseEnter={(e) => {
+                  if (!webSearchEnabled) {
+                    e.currentTarget.style.borderColor = "rgba(0, 150, 255, 0.3)";
+                    e.currentTarget.style.color = "#0096ff";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!webSearchEnabled) {
+                    e.currentTarget.style.borderColor = "#1e2a3a";
+                    e.currentTarget.style.color = "#5a6a7a";
+                  }
+                }}
+                title="Enable web search (OpenAI Responses API)"
+              >
+                {webSearchEnabled ? "WEB ON" : "WEB"}
+              </button>
+            </>
+          )}
+
           {activeConv && (
             <>
               <span style={{ color: "#333" }}>|</span>
@@ -588,6 +656,43 @@ export default function LLMPage() {
               >
                 {msg.content}
               </div>
+
+              {/* Web search citations */}
+              {msg.role === "assistant" && (() => {
+                const cites = msg.citations || msg.citationsJson;
+                return cites && cites.length > 0 ? (
+                  <div
+                    style={{
+                      maxWidth: "85%",
+                      marginTop: "6px",
+                      padding: "8px 12px",
+                      backgroundColor: "rgba(0, 150, 255, 0.04)",
+                      border: "1px solid rgba(0, 150, 255, 0.15)",
+                      borderRadius: "4px",
+                      fontSize: "11px",
+                    }}
+                  >
+                    <div style={{ color: "#0096ff", fontWeight: 700, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "4px" }}>
+                      sources
+                    </div>
+                    {cites.map((c: Citation, i: number) => (
+                      <div key={i} style={{ marginBottom: "2px" }}>
+                        <span style={{ color: "#555" }}>&#8226; </span>
+                        <a
+                          href={c.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: "#0096ff", textDecoration: "none", fontSize: "11px" }}
+                          onMouseEnter={(e) => { e.currentTarget.style.textDecoration = "underline"; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.textDecoration = "none"; }}
+                        >
+                          {c.title || c.url}
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                ) : null;
+              })()}
 
               {/* Stats for assistant messages */}
               {msg.role === "assistant" && (msg.inputTokens || msg.latencyMs) && (

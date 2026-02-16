@@ -33,7 +33,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   return withAuth(async (user) => {
     const body = await req.json();
-    const { modelId, title, templateId, knowledgeBaseIds } = body;
+    const { modelId, title, templateId, knowledgeBaseIds, webSearchEnabled } = body;
     const workspaceId = await getActiveWorkspaceId(user.id);
 
     const conversation = await prisma.conversation.create({
@@ -46,6 +46,7 @@ export async function POST(req: NextRequest) {
         knowledgeBaseIds: Array.isArray(knowledgeBaseIds) && knowledgeBaseIds.length > 0
           ? knowledgeBaseIds
           : undefined,
+        webSearchEnabled: !!webSearchEnabled,
       },
     });
 

@@ -36,6 +36,20 @@ export type LLMResult = {
   responseId?: string; // Provider response ID for audit trail
 };
 
+export type WebSearchCitation = {
+  url: string;
+  title: string;
+};
+
+export type WebSearchResult = {
+  text: string;
+  citations: WebSearchCitation[];
+  inputTokens: number;
+  outputTokens: number;
+  latencyMs: number;
+  responseId?: string;
+};
+
 /**
  * Single-shot LLM call (backward compatible).
  */
@@ -141,4 +155,109 @@ export async function runLLMChat(
     outputTokens: usage?.candidatesTokenCount || 0,
     latencyMs: Date.now() - start,
   };
+}
+
+/**
+ * Web search-enabled LLM call using OpenAI Responses API.
+ * Always uses GPT-4o with web_search_preview tool.
+ * Falls back to standard runLLMChat() on error.
+ */
+export async function runLLMWebSearch(
+  messages: ChatMessage[],
+  systemPrompt?: string
+): Promise<WebSearchResult> {
+  const start = Date.now();
+
+  try {
+    const openai = getOpenAI();
+
+    // Build input array for Responses API
+    // System prompt goes as first message in the input array
+    const input: Array<{ role: "system" | "user" | "assistant"; content: string }> = [];
+    if (systemPrompt) {
+      input.push({ role: "system", content: systemPrompt });
+    }
+    input.push(
+      ...messages.map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      }))
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const resp = await (openai.responses as any).create({
+      model: "gpt-4o",
+      input,
+      tools: [{ type: "web_search_preview", search_context_size: "low" }],
+      max_output_tokens: 8192,
+    });
+
+    // Extract text from output items
+    let text = "";
+    const citations: WebSearchCitation[] = [];
+    const seenUrls = new Set<string>();
+
+    if (resp.output) {
+      for (const item of resp.output) {
+        if (item.type === "message" && item.content) {
+          for (const block of item.content) {
+            if (block.type === "output_text") {
+              text += block.text || "";
+              // Extract citations from annotations
+              if (block.annotations) {
+                for (const ann of block.annotations) {
+                  if (ann.type === "url_citation" && ann.url && !seenUrls.has(ann.url)) {
+                    seenUrls.add(ann.url);
+                    citations.push({
+                      url: ann.url,
+                      title: ann.title || ann.url,
+                    });
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Fallback: if output_text is empty, try resp.output_text
+    if (!text && resp.output_text) {
+      text = resp.output_text;
+    }
+
+    const inputTokens = resp.usage?.input_tokens || 0;
+    const outputTokens = resp.usage?.output_tokens || 0;
+
+    return {
+      text,
+      citations,
+      inputTokens,
+      outputTokens,
+      latencyMs: Date.now() - start,
+      responseId: resp.id,
+    };
+  } catch (err) {
+    // Fallback: use standard Chat Completions API without web search
+    console.warn(
+      "[WebSearch] Responses API failed, falling back to standard chat:",
+      err instanceof Error ? err.message : err
+    );
+
+    const fallbackModel: ModelEntry = {
+      id: "gpt-4o",
+      label: "GPT-4o",
+      provider: "openai",
+    };
+
+    const result = await runLLMChat(fallbackModel, messages, systemPrompt);
+    return {
+      text: result.text,
+      citations: [], // No citations in fallback mode
+      inputTokens: result.inputTokens,
+      outputTokens: result.outputTokens,
+      latencyMs: result.latencyMs,
+      responseId: result.responseId,
+    };
+  }
 }

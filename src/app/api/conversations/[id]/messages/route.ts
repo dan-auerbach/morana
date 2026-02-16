@@ -3,7 +3,7 @@ import { withAuth } from "@/lib/session";
 import { checkRateLimit, isModelAllowed } from "@/lib/rate-limit";
 import { prisma } from "@/lib/prisma";
 import { getApprovedModels, config } from "@/lib/config";
-import { runLLMChat, ChatMessage } from "@/lib/providers/llm";
+import { runLLMChat, runLLMWebSearch, ChatMessage, WebSearchCitation } from "@/lib/providers/llm";
 import { logUsage } from "@/lib/usage";
 import { buildRAGContext } from "@/lib/rag";
 import { fetchURLsFromMessage } from "@/lib/url-fetcher";
@@ -18,7 +18,7 @@ export async function POST(
 ) {
   return withAuth(async (user) => {
     const { id: conversationId } = await params;
-    const { content } = await req.json();
+    const { content, webSearch } = await req.json();
 
     if (!content || typeof content !== "string") {
       return NextResponse.json({ error: "content is required" }, { status: 400 });
@@ -139,18 +139,52 @@ export async function POST(
     });
 
     try {
-      const result = await runLLMChat(modelEntry, history, systemPrompt);
+      // Determine if web search should be used
+      const useWebSearch =
+        (webSearch === true || conversation.webSearchEnabled) &&
+        modelEntry.provider === "openai";
 
-      // Save assistant message
+      let resultText: string;
+      let resultInputTokens: number;
+      let resultOutputTokens: number;
+      let resultLatencyMs: number;
+      let resultResponseId: string | undefined;
+      let citations: WebSearchCitation[] = [];
+      let actualProvider = modelEntry.provider;
+      let actualModel = modelEntry.id;
+
+      if (useWebSearch) {
+        // Web search mode — uses OpenAI Responses API with GPT-4o
+        const wsResult = await runLLMWebSearch(history, systemPrompt);
+        resultText = wsResult.text;
+        resultInputTokens = wsResult.inputTokens;
+        resultOutputTokens = wsResult.outputTokens;
+        resultLatencyMs = wsResult.latencyMs;
+        resultResponseId = wsResult.responseId;
+        citations = wsResult.citations;
+        actualProvider = "openai";
+        actualModel = "gpt-4o";
+      } else {
+        // Standard chat mode
+        const chatResult = await runLLMChat(modelEntry, history, systemPrompt);
+        resultText = chatResult.text;
+        resultInputTokens = chatResult.inputTokens;
+        resultOutputTokens = chatResult.outputTokens;
+        resultLatencyMs = chatResult.latencyMs;
+        resultResponseId = chatResult.responseId;
+      }
+
+      // Save assistant message (with citations if web search was used)
       const assistantMessage = await prisma.message.create({
         data: {
           conversationId,
           role: "assistant",
-          content: result.text,
-          inputTokens: result.inputTokens,
-          outputTokens: result.outputTokens,
-          latencyMs: result.latencyMs,
+          content: resultText,
+          inputTokens: resultInputTokens,
+          outputTokens: resultOutputTokens,
+          latencyMs: resultLatencyMs,
           runId: run.id,
+          ...(citations.length > 0 && { citationsJson: citations }),
         },
       });
 
@@ -178,7 +212,7 @@ export async function POST(
       await prisma.runInput.create({
         data: {
           runId: run.id,
-          payloadJson: { conversationId, messageCount: history.length },
+          payloadJson: { conversationId, messageCount: history.length, webSearch: useWebSearch },
         },
       });
 
@@ -186,10 +220,12 @@ export async function POST(
         data: {
           runId: run.id,
           payloadJson: {
-            text: result.text,
-            inputTokens: result.inputTokens,
-            outputTokens: result.outputTokens,
-            latencyMs: result.latencyMs,
+            text: resultText,
+            inputTokens: resultInputTokens,
+            outputTokens: resultOutputTokens,
+            latencyMs: resultLatencyMs,
+            ...(resultResponseId && { responseId: resultResponseId }),
+            ...(citations.length > 0 && { citations }),
           },
         },
       });
@@ -197,10 +233,10 @@ export async function POST(
       await logUsage({
         runId: run.id,
         userId: user.id,
-        provider: modelEntry.provider,
-        model: modelEntry.id,
-        units: { inputTokens: result.inputTokens, outputTokens: result.outputTokens },
-        latencyMs: result.latencyMs,
+        provider: actualProvider,
+        model: actualModel,
+        units: { inputTokens: resultInputTokens, outputTokens: resultOutputTokens },
+        latencyMs: resultLatencyMs,
       });
 
       return NextResponse.json({
@@ -213,11 +249,12 @@ export async function POST(
         assistantMessage: {
           id: assistantMessage.id,
           role: "assistant",
-          content: result.text,
-          inputTokens: result.inputTokens,
-          outputTokens: result.outputTokens,
-          latencyMs: result.latencyMs,
+          content: resultText,
+          inputTokens: resultInputTokens,
+          outputTokens: resultOutputTokens,
+          latencyMs: resultLatencyMs,
           createdAt: assistantMessage.createdAt,
+          ...(citations.length > 0 && { citations }),
         },
       });
     } catch (err: unknown) {

@@ -22,6 +22,7 @@ export async function GET(
             inputTokens: true,
             outputTokens: true,
             latencyMs: true,
+            citationsJson: true,
             createdAt: true,
           },
         },
@@ -68,6 +69,7 @@ export async function PATCH(
             ? body.knowledgeBaseIds
             : null,
         }),
+        ...(body.webSearchEnabled !== undefined && { webSearchEnabled: !!body.webSearchEnabled }),
       },
     });
 
