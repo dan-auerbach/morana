@@ -5,6 +5,9 @@ import { prisma } from "@/lib/prisma";
 import { runImageGeneration } from "@/lib/providers/image";
 import {
   submitImageJob,
+  getImageJobStatus,
+  getImageJobResult,
+  downloadFalImage,
   type FalSubmitParams,
 } from "@/lib/providers/fal-image";
 import { logUsage } from "@/lib/usage";
@@ -12,7 +15,6 @@ import { validateMime } from "@/lib/mime-validate";
 import { uploadToR2, getSignedDownloadUrl } from "@/lib/storage";
 import { getActiveWorkspaceId } from "@/lib/workspace";
 import { validateImageParams, resolveFalImageSize, type ImageParams } from "@/lib/image/operations";
-import { inngest } from "@/lib/inngest/client";
 import { v4 as uuid } from "uuid";
 
 // Vercel serverless: image generation can take 20-60s
@@ -262,33 +264,103 @@ async function handleFalRequest(params: {
   try {
     // Submit to fal.ai queue
     const queueResult = await submitImageJob(modelId, falParams);
+    const requestId = queueResult.request_id;
 
-    // Store providerJobId for polling
+    // Store providerJobId
     await prisma.run.update({
       where: { id: run.id },
       data: {
         status: "running",
-        providerJobId: queueResult.request_id,
+        providerJobId: requestId,
       },
     });
 
-    // Enqueue Inngest job for async polling + result download
-    await inngest.send({
-      name: "image/fal-poll",
+    // ─── Inline poll (like STT/Soniox pattern) ─────────
+    // Flux schnell: ~2-5s, Flux dev: ~10-30s — fits within 60s maxDuration
+    const start = Date.now();
+    const MAX_POLL_MS = 55_000; // leave 5s buffer for download + upload
+    let pollInterval = 1000;
+    let completed = false;
+
+    while (Date.now() - start < MAX_POLL_MS) {
+      await new Promise((r) => setTimeout(r, pollInterval));
+      pollInterval = Math.min(pollInterval * 1.3, 5000);
+
+      const status = await getImageJobStatus(modelId, requestId);
+      if (status.status === "COMPLETED") {
+        completed = true;
+        break;
+      }
+    }
+
+    if (!completed) {
+      await prisma.run.update({
+        where: { id: run.id },
+        data: { status: "error", errorMessage: "Generation timed out", finishedAt: new Date() },
+      });
+      return NextResponse.json({ error: "Image generation timed out. Try a faster model or fewer steps." }, { status: 504 });
+    }
+
+    // ─── Download result ───────────────────────────────
+    const result = await getImageJobResult(modelId, requestId);
+    const latencyMs = Date.now() - start;
+
+    const outputFiles: Array<{ id: string; url: string }> = [];
+    for (const img of result.images) {
+      const { buffer, contentType } = await downloadFalImage(img.url);
+      const ext = contentType.includes("png") ? "png" : "jpg";
+      const storageKey = `image/output/${run.id}/${uuid()}.${ext}`;
+
+      await uploadToR2(storageKey, buffer, contentType, buffer.length);
+
+      const file = await prisma.file.create({
+        data: {
+          userId,
+          runId: run.id,
+          kind: "output",
+          mime: contentType,
+          size: buffer.length,
+          storageKey,
+        },
+      });
+      outputFiles.push({ id: file.id, url: `/api/files/${file.id}` });
+    }
+
+    // ─── Finalize ──────────────────────────────────────
+    await prisma.runOutput.create({
       data: {
         runId: run.id,
-        userId,
-        modelId,
-        requestId: queueResult.request_id,
-        numImages: numImages || 1,
-        workspaceId: workspaceId || null,
+        payloadJson: {
+          seed: result.seed,
+          timings: result.timings || {},
+          hasNsfwConcepts: result.has_nsfw_concepts || [],
+          latencyMs,
+        },
       },
+    });
+
+    await prisma.run.update({
+      where: { id: run.id },
+      data: { status: "done", finishedAt: new Date() },
+    });
+
+    await logUsage({
+      runId: run.id,
+      userId,
+      provider: "fal",
+      model: modelId,
+      units: { images: result.images.length },
+      latencyMs,
+      workspaceId: workspaceId || undefined,
     });
 
     return NextResponse.json({
       runId: run.id,
-      status: "running",
-      providerJobId: queueResult.request_id,
+      status: "done",
+      imageUrl: outputFiles[0]?.url || null,
+      files: outputFiles,
+      seed: result.seed,
+      latencyMs,
     });
   } catch (err) {
     const internalMsg = err instanceof Error ? err.message : "fal.ai submission failed";

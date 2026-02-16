@@ -242,14 +242,27 @@ export default function ImagePage() {
       setStats({ model: provider === "fal" ? modelId : "gemini-2.5-flash-image" });
 
       if (data.status === "done") {
-        // Gemini returns synchronously
         setLoading(false);
-        if (data.imageUrl) setOutputImages([{ id: "gemini", url: data.imageUrl }]);
+
+        // Fal.ai returns files array (batch support)
+        if (data.files?.length > 0) {
+          setOutputImages(
+            data.files.map((f: { id: string; url: string }, idx: number) => ({
+              id: f.id || `fal-${idx}`,
+              url: f.url,
+            }))
+          );
+        } else if (data.imageUrl) {
+          // Gemini returns single imageUrl
+          setOutputImages([{ id: "gemini", url: data.imageUrl }]);
+        }
+
         if (data.text) setResponseText(data.text);
+        if (data.seed !== undefined) setStats((s) => ({ ...s, seed: data.seed }));
         if (data.latencyMs) setStats((s) => ({ ...s, latencyMs: data.latencyMs }));
         loadHistory();
       } else if (data.status === "running") {
-        // Fal.ai: start polling
+        // Fallback: async polling if needed
         startPolling(data.runId);
       }
     } catch (err: unknown) {
