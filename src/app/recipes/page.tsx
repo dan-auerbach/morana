@@ -94,6 +94,7 @@ export default function RecipesPage() {
       const recipe = recipes.find(r => r.id === recipeId);
       const isAudio = recipe?.inputKind === "audio";
 
+      let resp: Response;
       if (isAudio) {
         // Use FormData for audio recipes
         const formData = new FormData();
@@ -107,21 +108,27 @@ export default function RecipesPage() {
           formData.append("transcriptText", inputText);
         }
 
-        await fetch(`/api/recipes/${recipeId}/execute`, {
+        resp = await fetch(`/api/recipes/${recipeId}/execute`, {
           method: "POST",
           body: formData,
         });
       } else {
         // JSON for text recipes
-        await fetch(`/api/recipes/${recipeId}/execute`, {
+        resp = await fetch(`/api/recipes/${recipeId}/execute`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ inputData: inputText ? { text: inputText } : null }),
         });
       }
 
+      const data = await resp.json();
       resetInput();
-      load();
+      // Navigate to execution detail page to see results
+      if (data.execution?.id) {
+        window.location.href = `/recipes/${data.execution.id}`;
+      } else {
+        load();
+      }
     } catch { /* ignore */ }
     finally { setExecuting(null); }
   }
@@ -301,9 +308,16 @@ export default function RecipesPage() {
                       <button
                         onClick={() => handleExecute(r.id)}
                         disabled={executing === r.id}
-                        style={{ padding: "8px 16px", background: "transparent", border: "1px solid #00ff88", color: "#00ff88", fontFamily: "inherit", fontSize: "11px", fontWeight: 700, cursor: "pointer", textTransform: "uppercase" }}
+                        style={{
+                          padding: "8px 16px", background: executing === r.id ? "rgba(255, 204, 0, 0.08)" : "transparent",
+                          border: `1px solid ${executing === r.id ? "#ffcc00" : "#00ff88"}`,
+                          color: executing === r.id ? "#ffcc00" : "#00ff88",
+                          fontFamily: "inherit", fontSize: "11px", fontWeight: 700,
+                          cursor: executing === r.id ? "wait" : "pointer", textTransform: "uppercase",
+                          animation: executing === r.id ? "blink 1.2s step-end infinite" : "none",
+                        }}
                       >
-                        {executing === r.id ? "..." : "RUN"}
+                        {executing === r.id ? "RUNNING..." : "RUN"}
                       </button>
                       <button
                         onClick={resetInput}

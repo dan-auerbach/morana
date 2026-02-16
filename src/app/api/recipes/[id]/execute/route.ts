@@ -107,10 +107,12 @@ export async function POST(
       },
     });
 
-    // Execute recipe (runs in-process for simplicity)
-    executeRecipe(execution.id).catch((err) => {
+    // Execute recipe synchronously — must await to keep Vercel serverless alive
+    try {
+      await executeRecipe(execution.id);
+    } catch (err) {
       console.error("[Recipe] Execution error:", err);
-      prisma.recipeExecution.update({
+      await prisma.recipeExecution.update({
         where: { id: execution.id },
         data: {
           status: "error",
@@ -118,8 +120,16 @@ export async function POST(
           finishedAt: new Date(),
         },
       }).catch(() => {});
+    }
+
+    // Re-fetch execution to return final status
+    const final = await prisma.recipeExecution.findUnique({
+      where: { id: execution.id },
+      select: { id: true, status: true, progress: true, errorMessage: true },
     });
 
-    return NextResponse.json({ execution: { id: execution.id, status: "pending" } }, { status: 201 });
+    return NextResponse.json({
+      execution: final || { id: execution.id, status: "pending" },
+    }, { status: 201 });
   }, req);
 }

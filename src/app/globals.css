@@ -95,17 +95,30 @@ input:focus, textarea:focus, select:focus {
 
 /* ===== RESPONSIVE / MOBILE ===== */
 
-/* Nav: hamburger hidden on desktop, shown on mobile */
+/* Nav: desktop defaults */
 .nav-hamburger { display: none !important; }
 .nav-links-desktop { display: flex; gap: 2px; align-items: center; }
-.nav-email { display: inline; }
-.nav-signout-desktop { display: inline-flex; }
+.nav-admin-desktop { display: block; }
+.nav-ws-desktop { display: block; }
+.nav-user-desktop { display: block; }
 
+/* Nav overflow: show "More" dropdown only on narrow desktop, hide overflow links */
+.nav-more-btn { display: none; }
+.nav-overflow-link { display: inline-flex; }
+
+/* Narrow desktop: between 769px and 950px — collapse History+Usage into More */
+@media (max-width: 950px) and (min-width: 769px) {
+  .nav-overflow-link { display: none !important; }
+  .nav-more-btn { display: block !important; }
+}
+
+/* Mobile: <= 768px */
 @media (max-width: 768px) {
   .nav-hamburger { display: inline-flex !important; }
   .nav-links-desktop { display: none !important; }
-  .nav-email { display: none !important; }
-  .nav-signout-desktop { display: none !important; }
+  .nav-admin-desktop { display: none !important; }
+  .nav-ws-desktop { display: none !important; }
+  .nav-user-desktop { display: none !important; }
 
   /* Pages with sidebars: hide sidebar on mobile, make layout vertical */
   .page-with-sidebar {
