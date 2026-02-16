@@ -131,6 +131,7 @@ export async function POST(
     const run = await prisma.run.create({
       data: {
         userId: user.id,
+        workspaceId: conversation.workspaceId || undefined,
         type: "llm",
         status: "running",
         provider: modelEntry.provider,
@@ -233,6 +234,7 @@ export async function POST(
       await logUsage({
         runId: run.id,
         userId: user.id,
+        workspaceId: conversation.workspaceId,
         provider: actualProvider,
         model: actualModel,
         units: { inputTokens: resultInputTokens, outputTokens: resultOutputTokens },
