@@ -23,7 +23,7 @@ export default function Nav() {
   const { data: session } = useSession();
   const isAdmin = (session?.user as Record<string, unknown>)?.role === "admin";
   const links = isAdmin
-    ? [...baseLinks, { href: "/admin/templates", label: "Templates" }, { href: "/admin/knowledge", label: "KB" }, { href: "/admin/auth-logs", label: "Logs" }, { href: "/admin/workspaces", label: "WS" }, { href: "/admin", label: "Admin" }]
+    ? [...baseLinks, { href: "/admin/recipes", label: "Rcps" }, { href: "/admin/templates", label: "Tmpl" }, { href: "/admin/knowledge", label: "KB" }, { href: "/admin/auth-logs", label: "Logs" }, { href: "/admin/workspaces", label: "WS" }, { href: "/admin", label: "Admin" }]
     : baseLinks;
   const [menuOpen, setMenuOpen] = useState(false);
   const [workspaces, setWorkspaces] = useState<WsInfo[]>([]);

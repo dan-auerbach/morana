@@ -1,11 +1,13 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 
 type Recipe = {
   id: string; name: string; slug: string; description: string | null;
+  inputKind: string; inputModes: string[] | null; defaultLang: string | null;
+  uiHints: Record<string, unknown> | null;
   steps: { id: string; stepIndex: number; name: string; type: string }[];
   _count: { executions: number };
 };
@@ -20,6 +22,8 @@ type Preset = {
   key: string; name: string; description: string; stepsCount: number; stepTypes: string[]; alreadyCreated: boolean;
 };
 
+type InputMode = "file" | "url" | "text";
+
 export default function RecipesPage() {
   const { data: session } = useSession();
   const isAdmin = (session?.user as Record<string, unknown>)?.role === "admin";
@@ -27,10 +31,17 @@ export default function RecipesPage() {
   const [executions, setExecutions] = useState<Execution[]>([]);
   const [loading, setLoading] = useState(false);
   const [executing, setExecuting] = useState<string | null>(null);
-  const [inputText, setInputText] = useState("");
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
   const [presets, setPresets] = useState<Preset[]>([]);
   const [creatingPreset, setCreatingPreset] = useState(false);
+
+  // Input state
+  const [inputText, setInputText] = useState("");
+  const [inputMode, setInputMode] = useState<InputMode>("text");
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [audioUrl, setAudioUrl] = useState("");
+  const [language, setLanguage] = useState("sl");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -58,16 +69,58 @@ export default function RecipesPage() {
     return () => clearInterval(interval);
   }, [executions, load]);
 
+  function resetInput() {
+    setInputText(""); setAudioFile(null); setAudioUrl(""); setInputMode("text"); setLanguage("sl");
+    setSelectedRecipeId(null);
+  }
+
+  function selectRecipe(recipe: Recipe) {
+    setSelectedRecipeId(recipe.id);
+    setLanguage(recipe.defaultLang || "sl");
+    // Default to first available input mode
+    const modes = recipe.inputModes as InputMode[] | null;
+    if (modes && modes.length > 0) {
+      setInputMode(modes[0]);
+    } else if (recipe.inputKind === "audio") {
+      setInputMode("file");
+    } else {
+      setInputMode("text");
+    }
+  }
+
   async function handleExecute(recipeId: string) {
     setExecuting(recipeId);
     try {
-      await fetch(`/api/recipes/${recipeId}/execute`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ inputData: inputText ? { text: inputText } : null }),
-      });
-      setInputText("");
-      setSelectedRecipeId(null);
+      const recipe = recipes.find(r => r.id === recipeId);
+      const isAudio = recipe?.inputKind === "audio";
+
+      if (isAudio) {
+        // Use FormData for audio recipes
+        const formData = new FormData();
+        formData.append("language", language);
+
+        if (inputMode === "file" && audioFile) {
+          formData.append("file", audioFile);
+        } else if (inputMode === "url" && audioUrl) {
+          formData.append("audioUrl", audioUrl);
+        } else if (inputMode === "text" && inputText) {
+          formData.append("transcriptText", inputText);
+        }
+
+        await fetch(`/api/recipes/${recipeId}/execute`, {
+          method: "POST",
+          body: formData,
+        });
+      } else {
+        // JSON for text recipes
+        await fetch(`/api/recipes/${recipeId}/execute`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ inputData: inputText ? { text: inputText } : null }),
+        });
+      }
+
+      resetInput();
       load();
     } catch { /* ignore */ }
     finally { setExecuting(null); }
@@ -81,6 +134,9 @@ export default function RecipesPage() {
     if (s === "error") return "#ff4444";
     return "#5a6a7a";
   };
+
+  const selectedRecipe = recipes.find(r => r.id === selectedRecipeId);
+  const availableModes = (selectedRecipe?.inputModes as InputMode[] | null) || (selectedRecipe?.inputKind === "audio" ? ["file", "url", "text"] as InputMode[] : ["text"] as InputMode[]);
 
   return (
     <div>
@@ -122,7 +178,7 @@ export default function RecipesPage() {
               >
                 + {p.name}
                 <span style={{ fontSize: "9px", color: "#5a6a7a", marginLeft: "6px" }}>
-                  ({p.stepTypes.join(" → ")})
+                  ({p.stepTypes.join(" \u2192 ")})
                 </span>
               </button>
             ))}
@@ -142,6 +198,9 @@ export default function RecipesPage() {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
                 <div>
                   <span style={{ color: "#e0e0e0", fontWeight: 700, fontSize: "14px" }}>{r.name}</span>
+                  {r.inputKind === "audio" && (
+                    <span style={{ marginLeft: "8px", padding: "1px 6px", backgroundColor: "rgba(0, 229, 255, 0.1)", border: "1px solid rgba(0, 229, 255, 0.3)", color: "#00e5ff", fontSize: "9px", fontWeight: 700, textTransform: "uppercase" }}>AUDIO</span>
+                  )}
                   {r.description && <span style={{ color: "#5a6a7a", fontSize: "12px", marginLeft: "8px" }}>{r.description}</span>}
                 </div>
                 <span style={{ color: "#5a6a7a", fontSize: "10px" }}>{r.steps.length} steps</span>
@@ -154,32 +213,110 @@ export default function RecipesPage() {
                 ))}
               </div>
               {selectedRecipeId === r.id ? (
-                <div style={{ display: "flex", gap: "8px", alignItems: "flex-end" }}>
-                  <textarea
-                    value={inputText}
-                    onChange={(e) => setInputText(e.target.value)}
-                    placeholder="Paste input text (optional — e.g. transcript, article text)..."
-                    style={{ flex: 1, padding: "8px", backgroundColor: "#111820", border: "1px solid #1e2a3a", color: "#e0e0e0", fontFamily: "inherit", fontSize: "12px", resize: "vertical", minHeight: "60px" }}
-                  />
-                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
-                    <button
-                      onClick={() => handleExecute(r.id)}
-                      disabled={executing === r.id}
-                      style={{ padding: "8px 16px", background: "transparent", border: "1px solid #00ff88", color: "#00ff88", fontFamily: "inherit", fontSize: "11px", fontWeight: 700, cursor: "pointer", textTransform: "uppercase" }}
-                    >
-                      {executing === r.id ? "..." : "RUN"}
-                    </button>
-                    <button
-                      onClick={() => { setSelectedRecipeId(null); setInputText(""); }}
-                      style={{ padding: "4px 16px", background: "transparent", border: "1px solid #5a6a7a", color: "#5a6a7a", fontFamily: "inherit", fontSize: "10px", cursor: "pointer" }}
-                    >
-                      CANCEL
-                    </button>
+                <div>
+                  {/* Input mode selector for audio recipes */}
+                  {r.inputKind === "audio" && availableModes.length > 1 && (
+                    <div style={{ display: "flex", gap: "4px", marginBottom: "8px" }}>
+                      {availableModes.map((mode) => (
+                        <button
+                          key={mode}
+                          onClick={() => setInputMode(mode)}
+                          style={{
+                            padding: "4px 12px", background: inputMode === mode ? "rgba(0, 229, 255, 0.1)" : "transparent",
+                            border: `1px solid ${inputMode === mode ? "#00e5ff" : "#1e2a3a"}`,
+                            color: inputMode === mode ? "#00e5ff" : "#5a6a7a",
+                            fontFamily: "inherit", fontSize: "10px", fontWeight: 700, cursor: "pointer", textTransform: "uppercase",
+                          }}
+                        >
+                          {mode === "file" ? "UPLOAD FILE" : mode === "url" ? "AUDIO URL" : "PASTE TRANSCRIPT"}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Language selector for audio recipes */}
+                  {r.inputKind === "audio" && (
+                    <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px" }}>
+                      <span style={{ fontSize: "10px", fontWeight: 700, color: "#5a6a7a", textTransform: "uppercase" }}>Lang:</span>
+                      {["sl", "en"].map((lang) => (
+                        <button
+                          key={lang}
+                          onClick={() => setLanguage(lang)}
+                          style={{
+                            padding: "2px 10px", background: language === lang ? "rgba(255, 204, 0, 0.1)" : "transparent",
+                            border: `1px solid ${language === lang ? "#ffcc00" : "#1e2a3a"}`,
+                            color: language === lang ? "#ffcc00" : "#5a6a7a",
+                            fontFamily: "inherit", fontSize: "10px", fontWeight: 700, cursor: "pointer",
+                          }}
+                        >
+                          {lang.toUpperCase()}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  <div style={{ display: "flex", gap: "8px", alignItems: "flex-end" }}>
+                    {/* Input area changes based on mode */}
+                    {r.inputKind === "audio" && inputMode === "file" ? (
+                      <div style={{ flex: 1 }}>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept={(r.uiHints?.acceptAudio as string) || "audio/*"}
+                          onChange={(e) => setAudioFile(e.target.files?.[0] || null)}
+                          style={{ display: "none" }}
+                        />
+                        <button
+                          onClick={() => fileInputRef.current?.click()}
+                          style={{
+                            width: "100%", padding: "16px", backgroundColor: "rgba(0, 229, 255, 0.03)",
+                            border: `2px dashed ${audioFile ? "#00ff88" : "rgba(0, 229, 255, 0.3)"}`,
+                            color: audioFile ? "#00ff88" : "#5a6a7a",
+                            fontFamily: "inherit", fontSize: "12px", cursor: "pointer", textAlign: "center",
+                          }}
+                        >
+                          {audioFile
+                            ? `\u2713 ${audioFile.name} (${(audioFile.size / 1024 / 1024).toFixed(1)} MB)`
+                            : "Click to select audio file (MP3, WAV, OGG, FLAC, M4A, AAC, WebM)"}
+                        </button>
+                      </div>
+                    ) : r.inputKind === "audio" && inputMode === "url" ? (
+                      <input
+                        value={audioUrl}
+                        onChange={(e) => setAudioUrl(e.target.value)}
+                        placeholder="https://example.com/audio.mp3"
+                        style={{ flex: 1, padding: "8px", backgroundColor: "#111820", border: "1px solid #1e2a3a", color: "#e0e0e0", fontFamily: "inherit", fontSize: "12px" }}
+                      />
+                    ) : (
+                      <textarea
+                        value={inputText}
+                        onChange={(e) => setInputText(e.target.value)}
+                        placeholder={r.inputKind === "audio" && inputMode === "text"
+                          ? "Paste transcript text here (STT step will be skipped)..."
+                          : "Paste input text (optional \u2014 e.g. transcript, article text)..."}
+                        style={{ flex: 1, padding: "8px", backgroundColor: "#111820", border: "1px solid #1e2a3a", color: "#e0e0e0", fontFamily: "inherit", fontSize: "12px", resize: "vertical", minHeight: "60px" }}
+                      />
+                    )}
+                    <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                      <button
+                        onClick={() => handleExecute(r.id)}
+                        disabled={executing === r.id}
+                        style={{ padding: "8px 16px", background: "transparent", border: "1px solid #00ff88", color: "#00ff88", fontFamily: "inherit", fontSize: "11px", fontWeight: 700, cursor: "pointer", textTransform: "uppercase" }}
+                      >
+                        {executing === r.id ? "..." : "RUN"}
+                      </button>
+                      <button
+                        onClick={resetInput}
+                        style={{ padding: "4px 16px", background: "transparent", border: "1px solid #5a6a7a", color: "#5a6a7a", fontFamily: "inherit", fontSize: "10px", cursor: "pointer" }}
+                      >
+                        CANCEL
+                      </button>
+                    </div>
                   </div>
                 </div>
               ) : (
                 <button
-                  onClick={() => setSelectedRecipeId(r.id)}
+                  onClick={() => selectRecipe(r)}
                   style={{ padding: "6px 16px", background: "transparent", border: "1px solid #00ff88", color: "#00ff88", fontFamily: "inherit", fontSize: "11px", fontWeight: 700, cursor: "pointer", textTransform: "uppercase" }}
                 >
                   [  EXECUTE  ]
@@ -203,7 +340,7 @@ export default function RecipesPage() {
                 <span style={{ color: statusColor(e.status), fontSize: "10px", fontWeight: 700, textTransform: "uppercase", width: "70px" }}>{e.status}</span>
                 <span style={{ color: "#e0e0e0", fontSize: "12px", flex: 1 }}>{e.recipe.name}</span>
                 {(e.status === "running" || e.status === "pending") && (
-                  <span style={{ color: "#ffcc00", fontSize: "10px" }}>{e.progress}% — step {e.currentStep + 1}/{e.totalSteps}</span>
+                  <span style={{ color: "#ffcc00", fontSize: "10px" }}>{e.progress}% &mdash; step {e.currentStep + 1}/{e.totalSteps}</span>
                 )}
                 <span style={{ color: "#5a6a7a", fontSize: "10px" }}>{new Date(e.startedAt).toLocaleString("sl-SI", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
               </Link>

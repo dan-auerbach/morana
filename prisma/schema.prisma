@@ -378,6 +378,10 @@ model Recipe {
   status      RecipeStatus @default(draft)
   isPreset    Boolean      @default(false)  // true for system presets (e.g. NOVINAR)
   presetKey   String?      @unique          // unique preset identifier
+  inputKind   String       @default("text") // "text", "audio", "image", "none"
+  inputModes  Json?                         // JSON array: ["file","url","text"] — allowed input modes
+  defaultLang String?                       // default language hint (e.g. "sl", "en")
+  uiHints     Json?                         // UI hints for the recipe frontend
   createdBy   String
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt

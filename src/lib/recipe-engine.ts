@@ -1,23 +1,42 @@
 import { prisma } from "./prisma";
 import { getApprovedModels } from "./config";
 import { runLLMChat } from "./providers/llm";
+import { runSTT } from "./providers/stt";
 import { logUsage } from "./usage";
+import { getObjectFromR2 } from "./storage";
 
 type StepConfig = {
   modelId?: string;
   systemPrompt?: string;
   userPromptTemplate?: string;
   language?: string;
+  provider?: string;
   voiceId?: string;
   promptTemplate?: string;
   formats?: string[];
   knowledgeBaseIds?: string[];
   templateId?: string;
+  description?: string;
 };
+
+type InputData = {
+  text?: string;
+  transcriptText?: string;
+  audioStorageKey?: string;
+  audioMimeType?: string;
+  audioUrl?: string;
+  language?: string;
+} | null;
 
 /**
  * Execute a recipe, processing steps sequentially.
  * Each step's output becomes the next step's input.
+ *
+ * Input modes for STT recipes:
+ * - transcriptText: skip STT step, use provided transcript directly
+ * - audioStorageKey: fetch from R2, run STT
+ * - audioUrl: fetch from URL, run STT
+ * - text: plain text input (no STT)
  */
 export async function executeRecipe(executionId: string): Promise<void> {
   const execution = await prisma.recipeExecution.findUnique({
@@ -40,9 +59,12 @@ export async function executeRecipe(executionId: string): Promise<void> {
   let previousOutput = "";
 
   // Get initial input from execution data
-  const inputData = execution.inputData as { text?: string } | null;
+  const inputData = execution.inputData as InputData;
   if (inputData?.text) {
     previousOutput = inputData.text;
+  }
+  if (inputData?.transcriptText) {
+    previousOutput = inputData.transcriptText;
   }
 
   const steps = execution.recipe.steps;
@@ -64,7 +86,7 @@ export async function executeRecipe(executionId: string): Promise<void> {
         executionId,
         stepIndex: step.stepIndex,
         status: "running",
-        inputPreview: previousOutput.substring(0, 500),
+        inputPreview: previousOutput.substring(0, 500) || "[audio input]",
         startedAt: new Date(),
       },
     });
@@ -81,15 +103,15 @@ export async function executeRecipe(executionId: string): Promise<void> {
     try {
       let output = "";
 
-      if (step.type === "llm") {
+      if (step.type === "stt") {
+        output = await executeSTTStep(execution.userId, config, inputData, previousOutput);
+      } else if (step.type === "llm") {
         output = await executeLLMStep(execution.userId, config, previousOutput);
       } else if (step.type === "output_format") {
-        // Output format step: just structure the output
         output = formatOutput(previousOutput, config.formats || ["markdown"]);
       } else {
-        // STT, TTS, Image — these are more complex and require file handling
-        // For now, pass through with a note
-        output = previousOutput || `[Step ${step.name}: ${step.type} processing would occur here]`;
+        // TTS, Image — not yet implemented
+        output = previousOutput || `[Step ${step.name}: ${step.type} processing not implemented]`;
       }
 
       // Update step result
@@ -140,6 +162,98 @@ export async function executeRecipe(executionId: string): Promise<void> {
       finishedAt: new Date(),
     },
   });
+}
+
+/**
+ * Execute an STT step.
+ *
+ * Skip logic:
+ * - If transcriptText was provided as input, skip STT and use it directly.
+ * - If previousOutput already has text (e.g. from direct text input), skip STT.
+ * - Otherwise, run Soniox STT on the audio from R2 or URL.
+ */
+async function executeSTTStep(
+  userId: string,
+  config: StepConfig,
+  inputData: InputData,
+  previousOutput: string
+): Promise<string> {
+  // SKIP: transcript already provided by user
+  if (inputData?.transcriptText) {
+    return inputData.transcriptText;
+  }
+
+  // SKIP: previous output has text (text input mode, no audio)
+  if (previousOutput && previousOutput.length > 10) {
+    return previousOutput;
+  }
+
+  // Determine language
+  const language = (inputData?.language || config.language || "sl") as "sl" | "en";
+
+  let audioBuffer: Buffer;
+  let mimeType: string;
+
+  if (inputData?.audioStorageKey) {
+    // Fetch audio from R2
+    const r2Resp = await getObjectFromR2(inputData.audioStorageKey);
+    if (!r2Resp.Body) throw new Error("Audio file not found in storage");
+    const arrayBuffer = await r2Resp.Body.transformToByteArray();
+    audioBuffer = Buffer.from(arrayBuffer);
+    mimeType = inputData.audioMimeType || "audio/mpeg";
+  } else if (inputData?.audioUrl) {
+    // Fetch audio from URL
+    const resp = await fetch(inputData.audioUrl);
+    if (!resp.ok) throw new Error(`Failed to fetch audio from URL: ${resp.status}`);
+    const arrayBuffer = await resp.arrayBuffer();
+    audioBuffer = Buffer.from(arrayBuffer);
+    mimeType = resp.headers.get("content-type") || "audio/mpeg";
+  } else {
+    throw new Error("No audio source provided for STT step. Provide an audio file, URL, or transcript text.");
+  }
+
+  // Create a run for cost tracking
+  const run = await prisma.run.create({
+    data: {
+      userId,
+      type: "stt",
+      status: "running",
+      provider: "soniox",
+      model: "stt-async-v4",
+    },
+  });
+
+  try {
+    const result = await runSTT(audioBuffer, language, mimeType);
+
+    await prisma.run.update({
+      where: { id: run.id },
+      data: { status: "done", finishedAt: new Date() },
+    });
+
+    // Log usage (Soniox pricing is per-minute)
+    const durationMinutes = Math.ceil(result.durationSeconds / 60);
+    await logUsage({
+      runId: run.id,
+      userId,
+      provider: "soniox",
+      model: "stt-async-v4",
+      units: { durationSeconds: result.durationSeconds, durationMinutes },
+      latencyMs: result.latencyMs,
+    });
+
+    if (!result.text || result.text.trim().length === 0) {
+      throw new Error("STT returned empty transcript. The audio may be silent or in an unsupported format.");
+    }
+
+    return result.text;
+  } catch (err) {
+    await prisma.run.update({
+      where: { id: run.id },
+      data: { status: "error", errorMessage: err instanceof Error ? err.message : "STT failed", finishedAt: new Date() },
+    });
+    throw err;
+  }
 }
 
 /**
@@ -232,12 +346,11 @@ function formatOutput(text: string, formats: string[]): string {
 
 /**
  * NOVINAR Drupal-ready output format.
- * Expects the input to contain an article (from LLM step) followed by
- * SEO JSON (from the SEO step). Combines them into a structured Drupal payload.
+ * Expects the input to contain SEO JSON from the SEO step.
+ * The article text was the input TO the SEO step, so we retrieve it
+ * from the execution step results.
  */
 function formatDrupalOutput(text: string): string {
-  // The input contains the article text followed by SEO JSON from the previous step
-  // Try to parse SEO JSON from the input
   let seo: {
     titles?: { type: string; text: string }[];
     metaDescription?: string;
@@ -245,16 +358,12 @@ function formatDrupalOutput(text: string): string {
     tags?: string[];
     slug?: string;
   } = {};
-  let articleText = text;
 
   // Try to extract JSON from the text (SEO step output)
   const jsonMatch = text.match(/\{[\s\S]*"titles"[\s\S]*\}/);
   if (jsonMatch) {
     try {
       seo = JSON.parse(jsonMatch[0]);
-      // The article was in the previous step; SEO step got the full article as input
-      // So the current text IS the SEO JSON output
-      // We need to reconstruct: use the article from before SEO
     } catch {
       // Not valid JSON — treat whole text as article
     }
@@ -281,7 +390,7 @@ function formatDrupalOutput(text: string): string {
         })
         .filter(Boolean)
         .join("\n")
-    : `<p>${articleText}</p>`;
+    : `<p>${text}</p>`;
 
   // Extract title from article (first h1 or first line)
   const titleMatch = articlePart.match(/^#\s+(.+)/m);

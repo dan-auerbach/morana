@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
     if (denied) return denied;
 
     const body = await req.json();
-    const { name, slug, description, status } = body;
+    const { name, slug, description, status, inputKind, inputModes, defaultLang, uiHints } = body;
 
     if (!name || typeof name !== "string" || !name.trim()) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
@@ -70,6 +70,10 @@ export async function POST(req: NextRequest) {
         slug: finalSlug,
         description: description?.trim() || null,
         status: status || "draft",
+        inputKind: inputKind || "text",
+        inputModes: inputModes || null,
+        defaultLang: defaultLang || null,
+        uiHints: uiHints || null,
         createdBy: user.id,
         workspaceId,
       },

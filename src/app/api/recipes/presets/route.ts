@@ -70,6 +70,10 @@ export async function POST(req: NextRequest) {
         status: "active",
         isPreset: true,
         presetKey: preset.key,
+        inputKind: preset.inputKind || "text",
+        inputModes: preset.inputModes ? (preset.inputModes as Prisma.InputJsonValue) : Prisma.DbNull,
+        defaultLang: preset.defaultLang || null,
+        uiHints: preset.uiHints ? (preset.uiHints as Prisma.InputJsonValue) : Prisma.DbNull,
         createdBy: user.id,
         workspaceId,
         steps: {

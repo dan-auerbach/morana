@@ -49,6 +49,10 @@ export async function PATCH(
     if (body.name !== undefined) data.name = body.name.trim();
     if (body.description !== undefined) data.description = body.description?.trim() || null;
     if (body.status !== undefined) data.status = body.status;
+    if (body.inputKind !== undefined) data.inputKind = body.inputKind;
+    if (body.inputModes !== undefined) data.inputModes = body.inputModes;
+    if (body.defaultLang !== undefined) data.defaultLang = body.defaultLang || null;
+    if (body.uiHints !== undefined) data.uiHints = body.uiHints;
 
     const recipe = await prisma.recipe.update({ where: { id }, data });
     return NextResponse.json({ recipe });

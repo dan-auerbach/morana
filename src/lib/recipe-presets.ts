@@ -14,6 +14,10 @@ export type RecipePreset = {
   key: string;
   name: string;
   description: string;
+  inputKind: string;
+  inputModes: string[];
+  defaultLang: string;
+  uiHints: Record<string, unknown>;
   steps: PresetStep[];
 };
 
@@ -25,11 +29,21 @@ export type RecipePreset = {
  * 2. LLM — Transform transcript into structured article
  * 3. LLM SEO — Generate SEO metadata as strict JSON
  * 4. Output Format — Combine into Drupal-ready HTML + structured fields
+ *
+ * Input: audio file, audio URL, or pasted transcript.
+ * If transcript is pasted, STT step is skipped automatically.
  */
 export const NOVINAR_PRESET: RecipePreset = {
   key: "novinar",
   name: "NOVINAR",
   description: "Audio → Članek → SEO → Drupal-ready HTML. Pipeline za novinarske prispevke.",
+  inputKind: "audio",
+  inputModes: ["file", "url", "text"],
+  defaultLang: "sl",
+  uiHints: {
+    acceptAudio: "audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/flac,audio/m4a,audio/aac,audio/webm",
+    maxFileSizeMB: 100,
+  },
   steps: [
     {
       stepIndex: 0,
