@@ -193,6 +193,7 @@ model Run {
   finishedAt     DateTime?
   errorMessage   String?   @db.Text
   idempotencyKey String?   @unique
+  providerJobId  String?              // External job ID (e.g. fal.ai queue request_id)
 
   user             User               @relation(fields: [userId], references: [id])
   workspace        Workspace?         @relation(fields: [workspaceId], references: [id])

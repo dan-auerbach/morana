@@ -2,6 +2,11 @@ import { inngest } from "./client";
 import { prisma } from "../prisma";
 import { runSTT } from "../providers/stt";
 import { runTTS } from "../providers/tts";
+import {
+  getImageJobStatus,
+  getImageJobResult,
+  downloadFalImage,
+} from "../providers/fal-image";
 import { uploadToR2, getObjectFromR2 } from "../storage";
 import { logUsage } from "../usage";
 import { executeRecipe } from "../recipe-engine";
@@ -172,4 +177,154 @@ export const recipeExecutionJob = inngest.createFunction(
   }
 );
 
-export const inngestFunctions = [sttJob, ttsJob, recipeExecutionJob];
+// ─── Fal.ai Image Job — async poll + download ──────────────
+export const falImageJob = inngest.createFunction(
+  { id: "image-fal-poll", retries: 2 },
+  { event: "image/fal-poll" },
+  async ({ event, step }) => {
+    const { runId, userId, modelId, requestId, numImages, workspaceId } = event.data as {
+      runId: string;
+      userId: string;
+      modelId: string;
+      requestId: string;
+      numImages: number;
+      workspaceId: string | null;
+    };
+
+    // Idempotency check
+    const existing = await prisma.run.findUnique({ where: { id: runId } });
+    if (!existing || existing.status === "done" || existing.status === "error") {
+      return { skipped: true };
+    }
+
+    const start = Date.now();
+
+    // Poll fal.ai queue with exponential backoff (max 5 min)
+    const MAX_POLL_MS = 5 * 60 * 1000;
+    let pollInterval = 1500; // start at 1.5s
+
+    let completed = false;
+    while (Date.now() - start < MAX_POLL_MS) {
+      // Check if run was cancelled
+      const run = await prisma.run.findUnique({
+        where: { id: runId },
+        select: { status: true },
+      });
+      if (!run || run.status === "error") {
+        return { cancelled: true };
+      }
+
+      const status = await step.run(`poll-${Date.now()}`, async () => {
+        return getImageJobStatus(modelId, requestId);
+      });
+
+      if (status.status === "COMPLETED") {
+        completed = true;
+        break;
+      }
+
+      // Wait with exponential backoff (cap at 10s)
+      await step.sleep(`wait-${Date.now()}`, `${Math.min(pollInterval, 10000)}ms`);
+      pollInterval = Math.min(pollInterval * 1.5, 10000);
+    }
+
+    if (!completed) {
+      await prisma.run.update({
+        where: { id: runId },
+        data: { status: "error", errorMessage: "Generation timed out (5 min)", finishedAt: new Date() },
+      });
+      return { error: "timeout" };
+    }
+
+    // Get result
+    try {
+      const result = await step.run("get-result", async () => {
+        return getImageJobResult(modelId, requestId);
+      });
+
+      const latencyMs = Date.now() - start;
+      const outputImages: Array<{
+        r2Key: string;
+        width: number;
+        height: number;
+        contentType: string;
+        fileId: string;
+      }> = [];
+
+      // Download each image and store in R2
+      for (let i = 0; i < result.images.length; i++) {
+        const img = result.images[i];
+        await step.run(`download-${i}`, async () => {
+          const { buffer, contentType } = await downloadFalImage(img.url);
+          const ext = contentType.includes("png") ? "png" : "jpg";
+          const storageKey = `image/output/${runId}/${uuid()}.${ext}`;
+
+          await uploadToR2(storageKey, buffer, contentType, buffer.length);
+
+          const file = await prisma.file.create({
+            data: {
+              userId,
+              runId,
+              kind: "output",
+              mime: contentType,
+              size: buffer.length,
+              storageKey,
+            },
+          });
+
+          outputImages.push({
+            r2Key: storageKey,
+            width: img.width,
+            height: img.height,
+            contentType,
+            fileId: file.id,
+          });
+        });
+      }
+
+      // Save output + mark done
+      await step.run("finalize", async () => {
+        await prisma.runOutput.create({
+          data: {
+            runId,
+            payloadJson: {
+              outputs: outputImages,
+              seed: result.seed,
+              timings: result.timings || {},
+              hasNsfwConcepts: result.has_nsfw_concepts || [],
+              latencyMs,
+            },
+          },
+        });
+
+        await prisma.run.update({
+          where: { id: runId },
+          data: { status: "done", finishedAt: new Date() },
+        });
+
+        // Cost tracking: estimate based on megapixels * numImages
+        // fal.ai flux pricing: ~$0.025/image (schnell) or ~$0.055/image (dev)
+        await logUsage({
+          runId,
+          userId,
+          provider: "fal",
+          model: modelId,
+          units: { images: result.images.length },
+          latencyMs,
+          workspaceId: workspaceId || undefined,
+        });
+      });
+
+      return { success: true, images: outputImages.length };
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      await prisma.run.update({
+        where: { id: runId },
+        data: { status: "error", errorMessage: message, finishedAt: new Date() },
+      });
+      throw err;
+    }
+  }
+);
+
+export const inngestFunctions = [sttJob, ttsJob, recipeExecutionJob, falImageJob];

@@ -137,6 +137,8 @@ const defaultPricing: Record<string, { input: number; output: number; unit: stri
   "gpt-4o-mini": { input: 0.15, output: 0.6, unit: "1M_tokens" },
   soniox: { input: 0.35, output: 0, unit: "per_minute" },
   elevenlabs: { input: 0.30, output: 0, unit: "1k_chars" },
+  "fal-ai/flux/schnell": { input: 0.025, output: 0, unit: "per_image" },
+  "fal-ai/flux/dev": { input: 0.055, output: 0, unit: "per_image" },
 };
 
 /** Combined pricing: DB-cached pricing merged with hardcoded defaults */
@@ -161,7 +163,7 @@ export const pricing: Record<string, { input: number; output: number; unit: stri
  */
 export function estimateCostCents(
   model: string,
-  units: { inputTokens?: number; outputTokens?: number; chars?: number; seconds?: number }
+  units: { inputTokens?: number; outputTokens?: number; chars?: number; seconds?: number; images?: number }
 ): number {
   const p = pricing[model];
   if (!p) return 0;
@@ -172,6 +174,8 @@ export function estimateCostCents(
     dollars = ((units.chars || 0) * p.input) / 1000;
   } else if (p.unit === "per_minute") {
     dollars = ((units.seconds || 0) / 60) * p.input;
+  } else if (p.unit === "per_image") {
+    dollars = (units.images || 0) * p.input;
   }
   return Math.round(dollars * 100);
 }

@@ -5,34 +5,90 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import StatusBadge from "../components/StatusBadge";
 import CostPreview from "../components/CostPreview";
 
+// ─── Types ─────────────────────────────────────────────────
+
 type HistoryRun = {
   id: string;
   status: string;
   createdAt: string;
   model: string;
+  provider: string;
   preview?: string;
 };
 
+type OutputImage = {
+  id: string;
+  url: string;
+  width?: number;
+  height?: number;
+};
+
+const FAL_MODELS = [
+  { id: "fal-ai/flux/schnell", label: "Flux Schnell (fast)", defaultSteps: 4 },
+  { id: "fal-ai/flux/dev", label: "Flux Dev (quality)", defaultSteps: 28 },
+];
+
+const ASPECT_RATIOS = [
+  { id: "1:1", label: "1:1" },
+  { id: "16:9", label: "16:9" },
+  { id: "9:16", label: "9:16" },
+  { id: "4:3", label: "4:3" },
+  { id: "3:4", label: "3:4" },
+  { id: "3:2", label: "3:2" },
+  { id: "2:3", label: "2:3" },
+];
+
+// ─── Component ─────────────────────────────────────────────
+
 export default function ImagePage() {
   const { data: session } = useSession();
-  const [prompt, setPrompt] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [runId, setRunId] = useState("");
-  const [status, setStatus] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
-  const [responseText, setResponseText] = useState("");
-  const [stats, setStats] = useState<{ latencyMs: number } | null>(null);
 
-  // Image upload
+  // Provider & mode
+  const [provider, setProvider] = useState<"fal" | "gemini">("fal");
+  const [operation, setOperation] = useState<"generate" | "img2img">("generate");
+
+  // Model
+  const [modelId, setModelId] = useState("fal-ai/flux/dev");
+
+  // Prompt
+  const [prompt, setPrompt] = useState("");
+
+  // Image params
+  const [aspectRatio, setAspectRatio] = useState("1:1");
+  const [numImages, setNumImages] = useState(1);
+  const [outputFormat, setOutputFormat] = useState<"jpeg" | "png">("jpeg");
+
+  // Advanced params
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [steps, setSteps] = useState<number | undefined>(undefined);
+  const [guidanceScale, setGuidanceScale] = useState<number | undefined>(undefined);
+  const [seed, setSeed] = useState<string>("");
+  const [strength, setStrength] = useState(0.7);
+
+  // Image upload (for img2img)
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [uploadedImageName, setUploadedImageName] = useState("");
   const [uploadedImageMime, setUploadedImageMime] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Results
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [runId, setRunId] = useState("");
+  const [status, setStatus] = useState("");
+  const [outputImages, setOutputImages] = useState<OutputImage[]>([]);
+  const [responseText, setResponseText] = useState("");
+  const [stats, setStats] = useState<{ latencyMs?: number; seed?: number; model?: string } | null>(null);
+
   // History sidebar
   const [history, setHistory] = useState<HistoryRun[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  // Polling for fal.ai async runs
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Modal
+  const [modalImage, setModalImage] = useState<string | null>(null);
 
   const loadHistory = useCallback(() => {
     fetch("/api/history?type=image&limit=50")
@@ -44,6 +100,13 @@ export default function ImagePage() {
     if (session) loadHistory();
   }, [session, loadHistory]);
 
+  // Cleanup poll on unmount
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, []);
+
   if (!session) {
     return (
       <div style={{ color: "#5a6a7a" }}>
@@ -51,6 +114,8 @@ export default function ImagePage() {
       </div>
     );
   }
+
+  // ─── File handling ───────────────────────────────────────
 
   function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -85,20 +150,75 @@ export default function ImagePage() {
     if (fileRef.current) fileRef.current.value = "";
   }
 
+  // ─── Polling for async runs ──────────────────────────────
+
+  function startPolling(id: string) {
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(async () => {
+      try {
+        const resp = await fetch(`/api/runs/${id}`);
+        const data = await resp.json();
+        setStatus(data.status);
+
+        if (data.status === "done") {
+          if (pollRef.current) clearInterval(pollRef.current);
+          pollRef.current = null;
+          setLoading(false);
+
+          // Load output images from files
+          if (data.files?.length > 0) {
+            setOutputImages(
+              data.files.map((f: { id: string; mime: string }) => ({
+                id: f.id,
+                url: `/api/files/${f.id}`,
+              }))
+            );
+          }
+
+          if (data.output?.seed) setStats((s) => ({ ...s, seed: data.output.seed }));
+          if (data.output?.latencyMs) setStats((s) => ({ ...s, latencyMs: data.output.latencyMs }));
+          loadHistory();
+        } else if (data.status === "error") {
+          if (pollRef.current) clearInterval(pollRef.current);
+          pollRef.current = null;
+          setLoading(false);
+          setError(data.errorMessage || "Generation failed");
+        }
+      } catch {
+        // retry
+      }
+    }, 2000);
+  }
+
+  // ─── Submit ──────────────────────────────────────────────
+
   async function handleSubmit() {
     if (!prompt.trim() || loading) return;
     setLoading(true);
     setError("");
-    setImageUrl("");
+    setOutputImages([]);
     setResponseText("");
-    setStatus("running");
+    setStatus("queued");
     setStats(null);
 
     try {
       const formData = new FormData();
+      formData.append("provider", provider);
+      formData.append("operation", operation);
       formData.append("prompt", prompt);
 
-      // If there's an uploaded image, convert data URI back to blob
+      if (provider === "fal") {
+        formData.append("modelId", modelId);
+        formData.append("aspectRatio", aspectRatio);
+        formData.append("numImages", String(numImages));
+        formData.append("outputFormat", outputFormat);
+        if (steps !== undefined) formData.append("steps", String(steps));
+        if (guidanceScale !== undefined) formData.append("guidanceScale", String(guidanceScale));
+        if (seed) formData.append("seed", seed);
+        if (operation === "img2img") formData.append("strength", String(strength));
+      }
+
+      // Attach image file if present
       if (uploadedImage && uploadedImageMime) {
         const base64Data = uploadedImage.split(",")[1];
         const binaryStr = atob(base64Data);
@@ -119,17 +239,63 @@ export default function ImagePage() {
 
       setRunId(data.runId);
       setStatus(data.status);
-      if (data.imageUrl) setImageUrl(data.imageUrl);
-      if (data.text) setResponseText(data.text);
-      if (data.latencyMs) setStats({ latencyMs: data.latencyMs });
-      loadHistory();
+      setStats({ model: provider === "fal" ? modelId : "gemini-2.5-flash-image" });
+
+      if (data.status === "done") {
+        // Gemini returns synchronously
+        setLoading(false);
+        if (data.imageUrl) setOutputImages([{ id: "gemini", url: data.imageUrl }]);
+        if (data.text) setResponseText(data.text);
+        if (data.latencyMs) setStats((s) => ({ ...s, latencyMs: data.latencyMs }));
+        loadHistory();
+      } else if (data.status === "running") {
+        // Fal.ai: start polling
+        startPolling(data.runId);
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Unknown error");
       setStatus("error");
-    } finally {
       setLoading(false);
     }
   }
+
+  // ─── Cancel ──────────────────────────────────────────────
+
+  async function handleCancel() {
+    if (!runId) return;
+    try {
+      await fetch(`/api/runs/image?runId=${runId}`, { method: "DELETE" });
+      if (pollRef.current) clearInterval(pollRef.current);
+      pollRef.current = null;
+      setLoading(false);
+      setStatus("error");
+      setError("Cancelled");
+    } catch {
+      // ignore
+    }
+  }
+
+  // ─── Use as input ────────────────────────────────────────
+
+  function useAsInput(imageUrl: string) {
+    setOperation("img2img");
+    setProvider("fal");
+    setModelId("fal-ai/flux/dev"); // only dev supports img2img
+    // Load the image as data URI for upload
+    fetch(imageUrl)
+      .then((r) => r.blob())
+      .then((blob) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          setUploadedImage(reader.result as string);
+          setUploadedImageName("input-image.jpg");
+          setUploadedImageMime(blob.type || "image/jpeg");
+        };
+        reader.readAsDataURL(blob);
+      });
+  }
+
+  // ─── Load history item ──────────────────────────────────
 
   async function loadHistoryItem(id: string) {
     try {
@@ -138,25 +304,52 @@ export default function ImagePage() {
       setRunId(data.id);
       setStatus(data.status);
       setError("");
-      setImageUrl("");
+      setOutputImages([]);
       setResponseText("");
+      setStats(null);
+
+      // Restore input params
       if (data.input?.prompt) setPrompt(data.input.prompt);
+      if (data.input?.provider) setProvider(data.input.provider);
+      if (data.input?.operation) setOperation(data.input.operation);
+      if (data.input?.modelId) setModelId(data.input.modelId);
+      if (data.input?.aspectRatio) setAspectRatio(data.input.aspectRatio);
+      if (data.input?.numImages) setNumImages(data.input.numImages);
+      if (data.input?.steps) setSteps(data.input.steps);
+      if (data.input?.guidanceScale) setGuidanceScale(data.input.guidanceScale);
+      if (data.input?.seed) setSeed(String(data.input.seed));
+      if (data.input?.strength) setStrength(data.input.strength);
+      if (data.input?.outputFormat) setOutputFormat(data.input.outputFormat);
+
       if (data.output?.text) setResponseText(data.output.text);
-      if (data.output?.latencyMs) setStats({ latencyMs: data.output.latencyMs });
-      // Load image via proxy endpoint (avoids R2 CORS issues)
-      if (data.files?.length > 0 && data.files[0].id) {
-        setImageUrl(`/api/files/${data.files[0].id}`);
+      if (data.output?.latencyMs) setStats({ latencyMs: data.output.latencyMs, model: data.model });
+      if (data.output?.seed) setStats((s) => ({ ...s, seed: data.output.seed }));
+
+      // Load images
+      if (data.files?.length > 0) {
+        setOutputImages(
+          data.files
+            .filter((f: { id: string; kind?: string }) => !f.kind || f.kind === "output")
+            .map((f: { id: string }) => ({
+              id: f.id,
+              url: `/api/files/${f.id}`,
+            }))
+        );
       }
-      if (data.errorMessage) {
-        setError(data.errorMessage);
-      }
+
+      if (data.errorMessage) setError(data.errorMessage);
     } catch {
       // ignore
     }
   }
 
+  // ─── Derived ─────────────────────────────────────────────
+
   const charPercent = Math.min((prompt.length / 10000) * 100, 100);
   const charColor = charPercent > 90 ? "#ff4444" : charPercent > 70 ? "#ffcc00" : "#5a6a7a";
+  const selectedModel = FAL_MODELS.find((m) => m.id === modelId);
+
+  // ─── Render ──────────────────────────────────────────────
 
   return (
     <div className="page-with-sidebar" style={{ display: "flex", gap: "0", margin: "-24px -16px", height: "calc(100vh - 57px)" }}>
@@ -201,6 +394,9 @@ export default function ImagePage() {
                 <span style={{ color: "#444", fontSize: "9px" }}>
                   {new Date(r.createdAt).toLocaleString("sl-SI", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
                 </span>
+                <span style={{ color: r.model?.includes("flux") ? "#00e5ff" : "#ffcc00", fontSize: "9px" }}>
+                  {r.model?.includes("schnell") ? "SCH" : r.model?.includes("dev") ? "DEV" : "GEM"}
+                </span>
               </div>
             </div>
           ))}
@@ -213,7 +409,7 @@ export default function ImagePage() {
       {/* Main area */}
       <div className="page-main" style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, overflowY: "auto" }}>
         {/* Header */}
-        <div style={{ padding: "10px 16px", borderBottom: "1px solid #1e2a3a", backgroundColor: "#0d1117", display: "flex", alignItems: "center", gap: "12px", flexShrink: 0 }}>
+        <div style={{ padding: "10px 16px", borderBottom: "1px solid #1e2a3a", backgroundColor: "#0d1117", display: "flex", alignItems: "center", gap: "12px", flexShrink: 0, flexWrap: "wrap" }}>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
             style={{ background: "transparent", border: "1px solid #1e2a3a", color: "#5a6a7a", cursor: "pointer", padding: "4px 8px", fontFamily: "inherit", fontSize: "12px" }}
@@ -221,19 +417,109 @@ export default function ImagePage() {
             {sidebarOpen ? "<<" : ">>"}
           </button>
           <span style={{ color: "#00ff88", fontSize: "14px", fontWeight: 700 }}>[IMAGE]</span>
-          <span style={{ color: "#5a6a7a", fontSize: "12px" }}>$ image --model gemini-2.5-flash --generate</span>
+          <span style={{ color: "#5a6a7a", fontSize: "12px" }}>$ image --provider {provider} --{operation}</span>
         </div>
 
         {/* Content */}
-        <div style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "16px" }}>
+        <div style={{ padding: "16px", display: "flex", flexDirection: "column", gap: "14px" }}>
+
+          {/* Provider & Operation toggle */}
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+            {/* Provider toggle */}
+            <div style={{ display: "flex", border: "1px solid #1e2a3a", overflow: "hidden" }}>
+              {(["fal", "gemini"] as const).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => {
+                    setProvider(p);
+                    if (p === "gemini") {
+                      setModelId("gemini-2.5-flash-image");
+                      setOperation("generate");
+                    } else {
+                      setModelId("fal-ai/flux/dev");
+                    }
+                  }}
+                  style={{
+                    padding: "6px 14px",
+                    background: provider === p ? (p === "fal" ? "rgba(0, 229, 255, 0.15)" : "rgba(255, 204, 0, 0.15)") : "transparent",
+                    border: "none",
+                    borderRight: p === "fal" ? "1px solid #1e2a3a" : "none",
+                    color: provider === p ? (p === "fal" ? "#00e5ff" : "#ffcc00") : "#5a6a7a",
+                    fontFamily: "inherit",
+                    fontSize: "12px",
+                    fontWeight: provider === p ? 700 : 400,
+                    cursor: "pointer",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                  }}
+                >
+                  {p === "fal" ? "fal.ai (Flux)" : "Gemini"}
+                </button>
+              ))}
+            </div>
+
+            {/* Operation toggle (only for fal with dev model) */}
+            {provider === "fal" && (
+              <div style={{ display: "flex", border: "1px solid #1e2a3a", overflow: "hidden" }}>
+                {(["generate", "img2img"] as const).map((op) => (
+                  <button
+                    key={op}
+                    onClick={() => {
+                      setOperation(op);
+                      if (op === "img2img") setModelId("fal-ai/flux/dev");
+                    }}
+                    disabled={op === "img2img" && modelId === "fal-ai/flux/schnell"}
+                    style={{
+                      padding: "6px 14px",
+                      background: operation === op ? "rgba(0, 255, 136, 0.12)" : "transparent",
+                      border: "none",
+                      borderRight: op === "generate" ? "1px solid #1e2a3a" : "none",
+                      color: operation === op ? "#00ff88" : "#5a6a7a",
+                      fontFamily: "inherit",
+                      fontSize: "12px",
+                      fontWeight: operation === op ? 700 : 400,
+                      cursor: op === "img2img" && modelId === "fal-ai/flux/schnell" ? "not-allowed" : "pointer",
+                      opacity: op === "img2img" && modelId === "fal-ai/flux/schnell" ? 0.3 : 1,
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    {op === "generate" ? "Generate" : "Img2Img"}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Model selector (fal only) */}
+          {provider === "fal" && (
+            <div>
+              <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#00e5ff", textTransform: "uppercase", letterSpacing: "0.1em" }}>--model</label>
+              <select
+                value={modelId}
+                onChange={(e) => {
+                  setModelId(e.target.value);
+                  // Schnell doesn't support img2img
+                  if (e.target.value === "fal-ai/flux/schnell" && operation === "img2img") {
+                    setOperation("generate");
+                  }
+                }}
+                style={{ padding: "6px 10px", backgroundColor: "#111820", border: "1px solid #1e2a3a", color: "#e0e0e0", fontFamily: "inherit", fontSize: "13px", width: "100%", maxWidth: "400px" }}
+              >
+                {FAL_MODELS.map((m) => (
+                  <option key={m.id} value={m.id}>{m.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* Prompt input */}
           <div>
-            <label style={{ display: "block", marginBottom: "6px", fontSize: "11px", fontWeight: 700, color: "#00ff88", textTransform: "uppercase", letterSpacing: "0.1em" }}>--prompt</label>
+            <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#00ff88", textTransform: "uppercase", letterSpacing: "0.1em" }}>--prompt</label>
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               rows={4}
-              placeholder="Describe the image to generate, or instructions for editing the uploaded image..."
+              placeholder={operation === "img2img" ? "Describe the edit to apply to the uploaded image..." : "Describe the image to generate..."}
               style={{ width: "100%", padding: "8px 12px", backgroundColor: "#111820", border: "1px solid #1e2a3a", color: "#e0e0e0", fontFamily: "inherit", fontSize: "13px", resize: "vertical" }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
@@ -242,7 +528,7 @@ export default function ImagePage() {
                 }
               }}
             />
-            <div style={{ marginTop: "6px", fontSize: "11px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ marginTop: "4px", fontSize: "11px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span style={{ color: charColor }}>
                 <span style={{ color: "#ffcc00" }}>CHARS:</span> {prompt.length.toLocaleString()} / 10,000
               </span>
@@ -252,96 +538,299 @@ export default function ImagePage() {
             </div>
           </div>
 
-          {/* Image upload */}
-          <div>
-            <label style={{ display: "block", marginBottom: "6px", fontSize: "11px", fontWeight: 700, color: "#00ff88", textTransform: "uppercase", letterSpacing: "0.1em" }}>--input-image <span style={{ color: "#5a6a7a", fontWeight: 400, textTransform: "none" }}>(optional, for editing)</span></label>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/png,image/jpeg,image/webp,image/gif"
-              onChange={handleFileSelect}
-              style={{ display: "none" }}
-            />
-            {!uploadedImage ? (
+          {/* Aspect ratio (fal only) */}
+          {provider === "fal" && (
+            <div>
+              <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#00e5ff", textTransform: "uppercase", letterSpacing: "0.1em" }}>--aspect-ratio</label>
+              <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
+                {ASPECT_RATIOS.map((ar) => (
+                  <button
+                    key={ar.id}
+                    onClick={() => setAspectRatio(ar.id)}
+                    style={{
+                      padding: "5px 12px",
+                      background: aspectRatio === ar.id ? "rgba(0, 229, 255, 0.15)" : "transparent",
+                      border: `1px solid ${aspectRatio === ar.id ? "#00e5ff" : "#1e2a3a"}`,
+                      color: aspectRatio === ar.id ? "#00e5ff" : "#5a6a7a",
+                      fontFamily: "inherit",
+                      fontSize: "12px",
+                      cursor: "pointer",
+                      fontWeight: aspectRatio === ar.id ? 700 : 400,
+                    }}
+                  >
+                    {ar.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Batch count + output format (fal only) */}
+          {provider === "fal" && (
+            <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
+              <div>
+                <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#00e5ff", textTransform: "uppercase", letterSpacing: "0.1em" }}>--count</label>
+                <div style={{ display: "flex", gap: "4px" }}>
+                  {[1, 2, 3, 4].map((n) => (
+                    <button
+                      key={n}
+                      onClick={() => setNumImages(n)}
+                      style={{
+                        padding: "5px 12px",
+                        background: numImages === n ? "rgba(0, 229, 255, 0.15)" : "transparent",
+                        border: `1px solid ${numImages === n ? "#00e5ff" : "#1e2a3a"}`,
+                        color: numImages === n ? "#00e5ff" : "#5a6a7a",
+                        fontFamily: "inherit",
+                        fontSize: "12px",
+                        cursor: "pointer",
+                        fontWeight: numImages === n ? 700 : 400,
+                      }}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#00e5ff", textTransform: "uppercase", letterSpacing: "0.1em" }}>--format</label>
+                <div style={{ display: "flex", gap: "4px" }}>
+                  {(["jpeg", "png"] as const).map((fmt) => (
+                    <button
+                      key={fmt}
+                      onClick={() => setOutputFormat(fmt)}
+                      style={{
+                        padding: "5px 12px",
+                        background: outputFormat === fmt ? "rgba(0, 229, 255, 0.15)" : "transparent",
+                        border: `1px solid ${outputFormat === fmt ? "#00e5ff" : "#1e2a3a"}`,
+                        color: outputFormat === fmt ? "#00e5ff" : "#5a6a7a",
+                        fontFamily: "inherit",
+                        fontSize: "12px",
+                        cursor: "pointer",
+                        fontWeight: outputFormat === fmt ? 700 : 400,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      {fmt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Image upload (img2img or Gemini edit) */}
+          {(operation === "img2img" || provider === "gemini") && (
+            <div>
+              <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#00ff88", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                --input-image {provider === "gemini" && <span style={{ color: "#5a6a7a", fontWeight: 400, textTransform: "none" }}>(optional, for editing)</span>}
+              </label>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                onChange={handleFileSelect}
+                style={{ display: "none" }}
+              />
+              {!uploadedImage ? (
+                <button
+                  onClick={() => fileRef.current?.click()}
+                  style={{
+                    padding: "10px 20px",
+                    background: "transparent",
+                    border: "1px dashed #1e2a3a",
+                    color: "#5a6a7a",
+                    fontFamily: "inherit",
+                    fontSize: "12px",
+                    cursor: "pointer",
+                    width: "100%",
+                    textAlign: "center",
+                    transition: "all 0.2s",
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(0, 255, 136, 0.4)"; e.currentTarget.style.color = "#00ff88"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#1e2a3a"; e.currentTarget.style.color = "#5a6a7a"; }}
+                >
+                  [  UPLOAD IMAGE  ] — PNG, JPEG, WebP, GIF (max 20MB)
+                </button>
+              ) : (
+                <div style={{ border: "1px solid #1e2a3a", backgroundColor: "#111820", padding: "12px", display: "flex", alignItems: "center", gap: "12px" }}>
+                  <img
+                    src={uploadedImage}
+                    alt="Uploaded"
+                    style={{ width: "80px", height: "80px", objectFit: "cover", border: "1px solid #1e2a3a" }}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: "#e0e0e0", fontSize: "12px" }}>{uploadedImageName}</div>
+                    <div style={{ color: "#5a6a7a", fontSize: "11px", marginTop: "2px" }}>{uploadedImageMime}</div>
+                  </div>
+                  <button
+                    onClick={removeUploadedImage}
+                    style={{
+                      background: "transparent",
+                      border: "1px solid rgba(255, 68, 68, 0.3)",
+                      color: "#ff4444",
+                      padding: "4px 10px",
+                      fontFamily: "inherit",
+                      fontSize: "11px",
+                      cursor: "pointer",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Strength slider (img2img only) */}
+          {operation === "img2img" && provider === "fal" && (
+            <div>
+              <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#00e5ff", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                --strength <span style={{ color: "#e0e0e0", fontWeight: 400 }}>{strength.toFixed(2)}</span>
+              </label>
+              <input
+                type="range"
+                min="0.01"
+                max="1"
+                step="0.01"
+                value={strength}
+                onChange={(e) => setStrength(parseFloat(e.target.value))}
+                style={{ width: "100%", maxWidth: "400px", accentColor: "#00e5ff" }}
+              />
+              <div style={{ fontSize: "10px", color: "#5a6a7a", display: "flex", justifyContent: "space-between", maxWidth: "400px" }}>
+                <span>Subtle (preserve input)</span>
+                <span>Strong (new generation)</span>
+              </div>
+            </div>
+          )}
+
+          {/* Advanced settings (fal only) */}
+          {provider === "fal" && (
+            <div>
               <button
-                onClick={() => fileRef.current?.click()}
+                onClick={() => setShowAdvanced(!showAdvanced)}
                 style={{
-                  padding: "10px 20px",
                   background: "transparent",
-                  border: "1px dashed #1e2a3a",
+                  border: "none",
                   color: "#5a6a7a",
                   fontFamily: "inherit",
-                  fontSize: "12px",
+                  fontSize: "11px",
                   cursor: "pointer",
-                  width: "100%",
-                  textAlign: "center",
-                  transition: "all 0.2s",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = "rgba(0, 255, 136, 0.4)";
-                  e.currentTarget.style.color = "#00ff88";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = "#1e2a3a";
-                  e.currentTarget.style.color = "#5a6a7a";
+                  padding: "4px 0",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
                 }}
               >
-                [  UPLOAD IMAGE  ] — PNG, JPEG, WebP, GIF (max 20MB)
+                {showAdvanced ? "▼" : "▶"} Advanced Settings
               </button>
-            ) : (
-              <div style={{ border: "1px solid #1e2a3a", backgroundColor: "#111820", padding: "12px", display: "flex", alignItems: "center", gap: "12px" }}>
-                <img
-                  src={uploadedImage}
-                  alt="Uploaded"
-                  style={{ width: "80px", height: "80px", objectFit: "cover", border: "1px solid #1e2a3a" }}
-                />
-                <div style={{ flex: 1 }}>
-                  <div style={{ color: "#e0e0e0", fontSize: "12px" }}>{uploadedImageName}</div>
-                  <div style={{ color: "#5a6a7a", fontSize: "11px", marginTop: "2px" }}>{uploadedImageMime}</div>
+
+              {showAdvanced && (
+                <div style={{ padding: "12px", border: "1px solid #1e2a3a", backgroundColor: "#0a0e14", display: "flex", flexDirection: "column", gap: "12px", marginTop: "4px" }}>
+                  {/* Steps */}
+                  <div>
+                    <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#5a6a7a", textTransform: "uppercase" }}>
+                      --steps <span style={{ color: "#e0e0e0", fontWeight: 400 }}>{steps ?? selectedModel?.defaultSteps ?? "default"}</span>
+                    </label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="50"
+                      value={steps ?? selectedModel?.defaultSteps ?? 28}
+                      onChange={(e) => setSteps(parseInt(e.target.value, 10))}
+                      style={{ width: "100%", maxWidth: "400px", accentColor: "#5a6a7a" }}
+                    />
+                  </div>
+
+                  {/* Guidance scale */}
+                  <div>
+                    <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#5a6a7a", textTransform: "uppercase" }}>
+                      --guidance <span style={{ color: "#e0e0e0", fontWeight: 400 }}>{guidanceScale ?? "3.5"}</span>
+                    </label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="20"
+                      step="0.5"
+                      value={guidanceScale ?? 3.5}
+                      onChange={(e) => setGuidanceScale(parseFloat(e.target.value))}
+                      style={{ width: "100%", maxWidth: "400px", accentColor: "#5a6a7a" }}
+                    />
+                  </div>
+
+                  {/* Seed */}
+                  <div>
+                    <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#5a6a7a", textTransform: "uppercase" }}>--seed</label>
+                    <input
+                      type="text"
+                      value={seed}
+                      onChange={(e) => setSeed(e.target.value.replace(/[^0-9]/g, ""))}
+                      placeholder="Random"
+                      style={{ padding: "6px 10px", backgroundColor: "#111820", border: "1px solid #1e2a3a", color: "#e0e0e0", fontFamily: "inherit", fontSize: "13px", width: "200px" }}
+                    />
+                  </div>
                 </div>
-                <button
-                  onClick={removeUploadedImage}
-                  style={{
-                    background: "transparent",
-                    border: "1px solid rgba(255, 68, 68, 0.3)",
-                    color: "#ff4444",
-                    padding: "4px 10px",
-                    fontFamily: "inherit",
-                    fontSize: "11px",
-                    cursor: "pointer",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Remove
-                </button>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
           {/* Cost preview */}
           {prompt.trim() && (
             <div style={{ alignSelf: "flex-start" }}>
-              <CostPreview type="image" modelId="gemini-2.5-flash-image" />
+              <CostPreview
+                type="image"
+                modelId={provider === "fal" ? modelId : "gemini-2.5-flash-image"}
+              />
             </div>
           )}
 
-          {/* Generate button */}
-          <button
-            onClick={handleSubmit}
-            disabled={loading || !prompt.trim()}
-            style={{
-              alignSelf: "flex-start", padding: "8px 24px", background: "transparent",
-              border: `1px solid ${loading ? "#5a6a7a" : "#00ff88"}`,
-              color: loading ? "#5a6a7a" : "#00ff88", fontFamily: "inherit", fontSize: "13px",
-              fontWeight: 700, cursor: loading || !prompt.trim() ? "not-allowed" : "pointer",
-              textTransform: "uppercase", letterSpacing: "0.1em",
-              opacity: loading || !prompt.trim() ? 0.5 : 1, transition: "all 0.2s",
-            }}
-            onMouseEnter={(e) => { if (!loading && prompt.trim()) { e.currentTarget.style.background = "rgba(0, 255, 136, 0.1)"; e.currentTarget.style.boxShadow = "0 0 15px rgba(0, 255, 136, 0.2)"; } }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.boxShadow = "none"; }}
-          >
-            {loading ? "[  GENERATING...  ]" : uploadedImage ? "[  EDIT IMAGE  ]" : "[  GENERATE  ]"}
-          </button>
+          {/* Action buttons */}
+          <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+            <button
+              onClick={handleSubmit}
+              disabled={loading || !prompt.trim() || (operation === "img2img" && !uploadedImage)}
+              style={{
+                padding: "8px 24px",
+                background: "transparent",
+                border: `1px solid ${loading ? "#5a6a7a" : "#00ff88"}`,
+                color: loading ? "#5a6a7a" : "#00ff88",
+                fontFamily: "inherit",
+                fontSize: "13px",
+                fontWeight: 700,
+                cursor: loading || !prompt.trim() ? "not-allowed" : "pointer",
+                textTransform: "uppercase",
+                letterSpacing: "0.1em",
+                opacity: loading || !prompt.trim() ? 0.5 : 1,
+                transition: "all 0.2s",
+              }}
+              onMouseEnter={(e) => { if (!loading && prompt.trim()) { e.currentTarget.style.background = "rgba(0, 255, 136, 0.1)"; e.currentTarget.style.boxShadow = "0 0 15px rgba(0, 255, 136, 0.2)"; } }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.boxShadow = "none"; }}
+            >
+              {loading
+                ? "[  GENERATING...  ]"
+                : operation === "img2img"
+                  ? "[  EDIT IMAGE  ]"
+                  : `[  GENERATE ${numImages > 1 ? `(${numImages})` : ""}  ]`}
+            </button>
+
+            {loading && (
+              <button
+                onClick={handleCancel}
+                style={{
+                  padding: "8px 16px",
+                  background: "transparent",
+                  border: "1px solid #ff4444",
+                  color: "#ff4444",
+                  fontFamily: "inherit",
+                  fontSize: "12px",
+                  cursor: "pointer",
+                  textTransform: "uppercase",
+                }}
+              >
+                Cancel
+              </button>
+            )}
+          </div>
 
           {/* Error */}
           {error && (
@@ -352,21 +841,25 @@ export default function ImagePage() {
 
           {/* Run status */}
           {runId && (
-            <div style={{ fontSize: "12px", color: "#5a6a7a", display: "flex", alignItems: "center", gap: "10px", padding: "8px 0", borderTop: "1px solid #1e2a3a" }}>
+            <div style={{ fontSize: "12px", color: "#5a6a7a", display: "flex", alignItems: "center", gap: "10px", padding: "8px 0", borderTop: "1px solid #1e2a3a", flexWrap: "wrap" }}>
               <span><span style={{ color: "#ffcc00" }}>RUN:</span> <span style={{ color: "#e0e0e0" }}>{runId.slice(0, 8)}...</span></span>
               <StatusBadge status={status} />
+              {status === "running" && (
+                <span style={{ color: "#00e5ff", fontSize: "11px" }}>Generating on fal.ai...</span>
+              )}
             </div>
           )}
 
           {/* Stats */}
           {stats && (
-            <div style={{ display: "flex", gap: "20px", fontSize: "12px", padding: "8px 0", borderTop: "1px solid #1e2a3a" }}>
-              <span><span style={{ color: "#ffcc00" }}>LATENCY:</span> <span style={{ color: "#00e5ff" }}>{(stats.latencyMs / 1000).toFixed(1)}s</span></span>
-              <span><span style={{ color: "#ffcc00" }}>MODEL:</span> <span style={{ color: "#00e5ff" }}>gemini-2.5-flash-image</span></span>
+            <div style={{ display: "flex", gap: "20px", fontSize: "12px", padding: "8px 0", borderTop: "1px solid #1e2a3a", flexWrap: "wrap" }}>
+              {stats.latencyMs && <span><span style={{ color: "#ffcc00" }}>LATENCY:</span> <span style={{ color: "#00e5ff" }}>{(stats.latencyMs / 1000).toFixed(1)}s</span></span>}
+              {stats.model && <span><span style={{ color: "#ffcc00" }}>MODEL:</span> <span style={{ color: "#00e5ff" }}>{stats.model}</span></span>}
+              {stats.seed !== undefined && <span><span style={{ color: "#ffcc00" }}>SEED:</span> <span style={{ color: "#00e5ff" }}>{stats.seed}</span></span>}
             </div>
           )}
 
-          {/* Response text */}
+          {/* Response text (Gemini) */}
           {responseText && (
             <div style={{ padding: "12px", backgroundColor: "rgba(0, 255, 136, 0.04)", border: "1px solid rgba(0, 255, 136, 0.15)", fontSize: "13px", color: "#e0e0e0", whiteSpace: "pre-wrap", lineHeight: "1.6" }}>
               <div style={{ fontSize: "11px", fontWeight: 700, color: "#00ff88", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "8px" }}>
@@ -376,32 +869,82 @@ export default function ImagePage() {
             </div>
           )}
 
-          {/* Generated image output */}
-          {imageUrl && (
+          {/* Output gallery */}
+          {outputImages.length > 0 && (
             <div style={{ border: "1px solid #00ff88", backgroundColor: "#0d1117" }}>
               <div style={{ padding: "8px 12px", borderBottom: "1px solid #1e2a3a", fontSize: "11px", fontWeight: 700, color: "#00ff88", textTransform: "uppercase", letterSpacing: "0.1em", backgroundColor: "rgba(0, 255, 136, 0.05)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span>GENERATED IMAGE:</span>
-                <a
-                  href={imageUrl}
-                  download={`morana-image-${runId?.slice(0, 8) || "output"}.png`}
-                  style={{ color: "#00e5ff", fontSize: "10px", textDecoration: "none", border: "1px solid rgba(0, 229, 255, 0.3)", padding: "2px 8px", textTransform: "uppercase" }}
-                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(0, 229, 255, 0.1)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
-                >
-                  Download
-                </a>
+                <span>GENERATED {outputImages.length > 1 ? `(${outputImages.length} IMAGES)` : "IMAGE"}:</span>
               </div>
-              <div style={{ padding: "16px", display: "flex", justifyContent: "center" }}>
-                <img
-                  src={imageUrl}
-                  alt="Generated image"
-                  style={{ maxWidth: "100%", maxHeight: "600px", border: "1px solid #1e2a3a" }}
-                />
+              <div style={{
+                padding: "16px",
+                display: "grid",
+                gridTemplateColumns: outputImages.length === 1 ? "1fr" : "repeat(auto-fill, minmax(280px, 1fr))",
+                gap: "12px",
+                justifyItems: "center",
+              }}>
+                {outputImages.map((img, idx) => (
+                  <div key={img.id} style={{ position: "relative", width: "100%" }}>
+                    <img
+                      src={img.url}
+                      alt={`Generated image ${idx + 1}`}
+                      style={{ maxWidth: "100%", maxHeight: outputImages.length === 1 ? "600px" : "400px", border: "1px solid #1e2a3a", cursor: "pointer", display: "block", margin: "0 auto" }}
+                      onClick={() => setModalImage(img.url)}
+                    />
+                    <div style={{ display: "flex", gap: "6px", marginTop: "8px", justifyContent: "center" }}>
+                      <a
+                        href={img.url}
+                        download={`morana-image-${runId?.slice(0, 8) || "output"}-${idx + 1}.${outputFormat}`}
+                        style={{ color: "#00e5ff", fontSize: "10px", textDecoration: "none", border: "1px solid rgba(0, 229, 255, 0.3)", padding: "3px 10px", textTransform: "uppercase" }}
+                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(0, 229, 255, 0.1)"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+                      >
+                        Download
+                      </a>
+                      {provider === "fal" && (
+                        <button
+                          onClick={() => useAsInput(img.url)}
+                          style={{ color: "#ffcc00", fontSize: "10px", background: "transparent", border: "1px solid rgba(255, 204, 0, 0.3)", padding: "3px 10px", fontFamily: "inherit", cursor: "pointer", textTransform: "uppercase" }}
+                          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(255, 204, 0, 0.1)"; }}
+                          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+                        >
+                          Use as Input
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
         </div>
       </div>
+
+      {/* Lightbox modal */}
+      {modalImage && (
+        <div
+          onClick={() => setModalImage(null)}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.9)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+            cursor: "pointer",
+          }}
+        >
+          <img
+            src={modalImage}
+            alt="Full size"
+            style={{ maxWidth: "95vw", maxHeight: "95vh", border: "1px solid #1e2a3a" }}
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
   );
 }
