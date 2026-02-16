@@ -6,6 +6,7 @@ import { config } from "@/lib/config";
 import { runTTS, TTSOptions } from "@/lib/providers/tts";
 import { logUsage } from "@/lib/usage";
 import { uploadToR2 } from "@/lib/storage";
+import { getActiveWorkspaceId } from "@/lib/workspace";
 import { v4 as uuid } from "uuid";
 import crypto from "crypto";
 
@@ -62,6 +63,8 @@ export async function POST(req: NextRequest) {
       await prisma.run.delete({ where: { id: existingRun.id } });
     }
 
+    const workspaceId = await getActiveWorkspaceId(user.id);
+
     const run = await prisma.run.create({
       data: {
         userId: user.id,
@@ -70,6 +73,7 @@ export async function POST(req: NextRequest) {
         provider: "elevenlabs",
         model: modelId || "eleven_v3",
         idempotencyKey,
+        workspaceId: workspaceId || undefined,
       },
     });
 
@@ -132,9 +136,10 @@ export async function POST(req: NextRequest) {
         userId: user.id,
         runId: run.id,
         provider: "elevenlabs",
-        model: "elevenlabs",
+        model: modelId || "eleven_v3",
         units: { chars: result.chars },
         latencyMs: result.latencyMs,
+        workspaceId: workspaceId || undefined,
       });
 
       return NextResponse.json({

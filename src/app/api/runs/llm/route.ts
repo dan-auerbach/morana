@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { getApprovedModels, config } from "@/lib/config";
 import { runLLM } from "@/lib/providers/llm";
 import { logUsage } from "@/lib/usage";
+import { getActiveWorkspaceId } from "@/lib/workspace";
 
 // Vercel serverless: LLM calls can take 30-60s for complex prompts
 export const maxDuration = 60;
@@ -41,6 +42,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: rl.reason || "Rate limit reached", remaining: 0 }, { status: 429 });
     }
 
+    const workspaceId = await getActiveWorkspaceId(user.id);
+
     const run = await prisma.run.create({
       data: {
         userId: user.id,
@@ -48,6 +51,7 @@ export async function POST(req: NextRequest) {
         status: "running",
         provider: modelEntry.provider,
         model: modelEntry.id,
+        workspaceId: workspaceId || undefined,
       },
     });
 
@@ -82,6 +86,7 @@ export async function POST(req: NextRequest) {
         model: modelEntry.id,
         units: { inputTokens: result.inputTokens, outputTokens: result.outputTokens },
         latencyMs: result.latencyMs,
+        workspaceId: workspaceId || undefined,
       });
 
       return NextResponse.json({

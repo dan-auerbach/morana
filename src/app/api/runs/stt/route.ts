@@ -7,6 +7,7 @@ import { runSTT } from "@/lib/providers/stt";
 import { logUsage } from "@/lib/usage";
 import { validateMime } from "@/lib/mime-validate";
 import { validateFetchUrl } from "@/lib/url-validate";
+import { getActiveWorkspaceId } from "@/lib/workspace";
 import { v4 as uuid } from "uuid";
 
 // Vercel serverless: STT polling can take up to 180s
@@ -140,6 +141,8 @@ export async function POST(req: NextRequest) {
     const storageKey = `stt/input/${uuid()}/audio`;
     const idempotencyKey = `stt-${user.id}-${storageKey}`;
 
+    const workspaceId = await getActiveWorkspaceId(user.id);
+
     const run = await prisma.run.create({
       data: {
         userId: user.id,
@@ -148,6 +151,7 @@ export async function POST(req: NextRequest) {
         provider: "soniox",
         model: "stt-async-v4",
         idempotencyKey,
+        workspaceId: workspaceId || undefined,
       },
     });
 
@@ -181,6 +185,7 @@ export async function POST(req: NextRequest) {
         model: "stt-async-v4",
         units: { durationSeconds: result.durationSeconds },
         latencyMs: result.latencyMs,
+        workspaceId: workspaceId || undefined,
       });
 
       return NextResponse.json({

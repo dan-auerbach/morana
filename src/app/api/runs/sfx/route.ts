@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { runSoundEffect } from "@/lib/providers/tts";
 import { logUsage } from "@/lib/usage";
 import { uploadToR2 } from "@/lib/storage";
+import { getActiveWorkspaceId } from "@/lib/workspace";
 import { v4 as uuid } from "uuid";
 
 // Vercel serverless: SFX generation can take 10-30s
@@ -27,6 +28,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: rl.reason || "Rate limit reached" }, { status: 429 });
     }
 
+    const workspaceId = await getActiveWorkspaceId(user.id);
+
     const run = await prisma.run.create({
       data: {
         userId: user.id,
@@ -34,6 +37,7 @@ export async function POST(req: NextRequest) {
         status: "running",
         provider: "elevenlabs",
         model: "eleven_text_to_sound_v2",
+        workspaceId: workspaceId || undefined,
       },
     });
 
@@ -97,6 +101,7 @@ export async function POST(req: NextRequest) {
         model: "eleven_text_to_sound_v2",
         units: { chars: prompt.length },
         latencyMs: result.latencyMs,
+        workspaceId: workspaceId || undefined,
       });
 
       return NextResponse.json({

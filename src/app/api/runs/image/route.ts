@@ -6,6 +6,7 @@ import { runImageGeneration } from "@/lib/providers/image";
 import { logUsage } from "@/lib/usage";
 import { validateMime } from "@/lib/mime-validate";
 import { uploadToR2 } from "@/lib/storage";
+import { getActiveWorkspaceId } from "@/lib/workspace";
 import { v4 as uuid } from "uuid";
 
 // Vercel serverless: Gemini image generation can take 20-60s
@@ -75,6 +76,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Prompt exceeds 10,000 character limit" }, { status: 400 });
     }
 
+    const workspaceId = await getActiveWorkspaceId(user.id);
+
     const run = await prisma.run.create({
       data: {
         userId: user.id,
@@ -82,6 +85,7 @@ export async function POST(req: NextRequest) {
         status: "running",
         provider: "gemini",
         model: "gemini-2.5-flash-image",
+        workspaceId: workspaceId || undefined,
       },
     });
 
@@ -155,6 +159,7 @@ export async function POST(req: NextRequest) {
         model: "gemini-2.5-flash-image",
         units: { outputTokens: 1290 },
         latencyMs: result.latencyMs,
+        workspaceId: workspaceId || undefined,
       });
 
       return NextResponse.json({
