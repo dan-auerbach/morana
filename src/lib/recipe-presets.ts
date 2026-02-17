@@ -174,7 +174,7 @@ Guidelines:
 - topic_type: classify the topic into the most appropriate category
 - recommended_length: 300-500 for low, 500-800 for medium, 800-1200 for high
 - risk_level: "high" for politics, legal, health claims; "medium" for economy, breaking; "low" for culture, sports, local events`,
-        userPromptTemplate: "Classify this news topic:\n\n{{input}}",
+        userPromptTemplate: "Classify this news topic:\n\n{{original_input}}",
       },
     },
 
@@ -207,7 +207,7 @@ Rules:
 - Prioritize Slovenian and reputable international sources
 - Include specific numbers, dates, and quotes where available
 - All URLs must be real and accessible`,
-        userPromptTemplate: "Research this topic thoroughly:\n\n{{input}}",
+        userPromptTemplate: "Research this topic thoroughly:\n\n{{original_input}}",
       },
     },
 
@@ -238,7 +238,7 @@ Return STRICT JSON only:
 }
 
 Write in Slovenian. Target 4-6 sections for a comprehensive article.`,
-        userPromptTemplate: "Create article outline.\n\nTopic: {{input}}\n\nResearch data:\n{{step.1.text}}",
+        userPromptTemplate: "Create article outline.\n\nTopic: {{original_input}}\n\nResearch data:\n{{step.1.text}}",
       },
     },
 
@@ -277,7 +277,7 @@ PRAVILA:
         userPromptTemplate: `Napiši novinarski članek.
 
 TEMA:
-{{input}}
+{{original_input}}
 
 KLASIFIKACIJA:
 {{step.0.text}}

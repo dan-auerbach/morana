@@ -114,7 +114,13 @@ function resolveModelId(config: StepConfig, context: StepContext): string {
  * Supports: {{input}}, {{step.N.text}}, {{step.N.json}}
  */
 function interpolatePrompt(template: string, context: StepContext): string {
-  let result = template.replace(/\{\{input\}\}/g, context.previousOutput);
+  // {{original_input}} — always the user's original input (never overwritten by step outputs)
+  const originalInput = context.input?.text || context.input?.transcriptText || "";
+  let result = template.replace(/\{\{original_input\}\}/g, originalInput);
+
+  // {{input}} — previousOutput from last executed step (backward compat for NOVINAR v1)
+  result = result.replace(/\{\{input\}\}/g, context.previousOutput);
+
   result = result.replace(/\{\{step\.(\d+)\.text\}\}/g, (_, idx) =>
     context.steps[Number(idx)]?.text || ""
   );
