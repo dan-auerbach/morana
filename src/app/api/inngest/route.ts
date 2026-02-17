@@ -14,6 +14,7 @@ import { NextResponse } from "next/server";
  */
 
 function blocked() {
+  console.warn("[inngest] Blocked: INNGEST_SIGNING_KEY not configured");
   return NextResponse.json(
     { error: "Inngest not configured (INNGEST_SIGNING_KEY required)" },
     { status: 503 }

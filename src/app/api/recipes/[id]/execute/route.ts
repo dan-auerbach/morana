@@ -1,13 +1,14 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { withAuth } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { inngest } from "@/lib/inngest/client";
+import { executeRecipe } from "@/lib/recipe-engine";
 import { uploadToR2 } from "@/lib/storage";
 import { v4 as uuid } from "uuid";
 
-// Reduced: only need time for file upload + DB + enqueue (not full execution)
-export const maxDuration = 30;
+// Extended: supports direct execution fallback when Inngest is unavailable
+export const maxDuration = 300;
 
 const ALLOWED_AUDIO_TYPES = [
   "audio/mpeg", "audio/mp3", "audio/wav", "audio/wave", "audio/x-wav",
@@ -108,11 +109,31 @@ export async function POST(
       },
     });
 
-    // Enqueue background execution via Inngest (non-blocking)
-    await inngest.send({
-      name: "recipe/execute",
-      data: { executionId: execution.id, userId: user.id },
-    });
+    // Enqueue background execution — Inngest first, direct fallback
+    let executionMode = "inngest";
+    try {
+      await inngest.send({
+        name: "recipe/execute",
+        data: { executionId: execution.id, userId: user.id },
+      });
+    } catch (inngestError) {
+      executionMode = "direct";
+      console.warn(
+        `[recipe/execute] Inngest unavailable, using direct execution:`,
+        inngestError instanceof Error ? inngestError.message : inngestError
+      );
+      after(async () => {
+        try {
+          await executeRecipe(execution.id);
+        } catch (err) {
+          console.error(
+            `[recipe/execute] Direct execution failed for ${execution.id}:`,
+            err instanceof Error ? err.message : err
+          );
+        }
+      });
+    }
+    console.log(`[recipe/execute] ${execution.id} via ${executionMode}`);
 
     // Return immediately — frontend polls for progress
     return NextResponse.json({
