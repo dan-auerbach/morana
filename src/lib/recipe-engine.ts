@@ -698,24 +698,25 @@ function formatDrupalOutput(context: StepContext): string {
   }
 
   // Convert markdown-ish article to HTML
+  const bold = (s: string) => s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   const bodyHtml = articleText
     ? articleText
         .split("\n\n")
         .map((block) => {
           const trimmed = block.trim();
           if (!trimmed) return "";
-          if (trimmed.startsWith("# ")) return `<h1>${trimmed.slice(2)}</h1>`;
-          if (trimmed.startsWith("## ")) return `<h2>${trimmed.slice(3)}</h2>`;
-          if (trimmed.startsWith("### ")) return `<h3>${trimmed.slice(4)}</h3>`;
+          if (trimmed.startsWith("# ")) return `<h1>${bold(trimmed.slice(2))}</h1>`;
+          if (trimmed.startsWith("## ")) return `<h2>${bold(trimmed.slice(3))}</h2>`;
+          if (trimmed.startsWith("### ")) return `<h3>${bold(trimmed.slice(4))}</h3>`;
           if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
-            const items = trimmed.split("\n").map((l) => `<li>${l.replace(/^[-*]\s*/, "")}</li>`);
+            const items = trimmed.split("\n").map((l) => `<li>${bold(l.replace(/^[-*]\s*/, ""))}</li>`);
             return `<ul>${items.join("")}</ul>`;
           }
-          return `<p>${trimmed}</p>`;
+          return `<p>${bold(trimmed)}</p>`;
         })
         .filter(Boolean)
         .join("\n")
-    : `<p>${text}</p>`;
+    : `<p>${bold(text)}</p>`;
 
   // Extract title
   const titleMatch = articleText.match(/^#\s+(.+)/m);
