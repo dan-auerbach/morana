@@ -113,6 +113,15 @@ export default async function PreviewPage({ params }: Props) {
         <meta name="robots" content="noindex, nofollow" />
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <style dangerouslySetInnerHTML={{ __html: `
+          .article-body h1 { font-size: 26px; font-weight: 700; color: #fff; margin: 32px 0 12px; line-height: 1.3; }
+          .article-body h2 { font-size: 21px; font-weight: 700; color: #f0f0f0; margin: 28px 0 10px; line-height: 1.35; }
+          .article-body h3 { font-size: 17px; font-weight: 700; color: #e0e0e0; margin: 24px 0 8px; line-height: 1.4; }
+          .article-body p { margin: 0 0 14px; }
+          .article-body ul { margin: 0 0 14px; padding-left: 24px; }
+          .article-body li { margin-bottom: 4px; }
+          .article-body strong { color: #fff; }
+        `}} />
       </head>
       <body style={{ margin: 0, padding: 0, backgroundColor: "#0a0a0a", fontFamily: "'Georgia', 'Times New Roman', serif", color: "#e0e0e0" }}>
         <div style={{ maxWidth: "720px", margin: "0 auto", padding: "40px 24px 80px" }}>
@@ -171,6 +180,7 @@ export default async function PreviewPage({ params }: Props) {
                 <p dangerouslySetInnerHTML={{ __html: subtitle }} style={{ fontSize: "15px", lineHeight: 1.5, color: "#999", marginBottom: "24px", fontStyle: "italic" }} />
               )}
               <div
+                className="article-body"
                 dangerouslySetInnerHTML={{ __html: bodyHtml }}
                 style={{ fontSize: "14px", lineHeight: 1.8, color: "#d0d0d0" }}
               />
