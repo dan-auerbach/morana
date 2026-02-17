@@ -189,6 +189,7 @@ export async function executeRecipe(executionId: string): Promise<void> {
   }
 
   const steps = execution.recipe.steps;
+  const workspaceId = execution.recipe.workspaceId || null;
   const costBreakdown: CostEntry[] = [];
 
   for (let i = 0; i < steps.length; i++) {
@@ -249,9 +250,9 @@ export async function executeRecipe(executionId: string): Promise<void> {
       let stepOut: StepOutput;
 
       if (step.type === "stt") {
-        stepOut = await executeSTTStep(execution.userId, config, inputData, context.previousOutput);
+        stepOut = await executeSTTStep(execution.userId, workspaceId, config, inputData, context.previousOutput);
       } else if (step.type === "llm") {
-        stepOut = await executeLLMStep(execution.userId, config, context);
+        stepOut = await executeLLMStep(execution.userId, workspaceId, config, context);
       } else if (step.type === "output_format") {
         stepOut = { text: formatOutput(context, config.formats || ["markdown"]), runId: null, providerResponseId: null };
       } else {
@@ -430,6 +431,7 @@ async function generateAndSavePreview(executionId: string, context: StepContext)
 
 async function executeSTTStep(
   userId: string,
+  workspaceId: string | null,
   config: StepConfig,
   inputData: InputData,
   previousOutput: string
@@ -469,6 +471,7 @@ async function executeSTTStep(
   const run = await prisma.run.create({
     data: {
       userId,
+      workspaceId: workspaceId || undefined,
       type: "stt",
       status: "running",
       provider: "soniox",
@@ -488,6 +491,7 @@ async function executeSTTStep(
     await logUsage({
       runId: run.id,
       userId,
+      workspaceId: workspaceId || undefined,
       provider: "soniox",
       model: "stt-async-v4",
       units: { durationSeconds: result.durationSeconds, durationMinutes },
@@ -518,6 +522,7 @@ async function executeSTTStep(
  */
 async function executeLLMStep(
   userId: string,
+  workspaceId: string | null,
   config: StepConfig,
   context: StepContext
 ): Promise<StepOutput> {
@@ -538,6 +543,7 @@ async function executeLLMStep(
   const run = await prisma.run.create({
     data: {
       userId,
+      workspaceId: workspaceId || undefined,
       type: "llm",
       status: "running",
       provider: modelEntry.provider,
@@ -561,6 +567,7 @@ async function executeLLMStep(
       await logUsage({
         runId: run.id,
         userId,
+        workspaceId: workspaceId || undefined,
         provider: modelEntry.provider,
         model: modelEntry.id,
         units: { inputTokens: wsResult.inputTokens, outputTokens: wsResult.outputTokens },
@@ -590,6 +597,7 @@ async function executeLLMStep(
     await logUsage({
       runId: run.id,
       userId,
+      workspaceId: workspaceId || undefined,
       provider: modelEntry.provider,
       model: modelEntry.id,
       units: { inputTokens: result.inputTokens, outputTokens: result.outputTokens },

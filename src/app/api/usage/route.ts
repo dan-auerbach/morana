@@ -66,6 +66,43 @@ export async function GET(req: NextRequest) {
         byModel[key].costCents += e.costEstimateCents;
       }
 
+      // Recipe execution costs
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const recipeWhere: Record<string, any> = {
+        status: "done",
+        totalCostCents: { gt: 0 },
+      };
+
+      // User filtering
+      if (where.userId) recipeWhere.userId = where.userId;
+
+      // Date filtering
+      if (from || to) {
+        recipeWhere.startedAt = {};
+        if (from) recipeWhere.startedAt.gte = new Date(from);
+        if (to) recipeWhere.startedAt.lte = new Date(to + "T23:59:59Z");
+      }
+
+      // Workspace filtering via recipe relation
+      if (where.workspaceId) {
+        recipeWhere.recipe = { workspaceId: where.workspaceId };
+      }
+
+      const recipeExecutions = await prisma.recipeExecution.findMany({
+        where: recipeWhere,
+        orderBy: { startedAt: "desc" },
+        take: 50,
+        select: {
+          id: true,
+          totalCostCents: true,
+          startedAt: true,
+          finishedAt: true,
+          recipe: { select: { name: true, slug: true } },
+        },
+      });
+
+      const recipeTotalCostCents = recipeExecutions.reduce((s, r) => s + r.totalCostCents, 0);
+
       return NextResponse.json({
         events: events.map((e) => ({
           ...e,
@@ -82,11 +119,25 @@ export async function GET(req: NextRequest) {
             Object.entries(byModel).map(([k, v]) => [k, { count: v.count, cost: v.costCents / 100, costCents: v.costCents }])
           ),
         },
+        recipeExecutions: recipeExecutions.map((re) => ({
+          id: re.id,
+          recipeName: re.recipe.name,
+          recipeSlug: re.recipe.slug,
+          totalCostCents: re.totalCostCents,
+          totalCost: re.totalCostCents / 100,
+          startedAt: re.startedAt,
+          finishedAt: re.finishedAt,
+        })),
+        recipeSummary: {
+          totalExecutions: recipeExecutions.length,
+          totalCostCents: recipeTotalCostCents,
+          totalCost: recipeTotalCostCents / 100,
+        },
       });
     } catch (err) {
       console.error("[Usage API] Error:", err);
       const message = err instanceof Error ? err.message : "Failed to load usage data";
-      return NextResponse.json({ error: message, events: [], summary: null }, { status: 500 });
+      return NextResponse.json({ error: message, events: [], summary: null, recipeExecutions: [], recipeSummary: null }, { status: 500 });
     }
   });
 }

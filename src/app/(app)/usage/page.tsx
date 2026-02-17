@@ -21,10 +21,24 @@ type Summary = {
   byModel: Record<string, { count: number; cost: number }>;
 };
 
+type RecipeExec = {
+  id: string;
+  recipeName: string;
+  totalCost: number;
+  startedAt: string;
+};
+
+type RecipeSummary = {
+  totalExecutions: number;
+  totalCost: number;
+};
+
 export default function UsagePage() {
   const { data: session } = useSession();
   const [events, setEvents] = useState<UsageEvent[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [recipeExecs, setRecipeExecs] = useState<RecipeExec[]>([]);
+  const [recipeSummary, setRecipeSummary] = useState<RecipeSummary | null>(null);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [provider, setProvider] = useState("");
@@ -50,11 +64,15 @@ export default function UsagePage() {
       if (data.error) setError(data.error);
       setEvents(data.events || []);
       setSummary(data.summary || null);
+      setRecipeExecs(data.recipeExecutions || []);
+      setRecipeSummary(data.recipeSummary || null);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to load usage data";
       setError(msg.includes("abort") ? "Request timed out" : msg);
       setEvents([]);
       setSummary(null);
+      setRecipeExecs([]);
+      setRecipeSummary(null);
     } finally {
       setLoading(false);
     }
@@ -186,8 +204,10 @@ export default function UsagePage() {
             }}
           >
             <option value="">all</option>
+            <option value="openai">openai</option>
             <option value="anthropic">anthropic</option>
             <option value="gemini">gemini</option>
+            <option value="fal">fal</option>
             <option value="soniox">soniox</option>
             <option value="elevenlabs">elevenlabs</option>
           </select>
@@ -375,6 +395,53 @@ export default function UsagePage() {
                   <span style={{ color: "#ffcc00" }}>${val.cost.toFixed(4)}</span>
                 </div>
               </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Recipe executions breakdown */}
+      {recipeSummary && recipeSummary.totalExecutions > 0 && (
+        <div style={{ marginBottom: "24px" }}>
+          <div
+            style={{
+              fontSize: "11px",
+              fontWeight: 700,
+              color: "#ff8800",
+              textTransform: "uppercase",
+              letterSpacing: "0.15em",
+              marginBottom: "12px",
+              paddingBottom: "8px",
+              borderBottom: "1px solid #1e2a3a",
+            }}
+          >
+            Recipe Executions ({recipeSummary.totalExecutions} total &mdash; ${recipeSummary.totalCost.toFixed(4)})
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+            {recipeExecs.map((re) => (
+              <a
+                key={re.id}
+                href={`/recipes/${re.id}`}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  padding: "8px 12px",
+                  backgroundColor: "rgba(13, 17, 23, 0.5)",
+                  border: "1px solid #1e2a3a",
+                  borderLeft: "3px solid #ff8800",
+                  textDecoration: "none",
+                  transition: "border-color 0.2s",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#ff8800"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#1e2a3a"; e.currentTarget.style.borderLeftColor = "#ff8800"; }}
+              >
+                <span style={{ color: "#e0e0e0", fontSize: "12px", flex: 1 }}>{re.recipeName}</span>
+                <span style={{ color: "#ffcc00", fontSize: "11px", fontWeight: 700 }}>${re.totalCost.toFixed(4)}</span>
+                <span style={{ color: "#5a6a7a", fontSize: "10px" }}>
+                  {new Date(re.startedAt).toLocaleString("sl-SI", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                </span>
+              </a>
             ))}
           </div>
         </div>

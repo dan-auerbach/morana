@@ -15,6 +15,7 @@ type Recipe = {
 type Execution = {
   id: string; status: string; progress: number; currentStep: number; totalSteps: number;
   startedAt: string; finishedAt: string | null; errorMessage: string | null;
+  totalCostCents: number;
   recipe: { name: string; slug: string };
 };
 
@@ -364,6 +365,9 @@ export default function RecipesPage() {
                 <span style={{ color: "#e0e0e0", fontSize: "12px", flex: 1 }}>{e.recipe.name}</span>
                 {(e.status === "running" || e.status === "pending") && (
                   <span style={{ color: "#ffcc00", fontSize: "10px" }}>{e.progress}% &mdash; step {e.currentStep + 1}/{e.totalSteps}</span>
+                )}
+                {e.status === "done" && e.totalCostCents > 0 && (
+                  <span style={{ color: "#ffcc00", fontSize: "10px", fontWeight: 700 }}>${(e.totalCostCents / 100).toFixed(4)}</span>
                 )}
                 <span style={{ color: "#5a6a7a", fontSize: "10px" }}>{new Date(e.startedAt).toLocaleString("sl-SI", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
               </Link>
