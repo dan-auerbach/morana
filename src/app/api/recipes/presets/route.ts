@@ -93,3 +93,77 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ recipe }, { status: 201 });
   }, req);
 }
+
+// PUT /api/recipes/presets — sync an existing preset recipe from code
+// Updates all steps to match the current preset definition in recipe-presets.ts
+export async function PUT(req: NextRequest) {
+  return withAuth(async (user) => {
+    const denied = requireAdmin(user.role);
+    if (denied) return denied;
+
+    const { presetKey } = await req.json();
+    if (!presetKey) {
+      return NextResponse.json({ error: "presetKey required" }, { status: 400 });
+    }
+
+    const preset = getPreset(presetKey);
+    if (!preset) {
+      return NextResponse.json({ error: "Unknown preset" }, { status: 404 });
+    }
+
+    // Find the existing recipe
+    const recipe = await prisma.recipe.findUnique({
+      where: { presetKey },
+      include: { steps: true },
+    });
+    if (!recipe) {
+      return NextResponse.json({ error: "Preset not yet created" }, { status: 404 });
+    }
+
+    // Create version snapshot of current state (audit trail)
+    await prisma.recipeVersion.create({
+      data: {
+        recipeId: recipe.id,
+        versionNumber: recipe.currentVersion,
+        stepsSnapshot: JSON.parse(JSON.stringify(recipe.steps)),
+        name: recipe.name,
+        description: recipe.description,
+        changedBy: user.id,
+        changeNote: `Synced from preset "${presetKey}"`,
+      },
+    });
+
+    // Increment version
+    await prisma.recipe.update({
+      where: { id: recipe.id },
+      data: {
+        currentVersion: recipe.currentVersion + 1,
+        name: preset.name,
+        description: preset.description,
+      },
+    });
+
+    // Replace all steps with preset definition
+    await prisma.recipeStep.deleteMany({ where: { recipeId: recipe.id } });
+
+    const created = [];
+    for (const s of preset.steps) {
+      const step = await prisma.recipeStep.create({
+        data: {
+          recipeId: recipe.id,
+          stepIndex: s.stepIndex,
+          name: s.name,
+          type: s.type,
+          config: s.config as Prisma.InputJsonValue,
+        },
+      });
+      created.push(step);
+    }
+
+    return NextResponse.json({
+      recipe: { id: recipe.id, name: preset.name, version: recipe.currentVersion + 1 },
+      steps: created,
+      synced: true,
+    });
+  }, req);
+}

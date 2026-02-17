@@ -150,36 +150,48 @@ export default function RecipesPage() {
 
       {loading && <div style={{ color: "#00ff88", fontSize: "13px", marginBottom: "12px" }}>Loading...</div>}
 
-      {/* Admin: Create from preset */}
-      {isAdmin && presets.filter(p => !p.alreadyCreated).length > 0 && (
+      {/* Admin: Create from preset + Sync existing */}
+      {isAdmin && presets.length > 0 && (
         <div style={{ marginBottom: "24px", padding: "12px 16px", border: "1px dashed rgba(255, 136, 0, 0.4)", backgroundColor: "rgba(255, 136, 0, 0.03)" }}>
           <div style={{ fontSize: "11px", fontWeight: 700, color: "#ff8800", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "8px" }}>
             RECIPE PRESETS (Admin)
           </div>
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-            {presets.filter(p => !p.alreadyCreated).map((p) => (
+            {presets.map((p) => (
               <button
                 key={p.key}
                 disabled={creatingPreset}
                 onClick={async () => {
                   setCreatingPreset(true);
                   try {
-                    await fetch("/api/recipes/presets", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ presetKey: p.key }),
-                    });
+                    if (p.alreadyCreated) {
+                      // Sync: update existing recipe from preset code
+                      await fetch("/api/recipes/presets", {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ presetKey: p.key }),
+                      });
+                    } else {
+                      // Create: instantiate new recipe from preset
+                      await fetch("/api/recipes/presets", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ presetKey: p.key }),
+                      });
+                    }
                     load();
                   } catch { /* ignore */ }
                   finally { setCreatingPreset(false); }
                 }}
                 style={{
-                  padding: "8px 16px", background: "transparent", border: "1px solid #ff8800",
-                  color: "#ff8800", fontFamily: "inherit", fontSize: "11px", fontWeight: 700,
+                  padding: "8px 16px", background: "transparent",
+                  border: `1px solid ${p.alreadyCreated ? "#00e5ff" : "#ff8800"}`,
+                  color: p.alreadyCreated ? "#00e5ff" : "#ff8800",
+                  fontFamily: "inherit", fontSize: "11px", fontWeight: 700,
                   cursor: creatingPreset ? "wait" : "pointer", textTransform: "uppercase",
                 }}
               >
-                + {p.name}
+                {p.alreadyCreated ? "SYNC" : "+"} {p.name}
                 <span style={{ fontSize: "9px", color: "#5a6a7a", marginLeft: "6px" }}>
                   ({p.stepTypes.join(" \u2192 ")})
                 </span>
@@ -187,7 +199,8 @@ export default function RecipesPage() {
             ))}
           </div>
           <div style={{ fontSize: "10px", color: "#5a6a7a", marginTop: "6px" }}>
-            Click to create a ready-to-use recipe from a preset template.
+            {presets.some(p => !p.alreadyCreated) ? "Click + to create from preset." : ""}{" "}
+            {presets.some(p => p.alreadyCreated) ? "Click SYNC to update steps from code." : ""}
           </div>
         </div>
       )}
