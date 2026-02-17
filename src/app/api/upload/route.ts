@@ -9,6 +9,10 @@ const ALLOWED_AUDIO_TYPES = [
   "audio/x-m4a", "audio/aac", "audio/webm",
 ];
 
+const ALLOWED_IMAGE_TYPES = [
+  "image/png", "image/jpeg", "image/jpg", "image/webp",
+];
+
 const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 
 /**
@@ -30,11 +34,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "fileName and fileType are required" }, { status: 400 });
     }
 
-    // Validate audio type
+    // Validate file type (audio or image)
     const normalizedType = (fileType || "").toLowerCase();
     const isAudio = ALLOWED_AUDIO_TYPES.includes(normalizedType) || normalizedType.startsWith("audio/");
-    if (!isAudio) {
-      return NextResponse.json({ error: `Unsupported audio type: ${fileType}` }, { status: 400 });
+    const isImage = ALLOWED_IMAGE_TYPES.includes(normalizedType);
+    if (!isAudio && !isImage) {
+      return NextResponse.json({ error: `Unsupported file type: ${fileType}` }, { status: 400 });
     }
 
     // Validate file size

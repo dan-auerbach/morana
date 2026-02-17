@@ -178,12 +178,67 @@ export default function ExecutionDetailPage() {
                       <div style={{ padding: "8px", backgroundColor: "#0a0e14", border: "1px solid #1e2a3a", fontSize: "11px", color: "#8b949e", maxHeight: "100px", overflowY: "auto", whiteSpace: "pre-wrap" }}>{sr.inputPreview}</div>
                     </div>
                   )}
-                  {sr.outputFull && (sr.outputFull as { text?: string }).text && (
-                    <div style={{ marginTop: "8px" }}>
-                      <div style={{ fontSize: "10px", color: "#00ff88", fontWeight: 700, marginBottom: "4px" }}>OUTPUT</div>
-                      <div style={{ padding: "8px", backgroundColor: "#0a0e14", border: "1px solid #1e2a3a", fontSize: "11px", color: "#e0e0e0", maxHeight: "300px", overflowY: "auto", whiteSpace: "pre-wrap" }}>{(sr.outputFull as { text?: string }).text}</div>
-                    </div>
-                  )}
+                  {sr.outputFull && (sr.outputFull as { text?: string }).text && (() => {
+                    const text = (sr.outputFull as { text?: string }).text || "";
+                    // Try to parse as video output JSON
+                    let videoData: { videoUrl?: string; width?: number; height?: number; duration?: number; fps?: number } | null = null;
+                    try {
+                      const parsed = JSON.parse(text);
+                      if (parsed.videoUrl) videoData = parsed;
+                    } catch { /* not JSON */ }
+
+                    if (videoData && videoData.videoUrl) {
+                      return (
+                        <div style={{ marginTop: "8px" }}>
+                          <div style={{ fontSize: "10px", color: "#ff6b9d", fontWeight: 700, marginBottom: "4px" }}>VIDEO OUTPUT</div>
+                          <div style={{ padding: "12px", backgroundColor: "#0a0e14", border: "1px solid rgba(255, 107, 157, 0.3)" }}>
+                            <video
+                              controls
+                              autoPlay
+                              loop
+                              muted
+                              playsInline
+                              style={{ width: "100%", maxWidth: "640px", borderRadius: "4px", border: "1px solid #1e2a3a" }}
+                              src={videoData.videoUrl}
+                            />
+                            <div style={{ display: "flex", gap: "16px", marginTop: "8px", flexWrap: "wrap" }}>
+                              {videoData.width && videoData.height && (
+                                <span style={{ fontSize: "10px", color: "#5a6a7a" }}>
+                                  {videoData.width}x{videoData.height}
+                                </span>
+                              )}
+                              {videoData.duration && (
+                                <span style={{ fontSize: "10px", color: "#5a6a7a" }}>
+                                  {videoData.duration}s
+                                </span>
+                              )}
+                              {videoData.fps && (
+                                <span style={{ fontSize: "10px", color: "#5a6a7a" }}>
+                                  {videoData.fps} fps
+                                </span>
+                              )}
+                              <a
+                                href={videoData.videoUrl}
+                                download
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ fontSize: "10px", color: "#ff6b9d", fontWeight: 700, textDecoration: "none", textTransform: "uppercase" }}
+                              >
+                                DOWNLOAD
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div style={{ marginTop: "8px" }}>
+                        <div style={{ fontSize: "10px", color: "#00ff88", fontWeight: 700, marginBottom: "4px" }}>OUTPUT</div>
+                        <div style={{ padding: "8px", backgroundColor: "#0a0e14", border: "1px solid #1e2a3a", fontSize: "11px", color: "#e0e0e0", maxHeight: "300px", overflowY: "auto", whiteSpace: "pre-wrap" }}>{text}</div>
+                      </div>
+                    );
+                  })()}
                   {sr.errorMessage && (
                     <div style={{ marginTop: "8px", color: "#ff4444", fontSize: "11px" }}>[ERROR] {sr.errorMessage}</div>
                   )}

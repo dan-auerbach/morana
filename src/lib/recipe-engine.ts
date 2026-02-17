@@ -3,7 +3,15 @@ import { getApprovedModels } from "./config";
 import { runLLMChat, runLLMWebSearch } from "./providers/llm";
 import { runSTT } from "./providers/stt";
 import { logUsage } from "./usage";
-import { getObjectFromR2 } from "./storage";
+import { getObjectFromR2, uploadToR2, getSignedDownloadUrl } from "./storage";
+import {
+  submitVideoJob,
+  getVideoJobStatus,
+  getVideoJobResult,
+  downloadFalVideo,
+  type VideoSubmitParams,
+  type VideoResolution,
+} from "./providers/fal-video";
 import { createHash, randomUUID } from "crypto";
 
 function sha256(text: string): string {
@@ -41,6 +49,11 @@ type StepConfig = {
   webSearch?: boolean;
   // Engine v2: URL content fetching (extracts page content and injects into prompt)
   fetchUrls?: boolean;
+  // Engine v2: video step configuration
+  videoOperation?: "text2video" | "img2video" | "video2video";
+  videoDuration?: number;       // seconds (1-15)
+  videoResolution?: "480p" | "720p";
+  videoAspectRatio?: string;    // "16:9", "9:16", etc.
 };
 
 type InputData = {
@@ -50,6 +63,9 @@ type InputData = {
   audioMimeType?: string;
   audioUrl?: string;
   language?: string;
+  // Image input for video recipes
+  imageStorageKey?: string;
+  imageMimeType?: string;
 } | null;
 
 type StepOutput = {
@@ -255,6 +271,8 @@ export async function executeRecipe(executionId: string): Promise<void> {
         stepOut = await executeSTTStep(execution.userId, workspaceId, config, inputData, context.previousOutput);
       } else if (step.type === "llm") {
         stepOut = await executeLLMStep(execution.userId, workspaceId, config, context);
+      } else if (step.type === "video") {
+        stepOut = await executeVideoStep(execution.userId, workspaceId, config, context);
       } else if (step.type === "output_format") {
         stepOut = { text: formatOutput(context, config.formats || ["markdown"]), runId: null, providerResponseId: null };
       } else {
@@ -624,6 +642,185 @@ async function executeLLMStep(
     await prisma.run.update({
       where: { id: run.id },
       data: { status: "error", errorMessage: err instanceof Error ? err.message : "LLM failed", finishedAt: new Date() },
+    });
+    throw err;
+  }
+}
+
+// ─── Video Step ──────────────────────────────────────────────────────────
+
+/**
+ * Execute a video generation step using fal.ai.
+ * Supports img2video (photo → video), text2video, and video2video.
+ * The video prompt comes from context.previousOutput (typically from an LLM step).
+ * For img2video, the source image comes from context.input.imageStorageKey.
+ */
+async function executeVideoStep(
+  userId: string,
+  workspaceId: string | null,
+  config: StepConfig,
+  context: StepContext
+): Promise<StepOutput> {
+  const operation = config.videoOperation || "img2video";
+  const duration = Math.max(1, Math.min(15, config.videoDuration || 5));
+  const resolution: VideoResolution = config.videoResolution || "480p";
+  const aspectRatio = config.videoAspectRatio || "16:9";
+
+  // Video prompt from previous step (the LLM-generated prompt)
+  const prompt = context.previousOutput?.trim();
+  if (!prompt) throw new Error("Video step requires a prompt from the previous step");
+
+  // Build fal.ai params
+  const falParams: VideoSubmitParams = { prompt, duration, resolution };
+
+  // Set aspect ratio: img2video uses "auto" (derives from image), text2video uses explicit
+  if (operation === "img2video") {
+    falParams.aspect_ratio = "auto";
+
+    // Get the source image from R2
+    const imageKey = context.input?.imageStorageKey;
+    if (!imageKey) throw new Error("img2video requires an image (imageStorageKey in input)");
+    const signedUrl = await getSignedDownloadUrl(imageKey, 600);
+    falParams.image_url = signedUrl;
+  } else {
+    falParams.aspect_ratio = aspectRatio;
+  }
+
+  // Create Run record for cost tracking
+  const pricingModel = `grok-imagine-video-${resolution}`;
+  const run = await prisma.run.create({
+    data: {
+      userId,
+      type: "video",
+      status: "queued",
+      provider: "fal",
+      model: pricingModel,
+      workspaceId: workspaceId || undefined,
+    },
+  });
+
+  await prisma.runInput.create({
+    data: {
+      runId: run.id,
+      payloadJson: {
+        operation,
+        prompt: prompt.slice(0, 500),
+        duration,
+        aspectRatio,
+        resolution,
+        imageStorageKey: context.input?.imageStorageKey || null,
+      },
+    },
+  });
+
+  try {
+    // Submit to fal.ai queue
+    const queueResult = await submitVideoJob(operation, falParams);
+    const statusUrl = queueResult.status_url;
+    const responseUrl = queueResult.response_url;
+
+    await prisma.run.update({
+      where: { id: run.id },
+      data: { status: "running", providerJobId: queueResult.request_id },
+    });
+
+    // Poll for completion (video gen takes 30-180s)
+    const start = Date.now();
+    const MAX_POLL_MS = 280_000;
+    let pollInterval = 2000;
+    let completed = false;
+
+    while (Date.now() - start < MAX_POLL_MS) {
+      await new Promise((r) => setTimeout(r, pollInterval));
+      pollInterval = Math.min(pollInterval * 1.2, 8000);
+
+      const status = await getVideoJobStatus(statusUrl);
+      if (status.status === "COMPLETED") {
+        completed = true;
+        break;
+      }
+    }
+
+    if (!completed) {
+      await prisma.run.update({
+        where: { id: run.id },
+        data: { status: "error", errorMessage: "Video generation timed out", finishedAt: new Date() },
+      });
+      throw new Error("Video generation timed out. Try shorter duration or lower resolution.");
+    }
+
+    // Download result
+    const result = await getVideoJobResult(responseUrl);
+    const latencyMs = Date.now() - start;
+    const video = result.video;
+
+    const { buffer, contentType: videoContentType } = await downloadFalVideo(video.url);
+    const storageKey = `video/output/${run.id}/${randomUUID()}.mp4`;
+    await uploadToR2(storageKey, buffer, videoContentType, buffer.length);
+
+    // Create File record
+    const file = await prisma.file.create({
+      data: {
+        userId,
+        runId: run.id,
+        kind: "output",
+        mime: videoContentType,
+        size: buffer.length,
+        storageKey,
+      },
+    });
+
+    // Create RunOutput
+    await prisma.runOutput.create({
+      data: {
+        runId: run.id,
+        payloadJson: {
+          width: video.width,
+          height: video.height,
+          fps: video.fps,
+          duration: video.duration,
+          numFrames: video.num_frames,
+          latencyMs,
+        },
+      },
+    });
+
+    await prisma.run.update({
+      where: { id: run.id },
+      data: { status: "done", finishedAt: new Date() },
+    });
+
+    await logUsage({
+      runId: run.id,
+      userId,
+      provider: "fal",
+      model: pricingModel,
+      units: { videoSeconds: video.duration },
+      latencyMs,
+      workspaceId: workspaceId || undefined,
+    });
+
+    // Return structured JSON so execution detail page can render video player
+    const outputJson = {
+      videoFileId: file.id,
+      videoUrl: `/api/files/${file.id}`,
+      storageKey,
+      width: video.width,
+      height: video.height,
+      duration: video.duration,
+      fps: video.fps,
+    };
+
+    return {
+      text: JSON.stringify(outputJson),
+      runId: run.id,
+      providerResponseId: null,
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Video generation failed";
+    await prisma.run.update({
+      where: { id: run.id },
+      data: { status: "error", errorMessage: msg, finishedAt: new Date() },
     });
     throw err;
   }

@@ -42,9 +42,11 @@ export default function RecipesPage() {
   const [inputText, setInputText] = useState("");
   const [inputMode, setInputMode] = useState<InputMode>("text");
   const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [audioUrl, setAudioUrl] = useState("");
   const [language, setLanguage] = useState("sl");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -73,7 +75,7 @@ export default function RecipesPage() {
   }, [executions, load]);
 
   function resetInput() {
-    setInputText(""); setAudioFile(null); setAudioUrl(""); setInputMode("text"); setLanguage("sl");
+    setInputText(""); setAudioFile(null); setImageFile(null); setAudioUrl(""); setInputMode("text"); setLanguage("sl");
     setSelectedRecipeId(null);
   }
 
@@ -85,6 +87,8 @@ export default function RecipesPage() {
     if (modes && modes.length > 0) {
       setInputMode(modes[0]);
     } else if (recipe.inputKind === "audio") {
+      setInputMode("file");
+    } else if (recipe.inputKind === "image_text") {
       setInputMode("file");
     } else {
       setInputMode("text");
@@ -98,11 +102,53 @@ export default function RecipesPage() {
     try {
       const recipe = recipes.find(r => r.id === recipeId);
       const isAudio = recipe?.inputKind === "audio";
+      const isImageText = recipe?.inputKind === "image_text";
 
       // Build inputData for the execute endpoint (always JSON)
       let inputData: Record<string, unknown> | null = null;
 
-      if (isAudio) {
+      if (isImageText) {
+        // IMAGE+TEXT recipe: upload image to R2, send storageKey + text
+        if (!imageFile) {
+          throw new Error("Please select an image file.");
+        }
+        if (!inputText.trim()) {
+          throw new Error("Please write a story/description.");
+        }
+
+        setUploadStatus("Uploading image...");
+        const uploadResp = await fetch("/api/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fileName: imageFile.name,
+            fileSize: imageFile.size,
+            fileType: imageFile.type,
+            recipeId,
+          }),
+        });
+        if (!uploadResp.ok) {
+          const errData = await uploadResp.json().catch(() => ({}));
+          throw new Error(errData.error || `Upload init failed: HTTP ${uploadResp.status}`);
+        }
+        const { uploadUrl: imgUploadUrl, storageKey: imgStorageKey } = await uploadResp.json();
+
+        const r2Resp = await fetch(imgUploadUrl, {
+          method: "PUT",
+          headers: { "Content-Type": imageFile.type },
+          body: imageFile,
+        });
+        if (!r2Resp.ok) {
+          throw new Error(`Image upload failed: HTTP ${r2Resp.status}`);
+        }
+
+        setUploadStatus(null);
+        inputData = {
+          imageStorageKey: imgStorageKey,
+          imageMimeType: imageFile.type,
+          text: inputText.trim(),
+        };
+      } else if (isAudio) {
         if (inputMode === "file" && audioFile) {
           // Step 1: Get presigned upload URL from our API
           setUploadStatus("Uploading file...");
@@ -265,6 +311,9 @@ export default function RecipesPage() {
                   {r.inputKind === "audio" && (
                     <span style={{ marginLeft: "8px", padding: "1px 6px", backgroundColor: "rgba(0, 229, 255, 0.1)", border: "1px solid rgba(0, 229, 255, 0.3)", color: "#00e5ff", fontSize: "9px", fontWeight: 700, textTransform: "uppercase" }}>AUDIO</span>
                   )}
+                  {r.inputKind === "image_text" && (
+                    <span style={{ marginLeft: "8px", padding: "1px 6px", backgroundColor: "rgba(255, 107, 157, 0.1)", border: "1px solid rgba(255, 107, 157, 0.3)", color: "#ff6b9d", fontSize: "9px", fontWeight: 700, textTransform: "uppercase" }}>IMAGE+TEXT</span>
+                  )}
                   {r.description && <span style={{ color: "#5a6a7a", fontSize: "12px", marginLeft: "8px" }}>{r.description}</span>}
                 </div>
                 <span style={{ color: "#5a6a7a", fontSize: "10px" }}>{r.steps.length} steps</span>
@@ -319,6 +368,79 @@ export default function RecipesPage() {
                     </div>
                   )}
 
+                  {/* IMAGE+TEXT input: image upload + story textarea */}
+                  {r.inputKind === "image_text" ? (
+                    <div>
+                      <div style={{ display: "flex", gap: "12px", marginBottom: "8px" }}>
+                        {/* Image upload zone */}
+                        <div style={{ flex: "0 0 200px" }}>
+                          <input
+                            ref={imageInputRef}
+                            type="file"
+                            accept={(r.uiHints?.acceptImage as string) || "image/png,image/jpeg,image/webp"}
+                            onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                            style={{ display: "none" }}
+                          />
+                          <button
+                            onClick={() => imageInputRef.current?.click()}
+                            style={{
+                              width: "100%", height: "120px", backgroundColor: "rgba(255, 107, 157, 0.03)",
+                              border: `2px dashed ${imageFile ? "#00ff88" : "rgba(255, 107, 157, 0.3)"}`,
+                              color: imageFile ? "#00ff88" : "#5a6a7a",
+                              fontFamily: "inherit", fontSize: "11px", cursor: "pointer", textAlign: "center",
+                              display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "4px",
+                            }}
+                          >
+                            {imageFile ? (
+                              <>
+                                <span style={{ fontSize: "16px" }}>{"\u2713"}</span>
+                                <span>{imageFile.name}</span>
+                                <span style={{ fontSize: "10px", color: "#5a6a7a" }}>({(imageFile.size / 1024 / 1024).toFixed(1)} MB)</span>
+                              </>
+                            ) : (
+                              <>
+                                <span style={{ fontSize: "20px", color: "#ff6b9d" }}>{"\uD83D\uDCF7"}</span>
+                                <span>Click to select photo</span>
+                                <span style={{ fontSize: "10px" }}>PNG, JPG, WebP (max {(r.uiHints?.maxFileSizeMB as number) || 20}MB)</span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+                        {/* Story textarea */}
+                        <textarea
+                          value={inputText}
+                          onChange={(e) => setInputText(e.target.value)}
+                          placeholder={(r.uiHints?.textPlaceholder as string) || "Write your story here..."}
+                          style={{
+                            flex: 1, padding: "10px", backgroundColor: "#111820", border: "1px solid #1e2a3a",
+                            color: "#e0e0e0", fontFamily: "inherit", fontSize: "12px", resize: "vertical", minHeight: "120px",
+                          }}
+                        />
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "flex-end", gap: "4px" }}>
+                        <button
+                          onClick={resetInput}
+                          style={{ padding: "4px 16px", background: "transparent", border: "1px solid #5a6a7a", color: "#5a6a7a", fontFamily: "inherit", fontSize: "10px", cursor: "pointer" }}
+                        >
+                          CANCEL
+                        </button>
+                        <button
+                          onClick={() => handleExecute(r.id)}
+                          disabled={executing === r.id}
+                          style={{
+                            padding: "8px 20px", background: executing === r.id ? "rgba(255, 204, 0, 0.08)" : "transparent",
+                            border: `1px solid ${executing === r.id ? "#ffcc00" : "#ff6b9d"}`,
+                            color: executing === r.id ? "#ffcc00" : "#ff6b9d",
+                            fontFamily: "inherit", fontSize: "11px", fontWeight: 700,
+                            cursor: executing === r.id ? "wait" : "pointer", textTransform: "uppercase",
+                            animation: executing === r.id ? "blink 1.2s step-end infinite" : "none",
+                          }}
+                        >
+                          {executing === r.id ? (uploadStatus || "GENERATING VIDEO...") : "CREATE VIDEO"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
                   <div style={{ display: "flex", gap: "8px", alignItems: "flex-end" }}>
                     {/* Input area changes based on mode */}
                     {r.inputKind === "audio" && inputMode === "file" ? (
@@ -384,6 +506,7 @@ export default function RecipesPage() {
                       </button>
                     </div>
                   </div>
+                  )}
                 </div>
               ) : (
                 <button

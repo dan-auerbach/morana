@@ -817,8 +817,93 @@ PRAVILA:
   ],
 };
 
+// ─── STORY > VIDEO ──────────────────────────────────────────────────────
+//
+// Photo + short story → AI-enhanced cinematic video prompt → 5s img2video
+// Pipeline: LLM (prompt engineer) → Video (fal.ai img2video 480p)
+//
+// Quality features:
+//   - Expert cinematographer system prompt with motion/lighting/mood vocabulary
+//   - Web search to incorporate current visual trends
+//   - 300-word prompt budget for maximum detail to video model
+//   - Emotional micro-arc guidance even in 5 seconds
+//
+const STORY_VIDEO_PRESET: RecipePreset = {
+  key: "story-video",
+  name: "STORY > VIDEO",
+  description: "Naloži fotografijo in napiši kratko zgodbo → AI ustvari kinematografski 5-sekundni video.",
+  inputKind: "image_text",
+  inputModes: ["file"],
+  defaultLang: "en",
+  uiHints: {
+    label: "Story to Video",
+    description: "Upload a photo and write a short story. AI will create a cinematic 5-second video.",
+    acceptImage: "image/png,image/jpeg,image/webp",
+    maxFileSizeMB: 20,
+    textPlaceholder: "Describe the scene, tell a short story, or set the mood for the video...",
+  },
+  steps: [
+    // ── Step 0: LLM — Video Prompt Engineer ──────────────────────
+    {
+      stepIndex: 0,
+      name: "Video Prompt",
+      type: "llm",
+      config: {
+        modelId: "gpt-5.2",
+        webSearch: true,
+        description: "Analyze story and craft an expert cinematic video prompt for img2video generation",
+        systemPrompt: `You are an expert cinematographer and AI video prompt engineer. You specialize in creating prompts for AI video generation (image-to-video) that produce cinematic, visually stunning short videos.
+
+CONTEXT:
+The user has uploaded a photo and written a short story or description. You must create an optimal video generation prompt that will animate the photo into a compelling 5-second video clip.
+
+YOUR TASK:
+1. Analyze the user's story/description for key themes, mood, and narrative intent
+2. Envision how the static photo could come to life as a short video
+3. Search the web for current visual trends, cinematography techniques, or aesthetic references that match the mood
+4. Create a single, detailed video prompt that describes:
+   - Camera movement (slow dolly, gentle pan, zoom, static with subject motion, etc.)
+   - Subject motion (what moves, how, how fast)
+   - Atmospheric effects (light changes, particles, weather, fog, etc.)
+   - Mood and emotional progression across the 5 seconds
+   - Cinematic style (film grain, color grading, depth of field)
+
+OUTPUT FORMAT:
+Return ONLY the video prompt text. No explanations, no JSON, no markdown. Just the prompt.
+
+RULES FOR GREAT VIDEO PROMPTS:
+- Keep it under 300 words but be specific and vivid
+- Describe motion explicitly ("camera slowly dollies forward", "wind gently moves the hair")
+- Include lighting direction and quality ("warm golden hour light from the left")
+- Mention depth of field and focus ("shallow depth of field, background softly blurred")
+- Reference a cinematic style when fitting ("Wes Anderson color palette", "Terrence Malick natural light")
+- Add subtle atmospheric details ("dust particles catch the light", "gentle lens flare")
+- Describe the emotional arc even in 5 seconds ("starting serene, building to wonder")
+- Avoid impossible physics or jarring transitions — keep motion natural
+- The prompt should complement the existing image, not contradict it
+- Modern trends: cinematic color grading, anamorphic lens feel, natural handheld movement
+- If the story is in a non-English language, still write the video prompt in ENGLISH`,
+        userPromptTemplate: "{{original_input}}",
+      },
+    },
+    // ── Step 1: Video Generation (img2video) ─────────────────────
+    {
+      stepIndex: 1,
+      name: "Video Generation",
+      type: "video",
+      config: {
+        videoOperation: "img2video",
+        videoDuration: 5,
+        videoResolution: "480p",
+        videoAspectRatio: "16:9",
+        description: "Generate a 5-second cinematic video from the uploaded photo using the AI-crafted prompt",
+      },
+    },
+  ],
+};
+
 /** All available presets */
-export const RECIPE_PRESETS: RecipePreset[] = [NOVINAR_PRESET, NOVINAR_AUTO_1_PRESET, URL_POVZETEK_PRESET, INTERVJU_CLANEK_PRESET];
+export const RECIPE_PRESETS: RecipePreset[] = [NOVINAR_PRESET, NOVINAR_AUTO_1_PRESET, URL_POVZETEK_PRESET, INTERVJU_CLANEK_PRESET, STORY_VIDEO_PRESET];
 
 /** Get preset by key */
 export function getPreset(key: string): RecipePreset | undefined {
