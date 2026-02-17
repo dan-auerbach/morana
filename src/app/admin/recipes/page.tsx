@@ -272,7 +272,7 @@ export default function AdminRecipesPage() {
                           <div style={{ display: "flex", gap: "8px" }}>
                             <div style={{ flex: "0 0 180px" }}>
                               <label style={st.labelDim}>Model ID</label>
-                              <input value={(step.config.modelId as string) || ""} onChange={(e) => updateStep(i, "modelId", e.target.value)} placeholder="gpt-4o-mini" style={st.input} />
+                              <input value={(step.config.modelId as string) || ""} onChange={(e) => updateStep(i, "modelId", e.target.value)} placeholder="gpt-5-mini" style={st.input} />
                             </div>
                             <div style={{ flex: 1 }}>
                               <label style={st.labelDim}>User Prompt Template</label>

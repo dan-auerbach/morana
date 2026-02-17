@@ -44,18 +44,18 @@ const defaultModels: ModelEntry[] = [
   ...(process.env.OPENAI_API_KEY
     ? [
         {
-          id: process.env.OPENAI_MODEL || "gpt-5.2",
+          id: process.env.OPENAI_MODEL || "gpt-5-mini",
+          label: "OpenAI GPT-5 Mini",
+          provider: "openai" as const,
+        },
+        {
+          id: "gpt-5.2",
           label: "OpenAI GPT-5.2",
           provider: "openai" as const,
         },
         {
           id: "gpt-4o",
           label: "OpenAI GPT-4o",
-          provider: "openai" as const,
-        },
-        {
-          id: "gpt-4o-mini",
-          label: "OpenAI GPT-4o Mini",
           provider: "openai" as const,
         },
       ]
@@ -138,9 +138,9 @@ const defaultPricing: Record<string, { input: number; output: number; unit: stri
   "claude-sonnet-4-5-20250929": { input: 3.0, output: 15.0, unit: "1M_tokens" },
   "gemini-2.0-flash": { input: 0.1, output: 0.4, unit: "1M_tokens" },
   "gemini-2.5-flash-image": { input: 0.15, output: 30.0, unit: "1M_tokens" },
+  "gpt-5-mini": { input: 0.25, output: 2.0, unit: "1M_tokens" },
   "gpt-5.2": { input: 1.75, output: 14.0, unit: "1M_tokens" },
   "gpt-4o": { input: 2.5, output: 10.0, unit: "1M_tokens" },
-  "gpt-4o-mini": { input: 0.15, output: 0.6, unit: "1M_tokens" },
   soniox: { input: 0.35, output: 0, unit: "per_minute" },
   elevenlabs: { input: 0.30, output: 0, unit: "1k_chars" },
   "fal-ai/flux/schnell": { input: 0.025, output: 0, unit: "per_image" },

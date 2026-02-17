@@ -60,7 +60,7 @@ export const NOVINAR_PRESET: RecipePreset = {
       name: "Članek",
       type: "llm",
       config: {
-        modelId: "gpt-4o-mini",
+        modelId: "gpt-5-mini",
         systemPrompt: `Si profesionalni novinar za slovensko medijsko hišo. Piši v slovenščini.
 
 NALOGA:
@@ -88,7 +88,7 @@ PRAVILA:
       name: "SEO",
       type: "llm",
       config: {
-        modelId: "gpt-4o-mini",
+        modelId: "gpt-5-mini",
         systemPrompt: `Si SEO strokovnjak za slovensko medijsko hišo. Na podlagi članka ustvari SEO metapodatke.
 
 Odgovori STRIKTNO v JSON formatu (brez markdown blokov, samo čist JSON):

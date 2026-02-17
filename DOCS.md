@@ -1,6 +1,6 @@
 # MORANA — Internal AI Operations Terminal
 
-**Version:** 2.7.0
+**Version:** 2.8.0
 **Stack:** Next.js 16 | React 19 | TypeScript | Prisma 7 | PostgreSQL (Neon) + pgvector | Tailwind CSS 4
 **Hosting:** Vercel (serverless) | Cloudflare R2 (storage)
 **UI Theme:** Dark hacker/terminal aesthetic
@@ -14,7 +14,7 @@ MORANA je interni AI operations terminal za medijsko podjetje. Združuje več AI
 
 | Modul | Provider | Opis |
 |-------|----------|------|
-| **LLM** | Anthropic Claude, OpenAI GPT-5.2/GPT-4o, Google Gemini | Multi-turn chat z URL fetching, RAG, prompt templates, web search |
+| **LLM** | Anthropic Claude, OpenAI GPT-5 mini/GPT-5.2/GPT-4o, Google Gemini | Multi-turn chat z URL fetching, RAG, prompt templates, web search |
 | **STT** | Soniox | Transkripcija zvoka (SL, EN) |
 | **TTS** | ElevenLabs | Sinteza govora z voice settings, model izbiro, SFX generiranje |
 | **Image** | Flux (fal.ai), Gemini Flash, Face Swap, FLUX.2 Edit | Generiranje, urejanje, face swap, multi-reference editing |
@@ -629,7 +629,7 @@ Indeksi: `email`, `createdAt`, `event`
 
 ## AI Providerji
 
-### LLM — Anthropic Claude + OpenAI GPT-5.2/GPT-4o + Google Gemini
+### LLM — Anthropic Claude + OpenAI GPT-5 mini/GPT-5.2/GPT-4o + Google Gemini
 
 **Datoteka:** `src/lib/providers/llm.ts`
 
@@ -641,9 +641,9 @@ Podpira dva načina:
 | Model | Provider | Input cena | Output cena |
 |-------|----------|-----------|-------------|
 | `claude-sonnet-4-5-20250929` | Anthropic | $3.00/1M tok | $15.00/1M tok |
+| `gpt-5-mini` | OpenAI | $0.25/1M tok | $2.00/1M tok |
 | `gpt-5.2` | OpenAI | $1.75/1M tok | $14.00/1M tok |
 | `gpt-4o` | OpenAI | $2.50/1M tok | $10.00/1M tok |
-| `gpt-4o-mini` | OpenAI | $0.15/1M tok | $0.60/1M tok |
 | `gemini-2.0-flash` | Gemini | $0.10/1M tok | $0.40/1M tok |
 
 OpenAI modeli so na voljo samo če je `OPENAI_API_KEY` nastavljen.
@@ -1301,9 +1301,15 @@ npx prisma migrate deploy
 
 ## Changelog
 
+### v2.8.0 (2026-02-17)
+
+- **GPT-5 Mini model:** Dodan OpenAI GPT-5 Mini kot privzeti OpenAI model. Pricing: $0.25/1M input, $2.00/1M output. Nadomestil GPT-4o-mini, ki je odstranjen.
+- **GPT-5.2 za web search:** GPT-5.2 ostaja privzet za web search (Responses API). Pricing: $1.75/1M input, $14.00/1M output.
+- **Odstranjen GPT-4o-mini:** Zamenjan z GPT-5 Mini povsod (config, recipe preseti, admin UI).
+
 ### v2.7.0 (2026-02-17)
 
-- **GPT-5.2 model:** Dodan OpenAI GPT-5.2 kot privzeti OpenAI model. Pricing: $1.75/1M input, $14.00/1M output. Web search (Responses API) posodobljen na GPT-5.2. GPT-4o in GPT-4o-mini ostajata na voljo.
+- **GPT-5.2 model:** Dodan OpenAI GPT-5.2. Web search (Responses API) posodobljen na GPT-5.2. GPT-4o ostaja na voljo.
 - **Video privzete vrednosti:** Privzeta dolžina videa znižana na 3s (prej 6s), privzeta ločljivost na 480p (prej 720p) za cenejše testiranje.
 
 ### v2.6.0 (2026-02-16)

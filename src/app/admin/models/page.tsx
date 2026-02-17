@@ -363,7 +363,7 @@ export default function AdminModelsPage() {
               <input
                 value={formData.modelId}
                 onChange={(e) => setFormData({ ...formData, modelId: e.target.value })}
-                placeholder="e.g. gpt-4o-mini"
+                placeholder="e.g. gpt-5-mini"
                 style={s.input}
               />
             </div>
@@ -372,7 +372,7 @@ export default function AdminModelsPage() {
               <input
                 value={formData.label}
                 onChange={(e) => setFormData({ ...formData, label: e.target.value })}
-                placeholder="e.g. GPT-4o Mini"
+                placeholder="e.g. GPT-5 Mini"
                 style={s.input}
               />
             </div>
