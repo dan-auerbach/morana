@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Geist_Mono } from "next/font/google";
-import "./globals.css";
-import SessionProvider from "./components/SessionProvider";
-import Nav from "./components/Nav";
+import "@/app/globals.css";
+import SessionProvider from "@/app/components/SessionProvider";
+import Nav from "@/app/components/Nav";
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",

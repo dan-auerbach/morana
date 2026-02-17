@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import { useState, useEffect, useCallback } from "react";
-import StatusBadge from "../components/StatusBadge";
+import StatusBadge from "@/app/components/StatusBadge";
 
 type Run = {
   id: string;

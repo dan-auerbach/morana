@@ -2,8 +2,8 @@
 
 import { useSession } from "next-auth/react";
 import { useState, useEffect, useCallback } from "react";
-import StatusBadge from "../components/StatusBadge";
-import CostPreview from "../components/CostPreview";
+import StatusBadge from "@/app/components/StatusBadge";
+import CostPreview from "@/app/components/CostPreview";
 
 type Voice = { id: string; name: string };
 type HistoryRun = {
