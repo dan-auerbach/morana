@@ -685,8 +685,140 @@ DODATNA RAZISKAVA (web viri):
   ],
 };
 
+/**
+ * INTERVJU > ČLANEK preset: Audio → STT → Article (5 best quotes) → SEO → Drupal JSON
+ *
+ * Specialized for interview recordings. The LLM identifies the 5 most
+ * interesting/impactful statements from the transcript and weaves them
+ * into a journalistic article as highlighted blockquotes.
+ *
+ * Input: audio file, audio URL, or pasted transcript
+ * Output: structured Drupal JSON + SEO + public preview (no fact-check needed)
+ */
+export const INTERVJU_CLANEK_PRESET: RecipePreset = {
+  key: "intervju-clanek",
+  name: "INTERVJU > ČLANEK",
+  description: "Intervju (audio) → transkripcija → novinarski članek s 5 najboljšimi izjavami → SEO → Drupal JSON.",
+  inputKind: "audio",
+  inputModes: ["file", "url", "text"],
+  defaultLang: "sl",
+  uiHints: {
+    acceptAudio: "audio/mpeg,audio/mp3,audio/wav,audio/ogg,audio/flac,audio/m4a,audio/aac,audio/webm",
+    maxFileSizeMB: 100,
+  },
+  steps: [
+    // ── Step 0: TRANSKRIPCIJA (Soniox STT) ──
+    {
+      stepIndex: 0,
+      name: "Transkripcija",
+      type: "stt",
+      config: {
+        provider: "soniox",
+        language: "sl",
+        description: "Transkribiraj audio posnetek intervjuja v besedilo (slovenščina)",
+      },
+    },
+
+    // ── Step 1: ČLANEK (Interview → Article with 5 best quotes) ──
+    {
+      stepIndex: 1,
+      name: "Članek",
+      type: "llm",
+      config: {
+        modelId: "gpt-5.2",
+        systemPrompt: `Si profesionalni novinar za slovensko medijsko hišo. Piši v slovenščini.
+
+NALOGA:
+Na podlagi transkripcije intervjuja sestavi novinarski članek za spletne medije.
+
+KLJUČNA ZAHTEVA — 5 NAJBOLJŠIH IZJAV:
+Iz transkripcije izberi **5 najbolj zanimivih, pomembnih ali vplivnih izjav** sogovornika.
+Izberi izjave, ki so:
+- Presenetljive, kontroverzne ali emocionalne
+- Ključne za razumevanje teme
+- Citatno vredne — da bi jih bralec želel deliti
+- Informativne z novo ali ekskluzivno informacijo
+
+Izjave vključi v članek kot poudarjene citate v formatu:
+
+> "Dobesedni citat iz transkripcije." — Ime Govorca
+
+FORMAT ČLANKA:
+1. # NASLOV — jasen, informativen, lahko temelji na najmočnejši izjavi, največ 12 besed
+2. PODNASLOV / LEAD — 1-2 povedi: kdo je bil intervjuvan, o čem, zakaj je to pomembno
+3. TELO ČLANKA:
+   - Uporabi piramido obrnjenega trikotnika (najpomembnejše najprej)
+   - ## Podnaslov za vsak tematski sklop
+   - 5 citatov (blockquote z >) naravno vpletenih v besedilo — NE samo naštevaj citatov
+   - Pred vsakim citatom kratka kontekstualizacija (kaj je sogovornik želel povedati, zakaj je to pomembno)
+   - Po vsakem citatu kratka analiza ali pojasnilo
+   - **Krepko** za poudarke
+   - 5-8 odstavkov
+
+PRAVILA:
+- NE izmišljaj dejstev — uporabi SAMO informacije iz transkripcije
+- Citati morajo biti DOBESEDNI iz transkripcije (dovoljeno je rahlo urediti za berljivost, ohrani pomen)
+- Če govorec ni jasno identificiran v transkripciji, uporabi "sogovornik" ali "gost"
+- Če je informacija negotova ali nejasna, jo označi z [?]
+- Ohrani nevtralen novinarski ton
+- Piši jedrnato, jasno in strokovno`,
+        userPromptTemplate: "Napiši novinarski članek na podlagi naslednjega intervjuja:\n\n{{input}}",
+      },
+    },
+
+    // ── Step 2: SEO ENGINE ──
+    {
+      stepIndex: 2,
+      name: "SEO",
+      type: "llm",
+      config: {
+        modelId: "gpt-5-mini",
+        systemPrompt: `Si SEO strokovnjak za slovensko medijsko hišo. Na podlagi članka ustvari SEO metapodatke.
+
+Odgovori STRIKTNO v JSON formatu (brez markdown blokov, samo čist JSON):
+{
+  "meta_title": "SEO naslov, max 60 znakov",
+  "meta_description": "SEO meta opis, 150-160 znakov",
+  "keywords": ["ključna1", "ključna2", "ključna3", "ključna4", "ključna5"],
+  "slug": "url-prijazni-slug-clanka",
+  "social_title": "Naslov za družbena omrežja, max 70 znakov",
+  "social_description": "Opis za družbena omrežja, max 200 znakov",
+  "category_suggestion": "predlagana kategorija",
+  "titles": [
+    {"type": "exclamation", "text": "Naslov z vzklikom!"},
+    {"type": "question", "text": "Naslov kot vprašanje?"},
+    {"type": "prediction", "text": "Naslov z napovedjo"}
+  ],
+  "tags": ["oznaka1", "oznaka2", "oznaka3"],
+  "internal_link_suggestions": ["tema za interno povezavo"]
+}
+
+PRAVILA:
+- Vsi naslovi v slovenščini
+- Meta opis mora privabiti bralca in vsebovati ključno besedo
+- Ključne besede: 5-8, relevantne za iskalnike
+- Tags: 3-5 tematskih oznak
+- Slug: samo male črke, brez šumnikov, pomišljaji namesto presledkov
+- Upoštevaj, da gre za INTERVJU — naslovi naj odražajo izjave ali temo pogovora`,
+        userPromptTemplate: "Ustvari SEO metapodatke za naslednji članek:\n\n{{step.1.text}}",
+      },
+    },
+
+    // ── Step 3: DRUPAL OUTPUT ──
+    {
+      stepIndex: 3,
+      name: "Drupal Output",
+      type: "output_format",
+      config: {
+        formats: ["drupal_json"],
+        description: "Sestavi finalni Drupal JSON payload z člankom in SEO podatki",
+      },
+    },
+  ],
+};
+
 /** All available presets */
-export const RECIPE_PRESETS: RecipePreset[] = [NOVINAR_PRESET, NOVINAR_AUTO_1_PRESET, URL_POVZETEK_PRESET];
+export const RECIPE_PRESETS: RecipePreset[] = [NOVINAR_PRESET, NOVINAR_AUTO_1_PRESET, URL_POVZETEK_PRESET, INTERVJU_CLANEK_PRESET];
 
 /** Get preset by key */
 export function getPreset(key: string): RecipePreset | undefined {

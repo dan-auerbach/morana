@@ -116,6 +116,7 @@ export default async function PreviewPage({ params }: Props) {
     .article-body ul { font-size: 16px; line-height: 1.8; margin: 0 0 16px; padding-left: 24px; }
     .article-body li { font-size: 16px; line-height: 1.7; margin-bottom: 6px; }
     .article-body strong { color: #fff; font-size: inherit; }
+    .article-body blockquote { font-size: 17px; line-height: 1.7; font-style: italic; color: #e0e0e0; margin: 20px 0; padding: 12px 20px; border-left: 3px solid #f97316; background: rgba(249, 115, 22, 0.05); }
   `;
 
   return (

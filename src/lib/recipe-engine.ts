@@ -751,6 +751,11 @@ function formatDrupalOutput(context: StepContext): string {
             const items = trimmed.split("\n").map((l) => `<li>${bold(l.replace(/^[-*]\s*/, ""))}</li>`);
             return `<ul>${items.join("")}</ul>`;
           }
+          if (trimmed.startsWith("> ")) {
+            // Blockquote: may be multi-line (each line starting with >)
+            const quoteLines = trimmed.split("\n").map((l) => bold(l.replace(/^>\s*/, ""))).join("<br>");
+            return `<blockquote>${quoteLines}</blockquote>`;
+          }
           return `<p>${bold(trimmed)}</p>`;
         })
         .filter(Boolean)
