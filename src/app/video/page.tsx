@@ -34,9 +34,9 @@ export default function VideoPage() {
   // Controls
   const [operation, setOperation] = useState<VideoOperation>("text2video");
   const [prompt, setPrompt] = useState("");
-  const [duration, setDuration] = useState(6);
+  const [duration, setDuration] = useState(3);
   const [aspectRatio, setAspectRatio] = useState("16:9");
-  const [resolution, setResolution] = useState<VideoResolution>("720p");
+  const [resolution, setResolution] = useState<VideoResolution>("480p");
 
   // File upload
   const [uploadedFile, setUploadedFile] = useState<string | null>(null); // data URI
