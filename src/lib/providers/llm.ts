@@ -23,9 +23,18 @@ function getOpenAI() {
   return new OpenAI({ apiKey: getApiKey("OPENAI_API_KEY") });
 }
 
+export type ImageAttachment = {
+  /** Base64-encoded image data (no data URI prefix) */
+  base64: string;
+  /** MIME type: "image/jpeg" | "image/png" | "image/webp" | "image/gif" */
+  mimeType: string;
+};
+
 export type ChatMessage = {
   role: "user" | "assistant";
   content: string;
+  /** Optional image attachments for multimodal (vision) messages */
+  images?: ImageAttachment[];
 };
 
 export type LLMResult = {
@@ -78,7 +87,19 @@ export async function runLLMChat(
       model: modelEntry.id,
       max_tokens: 8192,
       ...(systemPrompt && { system: systemPrompt }),
-      messages: messages.map((m) => ({ role: m.role, content: m.content })),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      messages: messages.map((m): any => {
+        if (m.images && m.images.length > 0) {
+          // Multimodal: images first, then text
+          const parts: Array<{ type: "image"; source: { type: "base64"; media_type: string; data: string } } | { type: "text"; text: string }> = [];
+          for (const img of m.images) {
+            parts.push({ type: "image", source: { type: "base64", media_type: img.mimeType, data: img.base64 } });
+          }
+          parts.push({ type: "text", text: m.content });
+          return { role: m.role, content: parts };
+        }
+        return { role: m.role, content: m.content };
+      }),
     });
     const text = resp.content
       .filter((b) => b.type === "text")
@@ -95,11 +116,23 @@ export async function runLLMChat(
 
   if (modelEntry.provider === "openai") {
     const openai = getOpenAI();
-    const openaiMessages: { role: "system" | "user" | "assistant"; content: string }[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const openaiMessages: Array<{ role: "system" | "user" | "assistant"; content: any }> = [];
     if (systemPrompt) {
       openaiMessages.push({ role: "system", content: systemPrompt });
     }
-    openaiMessages.push(...messages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })));
+    openaiMessages.push(...messages.map((m) => {
+      if (m.images && m.images.length > 0) {
+        // Multimodal: images as data URIs + text
+        const parts: Array<{ type: "text"; text: string } | { type: "image_url"; image_url: { url: string; detail: string } }> = [];
+        for (const img of m.images) {
+          parts.push({ type: "image_url", image_url: { url: `data:${img.mimeType};base64,${img.base64}`, detail: "auto" } });
+        }
+        parts.push({ type: "text", text: m.content });
+        return { role: m.role as "user" | "assistant", content: parts };
+      }
+      return { role: m.role as "user" | "assistant", content: m.content };
+    }));
     // GPT-5 series requires max_completion_tokens (max_tokens is deprecated)
     // GPT-5 mini supports max 4096 completion tokens
     const isGpt5Mini = modelEntry.id.includes("gpt-5-mini");
@@ -127,9 +160,23 @@ export async function runLLMChat(
     ...(systemPrompt && { systemInstruction: systemPrompt }),
   });
 
+  // Helper: build Gemini parts for a message (text + optional images)
+  function geminiParts(m: ChatMessage) {
+    if (m.images && m.images.length > 0) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const parts: any[] = [];
+      for (const img of m.images) {
+        parts.push({ inlineData: { mimeType: img.mimeType, data: img.base64 } });
+      }
+      parts.push({ text: m.content });
+      return parts;
+    }
+    return [{ text: m.content }];
+  }
+
   // Gemini uses "history" for multi-turn: all messages except the last
   if (messages.length === 1) {
-    const resp = await model.generateContent(messages[0].content);
+    const resp = await model.generateContent({ contents: [{ role: "user", parts: geminiParts(messages[0]) }] });
     const result = resp.response;
     const text = result.text();
     const usage = result.usageMetadata;
@@ -144,12 +191,12 @@ export async function runLLMChat(
   // Multi-turn: use startChat with history
   const history: Content[] = messages.slice(0, -1).map((m) => ({
     role: m.role === "assistant" ? "model" : "user",
-    parts: [{ text: m.content }],
+    parts: geminiParts(m),
   }));
 
   const chat = model.startChat({ history });
-  const lastMessage = messages[messages.length - 1].content;
-  const resp = await chat.sendMessage(lastMessage);
+  const lastMsg = messages[messages.length - 1];
+  const resp = await chat.sendMessage(geminiParts(lastMsg));
   const result = resp.response;
   const text = result.text();
   const usage = result.usageMetadata;
@@ -177,15 +224,25 @@ export async function runLLMWebSearch(
 
     // Build input array for Responses API
     // System prompt goes as first message in the input array
-    const input: Array<{ role: "system" | "user" | "assistant"; content: string }> = [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const input: Array<{ role: "system" | "user" | "assistant"; content: any }> = [];
     if (systemPrompt) {
       input.push({ role: "system", content: systemPrompt });
     }
     input.push(
-      ...messages.map((m) => ({
-        role: m.role as "user" | "assistant",
-        content: m.content,
-      }))
+      ...messages.map((m) => {
+        if (m.images && m.images.length > 0) {
+          // Responses API multimodal: input_image + input_text
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const parts: any[] = [];
+          for (const img of m.images) {
+            parts.push({ type: "input_image", image_url: `data:${img.mimeType};base64,${img.base64}` });
+          }
+          parts.push({ type: "input_text", text: m.content });
+          return { role: m.role as "user" | "assistant", content: parts };
+        }
+        return { role: m.role as "user" | "assistant", content: m.content };
+      })
     );
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

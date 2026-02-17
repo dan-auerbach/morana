@@ -1,9 +1,9 @@
 import { prisma } from "./prisma";
 import { getApprovedModels } from "./config";
-import { runLLMChat, runLLMWebSearch } from "./providers/llm";
+import { runLLMChat, runLLMWebSearch, type ImageAttachment } from "./providers/llm";
 import { runSTT } from "./providers/stt";
 import { logUsage } from "./usage";
-import { getObjectFromR2, uploadToR2, getSignedDownloadUrl } from "./storage";
+import { getObjectFromR2, uploadToR2, getSignedDownloadUrl, getObjectAsBase64 } from "./storage";
 import {
   submitVideoJob,
   getVideoJobStatus,
@@ -568,6 +568,23 @@ async function executeLLMStep(
     }
   }
 
+  // Multimodal: load image from R2 if present (for image_text recipes like STORY_VIDEO)
+  let imageAttachments: ImageAttachment[] | undefined;
+  if (context.input?.imageStorageKey) {
+    try {
+      const { base64, contentType } = await getObjectAsBase64(context.input.imageStorageKey as string);
+      const mimeType = (context.input.imageMimeType as string) || contentType;
+      const MAX_IMAGE_BASE64_SIZE = 4 * 1024 * 1024; // 4MB base64 ≈ 3MB raw — safe for all providers
+      if (base64.length > MAX_IMAGE_BASE64_SIZE) {
+        console.warn(`[LLM] Image too large for multimodal (${(base64.length / 1024 / 1024).toFixed(1)}MB base64), skipping image`);
+      } else {
+        imageAttachments = [{ base64, mimeType }];
+      }
+    } catch (err) {
+      console.warn("[LLM] Failed to load image for multimodal:", err instanceof Error ? err.message : err);
+    }
+  }
+
   // Create a run for cost tracking
   const run = await prisma.run.create({
     data: {
@@ -584,7 +601,7 @@ async function executeLLMStep(
     // Web search mode: use OpenAI Responses API with web_search_preview
     if (config.webSearch && modelEntry.provider === "openai") {
       const wsResult = await runLLMWebSearch(
-        [{ role: "user", content: userContent }],
+        [{ role: "user", content: userContent, images: imageAttachments }],
         config.systemPrompt
       );
 
@@ -614,7 +631,7 @@ async function executeLLMStep(
     // Standard LLM chat
     const result = await runLLMChat(
       modelEntry,
-      [{ role: "user", content: userContent }],
+      [{ role: "user", content: userContent, images: imageAttachments }],
       config.systemPrompt
     );
 

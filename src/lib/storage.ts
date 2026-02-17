@@ -80,3 +80,15 @@ export async function getObjectFromR2(key: string) {
   const resp = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: key }));
   return resp;
 }
+
+/**
+ * Download an object from R2 and return it as a base64-encoded string.
+ * Used for passing images to multimodal LLM APIs.
+ */
+export async function getObjectAsBase64(key: string): Promise<{ base64: string; contentType: string }> {
+  const resp = await s3.send(new GetObjectCommand({ Bucket: BUCKET, Key: key }));
+  if (!resp.Body) throw new Error(`Object not found in storage: ${key}`);
+  const bytes = await resp.Body.transformToByteArray();
+  const base64 = Buffer.from(bytes).toString("base64");
+  return { base64, contentType: resp.ContentType || "application/octet-stream" };
+}
