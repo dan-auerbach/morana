@@ -186,7 +186,7 @@ export async function runLLMWebSearch(
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const resp = await (openai.responses as any).create({
-      model: "gpt-4o",
+      model: "gpt-5.2",
       input,
       tools: [{ type: "web_search_preview", search_context_size: "low" }],
       max_output_tokens: 8192,
@@ -245,8 +245,8 @@ export async function runLLMWebSearch(
     );
 
     const fallbackModel: ModelEntry = {
-      id: "gpt-4o",
-      label: "GPT-4o",
+      id: "gpt-5.2",
+      label: "GPT-5.2",
       provider: "openai",
     };
 
