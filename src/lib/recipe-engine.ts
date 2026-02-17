@@ -693,9 +693,20 @@ function formatDrupalOutput(context: StepContext): string {
       sources = json.sources;
     }
 
-    // Article: longest non-JSON text (heuristic)
-    if (!json && stepData.text.length > articleText.length) {
-      articleText = stepData.text;
+    // Article detection: prefer text with markdown headings (# or ##),
+    // which indicates a structured article vs raw transcript/research.
+    // Among texts WITH headings, keep the last one (article comes after STT).
+    // Only use text WITHOUT headings if no heading-text was found at all.
+    if (!json && stepData.text.length > 50) {
+      const hasHeadings = /^#{1,3}\s+.+/m.test(stepData.text);
+      const currentHasHeadings = articleText ? /^#{1,3}\s+.+/m.test(articleText) : false;
+      if (hasHeadings) {
+        // This step has headings — always prefer it (last one wins)
+        articleText = stepData.text;
+      } else if (!currentHasHeadings && !articleText) {
+        // No candidate yet and no headings — use as fallback
+        articleText = stepData.text;
+      }
     }
   }
 
