@@ -140,6 +140,10 @@ export async function PUT(req: NextRequest) {
         currentVersion: recipe.currentVersion + 1,
         name: preset.name,
         description: preset.description,
+        inputKind: preset.inputKind || "text",
+        inputModes: preset.inputModes ? (preset.inputModes as Prisma.InputJsonValue) : Prisma.DbNull,
+        defaultLang: preset.defaultLang || null,
+        uiHints: preset.uiHints ? (preset.uiHints as unknown as Prisma.InputJsonValue) : Prisma.DbNull,
       },
     });
 
