@@ -35,6 +35,7 @@ export default function RecipesPage() {
   const [selectedRecipeId, setSelectedRecipeId] = useState<string | null>(null);
   const [presets, setPresets] = useState<Preset[]>([]);
   const [creatingPreset, setCreatingPreset] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Input state
   const [inputText, setInputText] = useState("");
@@ -91,6 +92,7 @@ export default function RecipesPage() {
 
   async function handleExecute(recipeId: string) {
     setExecuting(recipeId);
+    setError(null);
     try {
       const recipe = recipes.find(r => r.id === recipeId);
       const isAudio = recipe?.inputKind === "audio";
@@ -122,12 +124,19 @@ export default function RecipesPage() {
         });
       }
 
+      if (!resp.ok) {
+        const errData = await resp.json().catch(() => ({}));
+        throw new Error(errData.error || `HTTP ${resp.status}`);
+      }
+
       await resp.json();
       resetInput();
       // Execution is async — reload to show it in the list, polling tracks progress
       load();
-    } catch { /* ignore */ }
-    finally { setExecuting(null); }
+    } catch (err) {
+      console.error("[Recipe Execute]", err);
+      setError(err instanceof Error ? err.message : "Execution failed");
+    } finally { setExecuting(null); }
   }
 
   if (!session) return <div style={{ color: "#5a6a7a" }}><span style={{ color: "#ff4444" }}>[ERROR]</span> Authentication required.</div>;
@@ -150,6 +159,12 @@ export default function RecipesPage() {
       </div>
 
       {loading && <div style={{ color: "#00ff88", fontSize: "13px", marginBottom: "12px" }}>Loading...</div>}
+
+      {error && (
+        <div style={{ padding: "8px 12px", backgroundColor: "rgba(255, 68, 68, 0.1)", border: "1px solid rgba(255, 68, 68, 0.3)", color: "#ff6666", fontSize: "12px", fontFamily: "inherit", marginBottom: "12px", cursor: "pointer" }} onClick={() => setError(null)}>
+          <span style={{ fontWeight: 700 }}>[ERROR]</span> {error}
+        </div>
+      )}
 
       {/* Admin: Create from preset + Sync existing */}
       {isAdmin && presets.length > 0 && (
