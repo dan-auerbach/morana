@@ -88,9 +88,12 @@ export default async function PreviewPage({ params }: Props) {
     }
   }
 
-  const title = (drupalPayload?.title as string) || execution.recipe.name;
-  const subtitle = (drupalPayload?.subtitle as string) || (drupalPayload?.summary as string) || "";
-  const bodyHtml = (drupalPayload?.body as string) || "";
+  // Convert markdown **bold** to <strong> (applied at render time for all content)
+  const mdBold = (s: string) => s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+
+  const title = mdBold((drupalPayload?.title as string) || execution.recipe.name);
+  const subtitle = mdBold((drupalPayload?.subtitle as string) || (drupalPayload?.summary as string) || "");
+  const bodyHtml = mdBold((drupalPayload?.body as string) || "");
   const confidenceScore = execution.confidenceScore;
   const warningFlag = execution.warningFlag;
   const sources = (drupalPayload?.sources as { title: string; url: string }[]) || [];
@@ -163,13 +166,13 @@ export default async function PreviewPage({ params }: Props) {
           {drupalPayload ? (
             <>
               {/* Article */}
-              <h1 style={{ fontSize: "32px", lineHeight: 1.3, marginBottom: "8px", fontWeight: 700, color: "#fff" }}>{title}</h1>
+              <h1 dangerouslySetInnerHTML={{ __html: title }} style={{ fontSize: "32px", lineHeight: 1.3, marginBottom: "8px", fontWeight: 700, color: "#fff" }} />
               {subtitle && (
-                <p style={{ fontSize: "18px", lineHeight: 1.5, color: "#999", marginBottom: "24px", fontStyle: "italic" }}>{subtitle}</p>
+                <p dangerouslySetInnerHTML={{ __html: subtitle }} style={{ fontSize: "15px", lineHeight: 1.5, color: "#999", marginBottom: "24px", fontStyle: "italic" }} />
               )}
               <div
                 dangerouslySetInnerHTML={{ __html: bodyHtml }}
-                style={{ fontSize: "17px", lineHeight: 1.8, color: "#d0d0d0" }}
+                style={{ fontSize: "14px", lineHeight: 1.8, color: "#d0d0d0" }}
               />
 
               {/* Sources */}
