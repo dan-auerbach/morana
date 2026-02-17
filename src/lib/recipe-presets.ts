@@ -186,7 +186,6 @@ Guidelines:
       config: {
         modelId: "gpt-5.2",
         webSearch: true,
-        condition: { stepIndex: 0, field: "needs_web", operator: "eq", value: true },
         systemPrompt: `You are a research assistant for a Slovenian newsroom.
 Research the given topic and return STRICT JSON only — no explanations, no markdown.
 
@@ -334,7 +333,6 @@ PRAVILA:
       type: "llm",
       config: {
         modelId: "gpt-5.2",
-        condition: { stepIndex: 0, field: "risk_level", operator: "neq", value: "low" },
         systemPrompt: `You are a fact-checker for a Slovenian news organization.
 Analyze the article for factual accuracy. Compare claims against the provided research data.
 
