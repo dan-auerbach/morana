@@ -716,10 +716,30 @@ function formatDrupalOutput(context: StepContext): string {
     }
   }
 
-  // Convert markdown-ish article to HTML
+  // Extract title and lead FIRST, then strip them from body
+  const titleMatch = articleText.match(/^#\s+(.+)/m);
+  const mainTitle = titleMatch?.[1] || (seoJson.meta_title as string) || (seoJson.titles as { text: string }[])?.[0]?.text || "Untitled";
+
+  const leadMatch = articleText.match(/^#\s+.+\n\n(.+)/m);
+  const lead = leadMatch?.[1] || (seoJson.meta_description as string) || (seoJson.metaDescription as string) || "";
+
+  // Strip title line and lead paragraph from article text so they don't duplicate in body
+  // (preview page renders title and lead separately above the body)
+  let bodyArticleText = articleText;
+  if (titleMatch) {
+    bodyArticleText = bodyArticleText.replace(/^#\s+.+\n*/m, "");
+  }
+  if (leadMatch?.[1]) {
+    // Remove the lead paragraph — first paragraph after the title
+    const leadEscaped = leadMatch[1].replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    bodyArticleText = bodyArticleText.replace(new RegExp(leadEscaped + "\\n*"), "");
+  }
+  bodyArticleText = bodyArticleText.trim();
+
+  // Convert markdown-ish article to HTML (using stripped body text)
   const bold = (s: string) => s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-  const bodyHtml = articleText
-    ? articleText
+  const bodyHtml = bodyArticleText
+    ? bodyArticleText
         .split("\n\n")
         .map((block) => {
           const trimmed = block.trim();
@@ -736,14 +756,6 @@ function formatDrupalOutput(context: StepContext): string {
         .filter(Boolean)
         .join("\n")
     : `<p>${bold(text)}</p>`;
-
-  // Extract title
-  const titleMatch = articleText.match(/^#\s+(.+)/m);
-  const mainTitle = titleMatch?.[1] || (seoJson.meta_title as string) || (seoJson.titles as { text: string }[])?.[0]?.text || "Untitled";
-
-  // Extract lead
-  const leadMatch = articleText.match(/^#\s+.+\n\n(.+)/m);
-  const lead = leadMatch?.[1] || (seoJson.meta_description as string) || (seoJson.metaDescription as string) || "";
 
   const drupalPayload = {
     title: mainTitle,

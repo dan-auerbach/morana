@@ -108,13 +108,14 @@ export default async function PreviewPage({ params }: Props) {
   const warningTextColor = warningFlag === "high_risk" ? "#fca5a5" : "#fdba74";
 
   const articleStyles = `
-    .article-body h1 { font-size: 26px; font-weight: 700; color: #fff; margin: 32px 0 12px; line-height: 1.3; }
-    .article-body h2 { font-size: 21px; font-weight: 700; color: #f0f0f0; margin: 28px 0 10px; line-height: 1.35; }
-    .article-body h3 { font-size: 17px; font-weight: 700; color: #e0e0e0; margin: 24px 0 8px; line-height: 1.4; }
-    .article-body p { margin: 0 0 14px; }
-    .article-body ul { margin: 0 0 14px; padding-left: 24px; }
-    .article-body li { margin-bottom: 4px; }
-    .article-body strong { color: #fff; }
+    .article-body { font-size: 16px; line-height: 1.8; color: #d0d0d0; }
+    .article-body h1 { font-size: 28px; font-weight: 700; color: #fff; margin: 32px 0 12px; line-height: 1.3; }
+    .article-body h2 { font-size: 22px; font-weight: 700; color: #f0f0f0; margin: 28px 0 10px; line-height: 1.35; }
+    .article-body h3 { font-size: 18px; font-weight: 700; color: #e0e0e0; margin: 24px 0 8px; line-height: 1.4; }
+    .article-body p { font-size: 16px; line-height: 1.8; margin: 0 0 16px; }
+    .article-body ul { font-size: 16px; line-height: 1.8; margin: 0 0 16px; padding-left: 24px; }
+    .article-body li { font-size: 16px; line-height: 1.7; margin-bottom: 6px; }
+    .article-body strong { color: #fff; font-size: inherit; }
   `;
 
   return (
@@ -171,14 +172,13 @@ export default async function PreviewPage({ params }: Props) {
         {drupalPayload ? (
           <>
             {/* Article */}
-            <h1 dangerouslySetInnerHTML={{ __html: title }} style={{ fontSize: "32px", lineHeight: 1.3, marginBottom: "8px", fontWeight: 700, color: "#fff" }} />
+            <h1 dangerouslySetInnerHTML={{ __html: title }} style={{ fontSize: "36px", lineHeight: 1.25, marginBottom: "12px", fontWeight: 700, color: "#fff" }} />
             {subtitle && (
-              <p dangerouslySetInnerHTML={{ __html: subtitle }} style={{ fontSize: "15px", lineHeight: 1.5, color: "#999", marginBottom: "24px", fontStyle: "italic" }} />
+              <p dangerouslySetInnerHTML={{ __html: subtitle }} style={{ fontSize: "18px", lineHeight: 1.6, color: "#999", marginBottom: "28px", fontStyle: "italic" }} />
             )}
             <div
               className="article-body"
               dangerouslySetInnerHTML={{ __html: bodyHtml }}
-              style={{ fontSize: "14px", lineHeight: 1.8, color: "#d0d0d0" }}
             />
 
             {/* Sources */}
