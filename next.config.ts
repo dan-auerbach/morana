@@ -4,6 +4,13 @@ const nextConfig: NextConfig = {
   // Remove X-Powered-By header to reduce fingerprinting
   poweredByHeader: false,
 
+  // Allow large audio file uploads (up to 100MB) for STT / recipe execution
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "100mb",
+    },
+  },
+
   // Security headers for all responses
   headers: async () => [
     {
