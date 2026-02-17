@@ -36,6 +36,7 @@ export default function RecipesPage() {
   const [presets, setPresets] = useState<Preset[]>([]);
   const [creatingPreset, setCreatingPreset] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
 
   // Input state
   const [inputText, setInputText] = useState("");
@@ -93,6 +94,7 @@ export default function RecipesPage() {
   async function handleExecute(recipeId: string) {
     setExecuting(recipeId);
     setError(null);
+    setUploadStatus(null);
     try {
       const recipe = recipes.find(r => r.id === recipeId);
       const isAudio = recipe?.inputKind === "audio";
@@ -103,7 +105,7 @@ export default function RecipesPage() {
       if (isAudio) {
         if (inputMode === "file" && audioFile) {
           // Step 1: Get presigned upload URL from our API
-          setError("Uploading file...");
+          setUploadStatus("Uploading file...");
           const uploadResp = await fetch("/api/upload", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -130,7 +132,7 @@ export default function RecipesPage() {
             throw new Error(`File upload failed: HTTP ${r2Resp.status}`);
           }
 
-          setError(null);
+          setUploadStatus(null);
           inputData = {
             audioStorageKey: storageKey,
             audioMimeType: audioFile.type,
@@ -165,9 +167,8 @@ export default function RecipesPage() {
       load();
     } catch (err) {
       console.error("[Recipe Execute]", err);
-      const msg = err instanceof Error ? err.message : "Execution failed";
-      if (msg !== "Uploading file...") setError(msg);
-    } finally { setExecuting(null); }
+      setError(err instanceof Error ? err.message : "Execution failed");
+    } finally { setExecuting(null); setUploadStatus(null); }
   }
 
   if (!session) return <div style={{ color: "#5a6a7a" }}><span style={{ color: "#ff4444" }}>[ERROR]</span> Authentication required.</div>;
@@ -373,7 +374,7 @@ export default function RecipesPage() {
                           animation: executing === r.id ? "blink 1.2s step-end infinite" : "none",
                         }}
                       >
-                        {executing === r.id ? "QUEUED..." : "RUN"}
+                        {executing === r.id ? (uploadStatus || "QUEUED...") : "RUN"}
                       </button>
                       <button
                         onClick={resetInput}
