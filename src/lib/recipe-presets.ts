@@ -383,8 +383,310 @@ KLASIFIKACIJA:
   ],
 };
 
+/**
+ * URL POVZETEK preset: URL → Fetch → Classifier → Research → Article → SEO → Fact-check → Drupal JSON
+ *
+ * Engine v2 features used:
+ * - URL content fetching (fetchUrls: true on step 0)
+ * - Conditional step execution (outline for high complexity, research if needs_web)
+ * - Dynamic model selection (modelStrategy: auto)
+ * - Web search (OpenAI Responses API for research & fact-check)
+ * - Cross-step context references ({{step.N.text}}, {{step.N.json}})
+ *
+ * Input: URL to an article or web page
+ * Output: structured Drupal JSON + SEO + confidence score + public preview
+ */
+export const URL_POVZETEK_PRESET: RecipePreset = {
+  key: "url-povzetek",
+  name: "URL POVZETEK",
+  description: "URL → povzetek → članek → SEO → fact-check → Drupal JSON. Pipeline za povzemanje spletnih vsebin.",
+  inputKind: "text",
+  inputModes: ["text"],
+  defaultLang: "sl",
+  uiHints: {
+    label: "URL Povzetek",
+    description: "Prilepite URL spletne strani — AI bo prebral vsebino, napisal članek, SEO in fact-check.",
+    placeholder: "Prilepite URL spletne strani (npr. https://www.rtvslo.si/...)",
+  },
+  steps: [
+    // ── Step 0: CLASSIFIER (with URL fetching) ──
+    {
+      stepIndex: 0,
+      name: "Klasifikator",
+      type: "llm",
+      config: {
+        modelId: "gemini-2.0-flash",
+        fetchUrls: true,
+        systemPrompt: `You are a newsroom classifier for a Slovenian media organization.
+You will receive the fetched content of a web page URL. Analyze it and return STRICT JSON only — no explanations, no markdown.
+
+Return this exact structure:
+{
+  "complexity": "low" | "medium" | "high",
+  "needs_web": true | false,
+  "topic_type": "politics" | "economy" | "local" | "breaking" | "analysis" | "culture" | "sports" | "technology" | "other",
+  "recommended_length": <number of words>,
+  "risk_level": "low" | "medium" | "high",
+  "source_language": "sl" | "en" | "de" | "hr" | "other",
+  "source_title": "title of the original article",
+  "source_summary": "comprehensive 5-10 sentence summary of the source article, covering all key facts, figures, quotes, and conclusions"
+}
+
+Guidelines:
+- complexity: "low" for simple factual topics, "medium" for multi-faceted topics, "high" for investigative/analysis topics
+- needs_web: true if additional context or verification from other web sources would improve the article
+- topic_type: classify the topic into the most appropriate category
+- recommended_length: 300-500 for low, 500-800 for medium, 800-1200 for high
+- risk_level: "high" for politics, legal, health claims; "medium" for economy, breaking; "low" for culture, sports, local events
+- source_language: the language of the original article
+- source_title: the title as found in the source
+- source_summary: DETAILED summary — this is the primary data source for the article writer. Include ALL key facts, names, numbers, dates, quotes, and conclusions from the source.`,
+        userPromptTemplate: "Classify and summarize the content from this URL:\n\n{{original_input}}",
+      },
+    },
+
+    // ── Step 1: WEB RESEARCH (conditional: needs_web == true) ──
+    {
+      stepIndex: 1,
+      name: "Web Research",
+      type: "llm",
+      config: {
+        modelId: "gpt-5.2",
+        webSearch: true,
+        condition: { stepIndex: 0, field: "needs_web", operator: "eq", value: true },
+        systemPrompt: `You are a research assistant for a Slovenian newsroom.
+You are given a URL and its classified content. Research the topic further to find additional context, verify key claims, and gather supplementary information.
+
+Return STRICT JSON only — no explanations, no markdown.
+
+Return this exact structure:
+{
+  "facts": [
+    { "claim": "factual statement", "source": "source name", "url": "source url" }
+  ],
+  "sources": [
+    { "title": "source title", "url": "source url" }
+  ],
+  "key_figures": ["person or entity relevant to the story"],
+  "timeline": ["chronological event if relevant"],
+  "additional_context": "any important background context not in the original article"
+}
+
+Rules:
+- Include 3-8 verified facts with sources
+- Prioritize Slovenian and reputable international sources
+- Focus on SUPPLEMENTARY information not already in the source article
+- Include specific numbers, dates, and quotes where available
+- All URLs must be real and accessible`,
+        userPromptTemplate: `Research this topic for additional context and verification.
+
+SOURCE URL: {{original_input}}
+
+CLASSIFICATION (includes source summary):
+{{step.0.text}}`,
+      },
+    },
+
+    // ── Step 2: OUTLINE (conditional: complexity == "high") ──
+    {
+      stepIndex: 2,
+      name: "Outline",
+      type: "llm",
+      config: {
+        modelStrategy: "auto",
+        modelStrategySource: { stepIndex: 0, field: "complexity" },
+        modelStrategyMap: { low: "gpt-5-mini", medium: "gpt-5.2", high: "gpt-5.2" },
+        condition: { stepIndex: 0, field: "complexity", operator: "eq", value: "high" },
+        systemPrompt: `You are a senior editor creating an article outline for a Slovenian newsroom.
+You are creating an outline for an article based on a web source. The article should be an original piece inspired by the source, NOT a simple translation or copy.
+
+Return STRICT JSON only:
+
+{
+  "headline_options": ["option 1", "option 2", "option 3"],
+  "lead": "compelling lead paragraph in 1-2 sentences",
+  "sections": [
+    {
+      "title": "section title",
+      "bullet_points": ["key point 1", "key point 2"],
+      "suggested_sources": ["reference to research fact if available"]
+    }
+  ],
+  "angle": "the editorial angle or perspective — how this article differs from the source"
+}
+
+Write in Slovenian. Target 4-6 sections for a comprehensive article.
+The article must provide NEW VALUE beyond the source — a unique angle, deeper analysis, or local perspective.`,
+        userPromptTemplate: `Create article outline based on the source content.
+
+SOURCE URL: {{original_input}}
+
+CLASSIFICATION (includes source summary):
+{{step.0.text}}
+
+ADDITIONAL RESEARCH (web):
+{{step.1.text}}`,
+      },
+    },
+
+    // ── Step 3: WRITING ENGINE ──
+    {
+      stepIndex: 3,
+      name: "Članek",
+      type: "llm",
+      config: {
+        modelStrategy: "auto",
+        modelStrategySource: { stepIndex: 0, field: "complexity" },
+        modelStrategyMap: { low: "gpt-5-mini", medium: "gpt-5.2", high: "claude-sonnet-4-5-20250929" },
+        systemPrompt: `Si profesionalni novinar za slovensko medijsko hišo. Piši v slovenščini.
+
+NALOGA:
+Na podlagi vsebine spletne strani (klasifikacija vsebuje podroben povzetek vira), morebitne dodatne raziskave in (opcijsko) osnutka sestavi IZVIRNI novinarski članek v slovenščini.
+
+POMEMBNO:
+- Članek NI prevod izvirnika — je NOVA novinarska vsebina, ki temelji na podatkih iz vira
+- Če je izvirni članek v tujem jeziku, preoblikuj vsebino v naraven slovenski novinarski slog
+- Dodaj kontekst, ki je relevanten za slovensko občinstvo
+- Navedi izvirni vir (URL) v članku
+
+FORMAT:
+1. # NASLOV — jasen, informativen, največ 12 besed, v slovenščini
+2. PODNASLOV / LEAD — 1-2 povedi ki povzamejo bistvo
+3. TELO ČLANKA:
+   - Uporabi piramido obrnjenega trikotnika (najpomembnejše najprej)
+   - ## Podnaslov za vsak tematski sklop
+   - Citati v navednicah z navedbo govorca (če so na voljo)
+   - Alineje (bullet points) za sezname ali ključne podatke
+   - **Krepko** za poudarke
+   - Na koncu navedi vir: "Vir: [naslov vira](URL)"
+
+PRAVILA:
+- NE izmišljaj dejstev — uporabi SAMO informacije iz klasifikacije, raziskave in osnutka
+- Če informacija ni na voljo, NE dodajaj podatkov
+- Če je informacija negotova, jo označi z [?]
+- Ohrani nevtralen novinarski ton
+- Piši jedrnato, jasno in strokovno
+- Dolžina naj ustreza zahtevnosti teme (glej klasifikacijo)`,
+        userPromptTemplate: `Napiši izvirni novinarski članek v slovenščini na podlagi spletnega vira.
+
+IZVIRNI URL:
+{{original_input}}
+
+KLASIFIKACIJA (vsebuje podroben povzetek vira):
+{{step.0.text}}
+
+DODATNA RAZISKAVA (web):
+{{step.1.text}}
+
+OUTLINE (če obstaja):
+{{step.2.text}}`,
+      },
+    },
+
+    // ── Step 4: SEO ENGINE ──
+    {
+      stepIndex: 4,
+      name: "SEO",
+      type: "llm",
+      config: {
+        modelId: "gpt-5-mini",
+        systemPrompt: `Si SEO strokovnjak za slovensko medijsko hišo. Na podlagi članka ustvari SEO metapodatke.
+
+Odgovori STRIKTNO v JSON formatu (brez markdown blokov, samo čist JSON):
+{
+  "meta_title": "SEO naslov, max 60 znakov",
+  "meta_description": "SEO meta opis, 150-160 znakov",
+  "keywords": ["ključna1", "ključna2", "ključna3", "ključna4", "ključna5"],
+  "slug": "url-prijazni-slug-clanka",
+  "social_title": "Naslov za družbena omrežja, max 70 znakov",
+  "social_description": "Opis za družbena omrežja, max 200 znakov",
+  "category_suggestion": "predlagana kategorija",
+  "titles": [
+    {"type": "exclamation", "text": "Naslov z vzklikom!"},
+    {"type": "question", "text": "Naslov kot vprašanje?"},
+    {"type": "prediction", "text": "Naslov z napovedjo"}
+  ],
+  "tags": ["oznaka1", "oznaka2", "oznaka3"],
+  "internal_link_suggestions": ["tema za interno povezavo"]
+}
+
+PRAVILA:
+- Vsi naslovi v slovenščini
+- Meta opis mora privabiti bralca in vsebovati ključno besedo
+- Ključne besede: 5-8, relevantne za iskalnike
+- Tags: 3-5 tematskih oznak
+- Slug: samo male črke, brez šumnikov, pomišljaji namesto presledkov`,
+        userPromptTemplate: "Ustvari SEO metapodatke za naslednji članek:\n\n{{step.3.text}}",
+      },
+    },
+
+    // ── Step 5: FACT CHECK ──
+    {
+      stepIndex: 5,
+      name: "Fact Check",
+      type: "llm",
+      config: {
+        modelId: "gpt-5.2",
+        webSearch: true,
+        systemPrompt: `You are a fact-checker for a Slovenian news organization.
+Analyze the article for factual accuracy. Compare claims against:
+1. The original source URL content (from classification step)
+2. The additional web research data
+3. Your own web search verification
+
+Return STRICT JSON only:
+{
+  "verified_claims": [
+    { "claim": "statement from article", "status": "verified", "source": "matching source" }
+  ],
+  "flagged_claims": [
+    { "claim": "problematic statement", "issue": "description of the problem", "severity": "warning" | "error" }
+  ],
+  "corrections": [
+    { "original": "incorrect text", "corrected": "suggested correction", "reason": "explanation" }
+  ],
+  "source_fidelity": "accurate" | "embellished" | "distorted",
+  "overall_verdict": "safe" | "needs_review" | "high_risk",
+  "confidence_score": <number 0-100>,
+  "summary": "brief assessment in Slovenian"
+}
+
+Rules:
+- confidence_score: 90-100 = all claims verified, 70-89 = minor issues, 50-69 = significant concerns, <50 = major problems
+- source_fidelity: check whether the article accurately represents the source material
+- Flag any claims that appear fabricated, embellished beyond the source, or unverifiable
+- "safe" = all claims verified or plausible, "needs_review" = some flagged claims, "high_risk" = major factual issues`,
+        userPromptTemplate: `Fact-check this article against its source.
+
+IZVIRNI URL:
+{{original_input}}
+
+KLASIFIKACIJA (vključuje povzetek vira):
+{{step.0.json}}
+
+ČLANEK:
+{{step.3.text}}
+
+DODATNA RAZISKAVA (web viri):
+{{step.1.json}}`,
+      },
+    },
+
+    // ── Step 6: DRUPAL OUTPUT ──
+    {
+      stepIndex: 6,
+      name: "Drupal Output",
+      type: "output_format",
+      config: {
+        formats: ["drupal_json"],
+        description: "Sestavi finalni Drupal JSON payload z člankom, SEO, viri in confidence score",
+      },
+    },
+  ],
+};
+
 /** All available presets */
-export const RECIPE_PRESETS: RecipePreset[] = [NOVINAR_PRESET, NOVINAR_AUTO_1_PRESET];
+export const RECIPE_PRESETS: RecipePreset[] = [NOVINAR_PRESET, NOVINAR_AUTO_1_PRESET, URL_POVZETEK_PRESET];
 
 /** Get preset by key */
 export function getPreset(key: string): RecipePreset | undefined {

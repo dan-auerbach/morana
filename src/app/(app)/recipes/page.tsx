@@ -310,7 +310,7 @@ export default function RecipesPage() {
                         onChange={(e) => setInputText(e.target.value)}
                         placeholder={r.inputKind === "audio" && inputMode === "text"
                           ? "Paste transcript text here (STT step will be skipped)..."
-                          : "Paste input text (optional \u2014 e.g. transcript, article text)..."}
+                          : (r.uiHints?.placeholder as string) || "Paste input text (optional \u2014 e.g. transcript, article text)..."}
                         style={{ flex: 1, padding: "8px", backgroundColor: "#111820", border: "1px solid #1e2a3a", color: "#e0e0e0", fontFamily: "inherit", fontSize: "12px", resize: "vertical", minHeight: "60px" }}
                       />
                     )}

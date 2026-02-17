@@ -39,6 +39,8 @@ type StepConfig = {
   modelStrategyMap?: Record<string, string>;
   // Engine v2: web search in recipe steps
   webSearch?: boolean;
+  // Engine v2: URL content fetching (extracts page content and injects into prompt)
+  fetchUrls?: boolean;
 };
 
 type InputData = {
@@ -537,6 +539,15 @@ async function executeLLMStep(
   let userContent = context.previousOutput;
   if (config.userPromptTemplate) {
     userContent = interpolatePrompt(config.userPromptTemplate, context);
+  }
+
+  // URL fetching: extract URLs from prompt, fetch page content, prepend to user message
+  if (config.fetchUrls) {
+    const { fetchURLsFromMessage } = await import("./url-fetcher");
+    const urlContext = await fetchURLsFromMessage(userContent);
+    if (urlContext) {
+      userContent = urlContext + "\n\n" + userContent;
+    }
   }
 
   // Create a run for cost tracking
