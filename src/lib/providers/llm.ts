@@ -100,9 +100,13 @@ export async function runLLMChat(
       openaiMessages.push({ role: "system", content: systemPrompt });
     }
     openaiMessages.push(...messages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })));
+    // GPT-5 series requires max_completion_tokens (max_tokens is deprecated)
+    // GPT-5 mini supports max 4096 completion tokens
+    const isGpt5Mini = modelEntry.id.includes("gpt-5-mini");
+    const maxTokens = isGpt5Mini ? 4096 : 8192;
     const resp = await openai.chat.completions.create({
       model: modelEntry.id,
-      max_tokens: 8192,
+      max_completion_tokens: maxTokens,
       messages: openaiMessages,
     });
     const choice = resp.choices[0];
