@@ -56,6 +56,18 @@ export async function uploadStreamToR2(
   return totalSize;
 }
 
+export async function getSignedUploadUrl(
+  key: string,
+  contentType: string,
+  expiresIn = 600
+): Promise<string> {
+  return getSignedUrl(
+    s3,
+    new PutObjectCommand({ Bucket: BUCKET, Key: key, ContentType: contentType }),
+    { expiresIn }
+  );
+}
+
 export async function getSignedDownloadUrl(key: string, expiresIn = 3600): Promise<string> {
   return getSignedUrl(
     s3,

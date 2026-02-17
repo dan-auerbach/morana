@@ -97,32 +97,62 @@ export default function RecipesPage() {
       const recipe = recipes.find(r => r.id === recipeId);
       const isAudio = recipe?.inputKind === "audio";
 
-      let resp: Response;
+      // Build inputData for the execute endpoint (always JSON)
+      let inputData: Record<string, unknown> | null = null;
+
       if (isAudio) {
-        // Use FormData for audio recipes
-        const formData = new FormData();
-        formData.append("language", language);
-
         if (inputMode === "file" && audioFile) {
-          formData.append("file", audioFile);
-        } else if (inputMode === "url" && audioUrl) {
-          formData.append("audioUrl", audioUrl);
-        } else if (inputMode === "text" && inputText) {
-          formData.append("transcriptText", inputText);
-        }
+          // Step 1: Get presigned upload URL from our API
+          setError("Uploading file...");
+          const uploadResp = await fetch("/api/upload", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              fileName: audioFile.name,
+              fileSize: audioFile.size,
+              fileType: audioFile.type,
+              recipeId,
+            }),
+          });
+          if (!uploadResp.ok) {
+            const errData = await uploadResp.json().catch(() => ({}));
+            throw new Error(errData.error || `Upload init failed: HTTP ${uploadResp.status}`);
+          }
+          const { uploadUrl, storageKey } = await uploadResp.json();
 
-        resp = await fetch(`/api/recipes/${recipeId}/execute`, {
-          method: "POST",
-          body: formData,
-        });
+          // Step 2: Upload file directly to R2 via presigned URL
+          const r2Resp = await fetch(uploadUrl, {
+            method: "PUT",
+            headers: { "Content-Type": audioFile.type },
+            body: audioFile,
+          });
+          if (!r2Resp.ok) {
+            throw new Error(`File upload failed: HTTP ${r2Resp.status}`);
+          }
+
+          setError(null);
+          inputData = {
+            audioStorageKey: storageKey,
+            audioMimeType: audioFile.type,
+            language,
+          };
+        } else if (inputMode === "url" && audioUrl) {
+          inputData = { audioUrl: audioUrl.trim(), language };
+        } else if (inputMode === "text" && inputText) {
+          inputData = { transcriptText: inputText.trim(), language };
+        } else {
+          inputData = { language };
+        }
       } else {
-        // JSON for text recipes
-        resp = await fetch(`/api/recipes/${recipeId}/execute`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ inputData: inputText ? { text: inputText } : null }),
-        });
+        inputData = inputText ? { text: inputText.trim() } : null;
       }
+
+      // Step 3: Start execution with JSON body (small payload, no body limit issues)
+      const resp = await fetch(`/api/recipes/${recipeId}/execute`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inputData }),
+      });
 
       if (!resp.ok) {
         const errData = await resp.json().catch(() => ({}));
@@ -135,7 +165,8 @@ export default function RecipesPage() {
       load();
     } catch (err) {
       console.error("[Recipe Execute]", err);
-      setError(err instanceof Error ? err.message : "Execution failed");
+      const msg = err instanceof Error ? err.message : "Execution failed";
+      if (msg !== "Uploading file...") setError(msg);
     } finally { setExecuting(null); }
   }
 

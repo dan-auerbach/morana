@@ -42,7 +42,7 @@ const nextConfig: NextConfig = {
             "style-src 'self' 'unsafe-inline'",                // Tailwind uses inline styles
             "img-src 'self' data: blob: https:",               // Allow data URIs + R2 signed URLs
             "font-src 'self' https://fonts.gstatic.com",
-            "connect-src 'self'",                               // API calls only to self
+            "connect-src 'self' https://*.r2.cloudflarestorage.com", // API + R2 direct uploads
             "media-src 'self' data: blob: https:",               // Audio/video playback + R2 signed URLs
             "frame-ancestors 'none'",                           // No iframe embedding
             "base-uri 'self'",

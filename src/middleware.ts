@@ -72,7 +72,7 @@ function addSecurityHeaders(response: NextResponse): NextResponse {
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https:",
       "font-src 'self' data:",
-      "connect-src 'self' https://accounts.google.com",
+      "connect-src 'self' https://accounts.google.com https://*.r2.cloudflarestorage.com",
       "frame-src https://accounts.google.com",
       "base-uri 'self'",
       "form-action 'self'",
