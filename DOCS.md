@@ -1,6 +1,6 @@
 # MORANA — Internal AI Operations Terminal
 
-**Version:** 2.8.0
+**Version:** 3.0.0
 **Stack:** Next.js 16 | React 19 | TypeScript | Prisma 7 | PostgreSQL (Neon) + pgvector | Tailwind CSS 4
 **Hosting:** Vercel (serverless) | Cloudflare R2 (storage)
 **UI Theme:** Dark hacker/terminal aesthetic
@@ -1300,6 +1300,23 @@ npx prisma migrate deploy
 ---
 
 ## Changelog
+
+### v2.8.0 (2026-02-17)
+
+### v3.0.0 (2026-02-17)
+
+- **Recipe Engine v2:** Generičen upgrade recipe execution engine z novimi zmogljivostmi:
+  - **Conditional step execution:** Koraki se lahko preskočijo na podlagi outputa prejšnjega koraka (`condition` field v step config z `eq`/`neq`/`in` operatorji)
+  - **Dynamic model selection (modelStrategy):** Model se izbere dinamično ob runtime glede na output klasifikatorja. Podpira `modelStrategyMap` za mapiranje vrednosti na modele.
+  - **Web search v recipe steps:** LLM koraki lahko uporabljajo OpenAI Responses API web search (`webSearch: true`). Citations se shranijo v `outputFull`.
+  - **StepContext accumulator:** Vsak korak hrani rezultate (text + parsed JSON) dostopne vsem naslednjim korakom. Podpira `{{step.N.text}}` in `{{step.N.json}}` interpolacijo v promptih.
+  - **Skipped step status:** Koraki preskočeni po condition dobijo status "skipped" namesto "done".
+  - **Post-execution metadata:** Engine avtomatsko ekstrahira `confidenceScore` in `warningFlag` iz fact-check step outputa.
+- **NOVINAR AUTO 1 preset:** Produkcijski AI-novinarki pipeline. 7 korakov: Klasifikator (Gemini) → Web Research (GPT-5.2, pogojno) → Outline (pogojno, dynamic model) → Članek (dynamic model) → SEO (GPT-5 mini) → Fact Check (GPT-5.2, pogojno) → Drupal JSON. Input: kratka tema (text). Output: strukturiran Drupal JSON + SEO + confidence score + javni preview link.
+- **Public preview system:** Javno dostopne preview strani za recipe execution rezultate. Route `/preview/{hash}` (no auth, noindex). Clean article render s confidence score badge, warning flagom, viri in AI disclaimer. Middleware posodobljen za public access.
+- **Drupal JSON payload v2:** Razširjen z `confidence_score`, `sources` (iz web research), `author`, `status: "draft"`, `meta.social_title`, `meta.social_description`, `meta.category_suggestion`.
+- **Execution detail UI:** Confidence score badge (zelena/rumena/rdeča), warning flag badge, PREVIEW link gumb, skipped step prikaz (siva barva, italic).
+- **DB migracija:** RecipeExecution +4 polja: `confidenceScore` (Int?), `warningFlag` (String?), `previewHash` (String? @unique), `previewUrl` (String?).
 
 ### v2.8.0 (2026-02-17)
 

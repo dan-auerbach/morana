@@ -437,6 +437,10 @@ model RecipeExecution {
   recipeVersion    Int?            // Recipe version used for this execution
   totalCostCents   Int             @default(0)  // Aggregated cost in CENTS
   costBreakdownJson Json?          // { steps: [{ stepIndex, model, costCents }] }
+  confidenceScore  Int?            // 0-100, extracted from fact-check step
+  warningFlag      String?         // null | "needs_review" | "high_risk"
+  previewHash      String?         @unique  // Short hash for public preview URL
+  previewUrl       String?         // Full public preview URL
   startedAt        DateTime        @default(now())
   finishedAt       DateTime?
   errorMessage     String?         @db.Text

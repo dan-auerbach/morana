@@ -19,6 +19,8 @@ type Execution = {
   id: string; status: string; progress: number; currentStep: number; totalSteps: number;
   startedAt: string; finishedAt: string | null; errorMessage: string | null;
   totalCostCents: number; recipeVersion: number | null;
+  confidenceScore: number | null; warningFlag: string | null;
+  previewUrl: string | null;
   recipe: { name: string; slug: string };
   stepResults: StepResult[];
 };
@@ -57,7 +59,14 @@ export default function ExecutionDetailPage() {
     if (s === "done") return "#00ff88";
     if (s === "running" || s === "pending") return "#ffcc00";
     if (s === "error") return "#ff4444";
+    if (s === "skipped") return "#5a6a7a";
     return "#5a6a7a";
+  };
+
+  const confidenceColor = (score: number) => {
+    if (score > 80) return "#00ff88";
+    if (score > 50) return "#ffcc00";
+    return "#ff4444";
   };
 
   return (
@@ -74,13 +83,61 @@ export default function ExecutionDetailPage() {
       {/* Status bar */}
       <div style={{ marginBottom: "20px", padding: "12px 16px", border: `1px solid ${statusColor(execution.status)}`, backgroundColor: `rgba(${execution.status === "done" ? "0, 255, 136" : execution.status === "error" ? "255, 68, 68" : "255, 204, 0"}, 0.05)` }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", flexWrap: "wrap", gap: "8px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
             <span style={{ color: statusColor(execution.status), fontWeight: 700, fontSize: "14px", textTransform: "uppercase" }}>{execution.status}</span>
             {execution.recipeVersion != null && (
               <span style={{ color: "#5a6a7a", fontSize: "10px", border: "1px solid #1e2a3a", padding: "1px 6px" }}>v{execution.recipeVersion}</span>
             )}
             {execution.totalCostCents > 0 && (
               <span style={{ color: "#ffcc00", fontSize: "11px", fontWeight: 700 }}>${(execution.totalCostCents / 100).toFixed(4)}</span>
+            )}
+            {/* Confidence score badge */}
+            {execution.confidenceScore != null && (
+              <span style={{
+                color: confidenceColor(execution.confidenceScore),
+                fontSize: "11px",
+                fontWeight: 700,
+                border: `1px solid ${confidenceColor(execution.confidenceScore)}`,
+                padding: "1px 8px",
+                letterSpacing: "0.03em",
+              }}>
+                {execution.confidenceScore}%
+              </span>
+            )}
+            {/* Warning flag badge */}
+            {execution.warningFlag && (
+              <span style={{
+                color: "#fff",
+                fontSize: "10px",
+                fontWeight: 700,
+                backgroundColor: execution.warningFlag === "high_risk" ? "#ff4444" : "#ff8800",
+                padding: "2px 8px",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+              }}>
+                {execution.warningFlag.replace(/_/g, " ")}
+              </span>
+            )}
+            {/* Preview link */}
+            {execution.previewUrl && execution.status === "done" && (
+              <a
+                href={execution.previewUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  color: "#00e5ff",
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  border: "1px solid rgba(0, 229, 255, 0.4)",
+                  padding: "2px 10px",
+                  textDecoration: "none",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.05em",
+                  transition: "all 0.2s",
+                }}
+              >
+                PREVIEW
+              </a>
             )}
           </div>
           <span style={{ color: "#5a6a7a", fontSize: "11px" }}>
@@ -100,17 +157,22 @@ export default function ExecutionDetailPage() {
       <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
         {execution.stepResults.map((sr) => {
           const isExpanded = expandedStep === sr.stepIndex;
+          const isSkipped = sr.status === "skipped";
           return (
-            <div key={sr.id} style={{ border: `1px solid ${isExpanded ? statusColor(sr.status) : "#1e2a3a"}` }}>
+            <div key={sr.id} style={{ border: `1px solid ${isExpanded ? statusColor(sr.status) : "#1e2a3a"}`, opacity: isSkipped ? 0.5 : 1 }}>
               <div onClick={() => setExpandedStep(isExpanded ? null : sr.stepIndex)} style={{ padding: "10px 16px", cursor: "pointer", display: "flex", alignItems: "center", gap: "12px" }}>
                 <span style={{ color: "#ffcc00", fontWeight: 700, fontSize: "11px" }}>#{sr.stepIndex + 1}</span>
-                <span style={{ color: statusColor(sr.status), fontWeight: 700, fontSize: "10px", textTransform: "uppercase", width: "60px" }}>{sr.status}</span>
-                <span style={{ color: "#e0e0e0", fontSize: "12px", flex: 1 }}>{sr.outputPreview ? sr.outputPreview.substring(0, 100) + "..." : "—"}</span>
+                <span style={{ color: statusColor(sr.status), fontWeight: 700, fontSize: "10px", textTransform: "uppercase", width: "60px" }}>
+                  {sr.status}
+                </span>
+                <span style={{ color: isSkipped ? "#5a6a7a" : "#e0e0e0", fontSize: "12px", flex: 1, fontStyle: isSkipped ? "italic" : "normal" }}>
+                  {isSkipped ? "[Skipped by condition]" : sr.outputPreview ? sr.outputPreview.substring(0, 100) + "..." : "—"}
+                </span>
                 <span style={{ color: isExpanded ? statusColor(sr.status) : "#444", fontSize: "10px" }}>{isExpanded ? "▼" : "▶"}</span>
               </div>
               {isExpanded && (
                 <div style={{ padding: "0 16px 12px", borderTop: "1px solid rgba(30, 42, 58, 0.5)" }}>
-                  {sr.inputPreview && (
+                  {sr.inputPreview && !isSkipped && (
                     <div style={{ marginTop: "8px" }}>
                       <div style={{ fontSize: "10px", color: "#00e5ff", fontWeight: 700, marginBottom: "4px" }}>INPUT</div>
                       <div style={{ padding: "8px", backgroundColor: "#0a0e14", border: "1px solid #1e2a3a", fontSize: "11px", color: "#8b949e", maxHeight: "100px", overflowY: "auto", whiteSpace: "pre-wrap" }}>{sr.inputPreview}</div>

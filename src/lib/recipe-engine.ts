@@ -1,14 +1,16 @@
 import { prisma } from "./prisma";
 import { getApprovedModels } from "./config";
-import { runLLMChat } from "./providers/llm";
+import { runLLMChat, runLLMWebSearch } from "./providers/llm";
 import { runSTT } from "./providers/stt";
 import { logUsage } from "./usage";
 import { getObjectFromR2 } from "./storage";
-import { createHash } from "crypto";
+import { createHash, randomUUID } from "crypto";
 
 function sha256(text: string): string {
   return createHash("sha256").update(text, "utf8").digest("hex");
 }
+
+// ─── Types ────────────────────────────────────────────────────────────────
 
 type CostEntry = { stepIndex: number; model: string; costCents: number };
 
@@ -24,6 +26,19 @@ type StepConfig = {
   knowledgeBaseIds?: string[];
   templateId?: string;
   description?: string;
+  // Engine v2: conditional execution
+  condition?: {
+    stepIndex: number;
+    field: string;
+    operator: "eq" | "neq" | "in";
+    value: unknown;
+  };
+  // Engine v2: dynamic model selection
+  modelStrategy?: "auto";
+  modelStrategySource?: { stepIndex: number; field: string };
+  modelStrategyMap?: Record<string, string>;
+  // Engine v2: web search in recipe steps
+  webSearch?: boolean;
 };
 
 type InputData = {
@@ -39,17 +54,100 @@ type StepOutput = {
   text: string;
   runId: string | null;
   providerResponseId: string | null;
+  citations?: { url: string; title: string }[];
 };
+
+/**
+ * StepContext — accumulated results from all executed steps.
+ * Enables cross-step references, conditional logic, and dynamic model selection.
+ */
+type StepContextEntry = { text: string; json?: unknown };
+
+type StepContext = {
+  previousOutput: string;
+  steps: Record<number, StepContextEntry>;
+  input: InputData;
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────
+
+/**
+ * Attempt to parse JSON from text. Looks for first `{ ... }` block.
+ * Returns null if not valid JSON.
+ */
+function tryParseJson(text: string): unknown | null {
+  try {
+    const match = text.match(/\{[\s\S]*\}/);
+    return match ? JSON.parse(match[0]) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Evaluate a step condition against accumulated context.
+ */
+function evaluateCondition(actual: unknown, op: string, expected: unknown): boolean {
+  if (op === "eq") return actual === expected;
+  if (op === "neq") return actual !== expected;
+  if (op === "in" && Array.isArray(expected)) return expected.includes(actual);
+  return true; // default: run
+}
+
+/**
+ * Resolve model ID — supports fixed modelId or dynamic modelStrategy.
+ */
+function resolveModelId(config: StepConfig, context: StepContext): string {
+  if (config.modelStrategy === "auto" && config.modelStrategySource && config.modelStrategyMap) {
+    const source = context.steps[config.modelStrategySource.stepIndex];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sourceJson = source?.json as Record<string, any> | null;
+    const key = String(sourceJson?.[config.modelStrategySource.field] || "");
+    const resolved = config.modelStrategyMap[key];
+    if (resolved) return resolved;
+  }
+  return config.modelId || "";
+}
+
+/**
+ * Interpolate prompt template with context references.
+ * Supports: {{input}}, {{step.N.text}}, {{step.N.json}}
+ */
+function interpolatePrompt(template: string, context: StepContext): string {
+  let result = template.replace(/\{\{input\}\}/g, context.previousOutput);
+  result = result.replace(/\{\{step\.(\d+)\.text\}\}/g, (_, idx) =>
+    context.steps[Number(idx)]?.text || ""
+  );
+  result = result.replace(/\{\{step\.(\d+)\.json\}\}/g, (_, idx) => {
+    const j = context.steps[Number(idx)]?.json;
+    return j ? JSON.stringify(j) : "";
+  });
+  return result;
+}
+
+/**
+ * Get a nested field from a JSON-like object using a simple dot-free field name.
+ */
+function getField(obj: unknown, field: string): unknown {
+  if (obj && typeof obj === "object" && field in (obj as Record<string, unknown>)) {
+    return (obj as Record<string, unknown>)[field];
+  }
+  return undefined;
+}
+
+// ─── Main Execution ───────────────────────────────────────────────────────
 
 /**
  * Execute a recipe, processing steps sequentially.
  * Each step's output becomes the next step's input.
  *
- * Input modes for STT recipes:
- * - transcriptText: skip STT step, use provided transcript directly
- * - audioStorageKey: fetch from R2, run STT
- * - audioUrl: fetch from URL, run STT
- * - text: plain text input (no STT)
+ * Engine v2 features:
+ * - StepContext: accumulated results accessible by any subsequent step
+ * - Conditional execution: steps can be skipped based on previous output
+ * - Dynamic model selection: model chosen at runtime from classifier output
+ * - Web search: LLM steps can use OpenAI Responses API web search
+ * - Context-aware interpolation: {{step.N.text}} and {{step.N.json}}
+ * - Post-execution metadata: confidence score, warning flags, preview
  */
 export async function executeRecipe(executionId: string): Promise<void> {
   const execution = await prisma.recipeExecution.findUnique({
@@ -69,15 +167,19 @@ export async function executeRecipe(executionId: string): Promise<void> {
     data: { status: "running" },
   });
 
-  let previousOutput = "";
-
-  // Get initial input from execution data
+  // Initialize context
   const inputData = execution.inputData as InputData;
+  const context: StepContext = {
+    previousOutput: "",
+    steps: {},
+    input: inputData,
+  };
+
   if (inputData?.text) {
-    previousOutput = inputData.text;
+    context.previousOutput = inputData.text;
   }
   if (inputData?.transcriptText) {
-    previousOutput = inputData.transcriptText;
+    context.previousOutput = inputData.transcriptText;
   }
 
   const steps = execution.recipe.steps;
@@ -93,7 +195,6 @@ export async function executeRecipe(executionId: string): Promise<void> {
       select: { status: true },
     });
     if (currentExec?.status === "cancelled") {
-      // Write partial cost before exiting
       await writeCostToExecution(executionId, costBreakdown);
       return;
     }
@@ -104,7 +205,7 @@ export async function executeRecipe(executionId: string): Promise<void> {
         executionId,
         stepIndex: step.stepIndex,
         status: "running",
-        inputPreview: previousOutput.substring(0, 500) || "[audio input]",
+        inputPreview: context.previousOutput.substring(0, 500) || "[audio input]",
         startedAt: new Date(),
       },
     });
@@ -118,23 +219,50 @@ export async function executeRecipe(executionId: string): Promise<void> {
       },
     });
 
+    // ── Condition evaluation: skip step if condition is false ──
+    if (config.condition) {
+      const sourceStep = context.steps[config.condition.stepIndex];
+      const fieldValue = getField(sourceStep?.json, config.condition.field);
+      const shouldRun = evaluateCondition(fieldValue, config.condition.operator, config.condition.value);
+
+      if (!shouldRun) {
+        await prisma.recipeStepResult.update({
+          where: { id: stepResult.id },
+          data: {
+            status: "skipped",
+            outputPreview: "[Skipped by condition]",
+            finishedAt: new Date(),
+          },
+        });
+        // Do NOT update previousOutput — keep it from last executed step
+        continue;
+      }
+    }
+
     try {
       let stepOut: StepOutput;
 
       if (step.type === "stt") {
-        stepOut = await executeSTTStep(execution.userId, config, inputData, previousOutput);
+        stepOut = await executeSTTStep(execution.userId, config, inputData, context.previousOutput);
       } else if (step.type === "llm") {
-        stepOut = await executeLLMStep(execution.userId, config, previousOutput);
+        stepOut = await executeLLMStep(execution.userId, config, context);
       } else if (step.type === "output_format") {
-        stepOut = { text: formatOutput(previousOutput, config.formats || ["markdown"]), runId: null, providerResponseId: null };
+        stepOut = { text: formatOutput(context, config.formats || ["markdown"]), runId: null, providerResponseId: null };
       } else {
         // TTS, Image — not yet implemented
-        stepOut = { text: previousOutput || `[Step ${step.name}: ${step.type} processing not implemented]`, runId: null, providerResponseId: null };
+        stepOut = { text: context.previousOutput || `[Step ${step.name}: ${step.type} processing not implemented]`, runId: null, providerResponseId: null };
       }
 
       // Compute audit hashes
-      const inputHashVal = previousOutput ? sha256(previousOutput) : null;
+      const inputHashVal = context.previousOutput ? sha256(context.previousOutput) : null;
       const outputHashVal = stepOut.text ? sha256(stepOut.text) : null;
+
+      // Build outputFull — include citations if present (web search)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const outputFull: Record<string, any> = { text: stepOut.text };
+      if (stepOut.citations && stepOut.citations.length > 0) {
+        outputFull.citations = stepOut.citations;
+      }
 
       // Update step result with output, hashes, and run link
       await prisma.recipeStepResult.update({
@@ -142,7 +270,7 @@ export async function executeRecipe(executionId: string): Promise<void> {
         data: {
           status: "done",
           outputPreview: stepOut.text.substring(0, 500),
-          outputFull: { text: stepOut.text },
+          outputFull,
           runId: stepOut.runId,
           inputHash: inputHashVal,
           outputHash: outputHashVal,
@@ -165,7 +293,12 @@ export async function executeRecipe(executionId: string): Promise<void> {
         });
       }
 
-      previousOutput = stepOut.text;
+      // Update context
+      context.steps[step.stepIndex] = {
+        text: stepOut.text,
+        json: tryParseJson(stepOut.text),
+      };
+      context.previousOutput = stepOut.text;
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Step failed";
 
@@ -193,6 +326,19 @@ export async function executeRecipe(executionId: string): Promise<void> {
     }
   }
 
+  // ── Post-execution: extract metadata (confidence, warnings) ──
+  await extractExecutionMetadata(executionId, context);
+
+  // ── Post-execution: generate public preview ──
+  const hasOutputFormat = steps.some((s) => s.type === "output_format");
+  if (hasOutputFormat) {
+    try {
+      await generateAndSavePreview(executionId, context);
+    } catch {
+      // Preview generation failed — non-critical, continue
+    }
+  }
+
   // All steps completed — write final cost and mark done
   await writeCostToExecution(executionId, costBreakdown);
   await prisma.recipeExecution.update({
@@ -206,28 +352,76 @@ export async function executeRecipe(executionId: string): Promise<void> {
   });
 }
 
-/**
- * Persist aggregated cost to RecipeExecution.
- */
+// ─── Cost ─────────────────────────────────────────────────────────────────
+
 async function writeCostToExecution(executionId: string, breakdown: CostEntry[]): Promise<void> {
   const totalCostCents = breakdown.reduce((sum, e) => sum + e.costCents, 0);
+  await prisma.recipeExecution
+    .update({
+      where: { id: executionId },
+      data: {
+        totalCostCents,
+        costBreakdownJson: { steps: breakdown },
+      },
+    })
+    .catch(() => {});
+}
+
+// ─── Metadata Extraction ──────────────────────────────────────────────────
+
+/**
+ * Scan step outputs for fact-check results (confidence_score, overall_verdict).
+ * Write to RecipeExecution.confidenceScore and warningFlag.
+ */
+async function extractExecutionMetadata(executionId: string, context: StepContext): Promise<void> {
+  try {
+    for (const stepData of Object.values(context.steps)) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const json = stepData.json as Record<string, any> | null;
+      if (json && typeof json.confidence_score === "number") {
+        const verdict = json.overall_verdict as string | undefined;
+        await prisma.recipeExecution.update({
+          where: { id: executionId },
+          data: {
+            confidenceScore: Math.round(json.confidence_score),
+            warningFlag: verdict === "safe" ? null : verdict || null,
+          },
+        });
+        break;
+      }
+    }
+  } catch {
+    // Non-critical — metadata extraction failure doesn't stop execution
+  }
+}
+
+// ─── Preview Generation ───────────────────────────────────────────────────
+
+/**
+ * Generate a public preview from execution output.
+ * Stores previewHash on RecipeExecution for public access.
+ */
+async function generateAndSavePreview(executionId: string, context: StepContext): Promise<void> {
+  // Find the last output_format step result
+  const lastOutputStep = Object.entries(context.steps)
+    .reverse()
+    .find(([, entry]) => entry.json && typeof entry.json === "object");
+
+  if (!lastOutputStep) return;
+
+  const hash = randomUUID().replace(/-/g, "").substring(0, 12);
+
   await prisma.recipeExecution.update({
     where: { id: executionId },
     data: {
-      totalCostCents,
-      costBreakdownJson: { steps: breakdown },
+      previewHash: hash,
+      previewUrl: `/preview/${hash}`,
     },
-  }).catch(() => {});
+  });
 }
 
-/**
- * Execute an STT step.
- *
- * Skip logic:
- * - If transcriptText was provided as input, skip STT and use it directly.
- * - If previousOutput already has text (e.g. from direct text input), skip STT.
- * - Otherwise, run Soniox STT on the audio from R2 or URL.
- */
+// ─── STT Step ─────────────────────────────────────────────────────────────
+
 async function executeSTTStep(
   userId: string,
   config: StepConfig,
@@ -251,14 +445,12 @@ async function executeSTTStep(
   let mimeType: string;
 
   if (inputData?.audioStorageKey) {
-    // Fetch audio from R2
     const r2Resp = await getObjectFromR2(inputData.audioStorageKey);
     if (!r2Resp.Body) throw new Error("Audio file not found in storage");
     const arrayBuffer = await r2Resp.Body.transformToByteArray();
     audioBuffer = Buffer.from(arrayBuffer);
     mimeType = inputData.audioMimeType || "audio/mpeg";
   } else if (inputData?.audioUrl) {
-    // Fetch audio from URL
     const resp = await fetch(inputData.audioUrl);
     if (!resp.ok) throw new Error(`Failed to fetch audio from URL: ${resp.status}`);
     const arrayBuffer = await resp.arrayBuffer();
@@ -268,7 +460,6 @@ async function executeSTTStep(
     throw new Error("No audio source provided for STT step. Provide an audio file, URL, or transcript text.");
   }
 
-  // Create a run for cost tracking
   const run = await prisma.run.create({
     data: {
       userId,
@@ -287,7 +478,6 @@ async function executeSTTStep(
       data: { status: "done", finishedAt: new Date() },
     });
 
-    // Log usage (Soniox pricing is per-minute)
     const durationMinutes = Math.ceil(result.durationSeconds / 60);
     await logUsage({
       runId: run.id,
@@ -312,23 +502,30 @@ async function executeSTTStep(
   }
 }
 
+// ─── LLM Step ─────────────────────────────────────────────────────────────
+
 /**
- * Execute a single LLM step. Returns text, runId, and providerResponseId.
+ * Execute a single LLM step. Supports:
+ * - Fixed modelId or dynamic modelStrategy
+ * - Context-aware prompt interpolation ({{step.N.text}}, {{step.N.json}})
+ * - Web search via OpenAI Responses API (config.webSearch: true)
  */
 async function executeLLMStep(
   userId: string,
   config: StepConfig,
-  input: string
+  context: StepContext
 ): Promise<StepOutput> {
+  // Resolve model (fixed or dynamic)
+  const modelId = resolveModelId(config, context);
   const models = getApprovedModels();
-  const modelEntry = models.find((m) => m.id === config.modelId) || models[0];
+  const modelEntry = models.find((m) => m.id === modelId) || models[0];
 
   if (!modelEntry) throw new Error("No LLM model available");
 
-  // Build prompt
-  let userContent = input;
+  // Build prompt with context-aware interpolation
+  let userContent = context.previousOutput;
   if (config.userPromptTemplate) {
-    userContent = config.userPromptTemplate.replace(/\{\{input\}\}/g, input);
+    userContent = interpolatePrompt(config.userPromptTemplate, context);
   }
 
   // Create a run for cost tracking
@@ -343,6 +540,36 @@ async function executeLLMStep(
   });
 
   try {
+    // Web search mode: use OpenAI Responses API with web_search_preview
+    if (config.webSearch && modelEntry.provider === "openai") {
+      const wsResult = await runLLMWebSearch(
+        [{ role: "user", content: userContent }],
+        config.systemPrompt
+      );
+
+      await prisma.run.update({
+        where: { id: run.id },
+        data: { status: "done", finishedAt: new Date() },
+      });
+
+      await logUsage({
+        runId: run.id,
+        userId,
+        provider: modelEntry.provider,
+        model: modelEntry.id,
+        units: { inputTokens: wsResult.inputTokens, outputTokens: wsResult.outputTokens },
+        latencyMs: wsResult.latencyMs,
+      });
+
+      return {
+        text: wsResult.text,
+        runId: run.id,
+        providerResponseId: wsResult.responseId || null,
+        citations: wsResult.citations,
+      };
+    }
+
+    // Standard LLM chat
     const result = await runLLMChat(
       modelEntry,
       [{ role: "user", content: userContent }],
@@ -377,10 +604,14 @@ async function executeLLMStep(
   }
 }
 
+// ─── Output Formatting ────────────────────────────────────────────────────
+
 /**
  * Format output in requested formats.
+ * Enhanced: receives full StepContext for richer Drupal output.
  */
-function formatOutput(text: string, formats: string[]): string {
+function formatOutput(context: StepContext, formats: string[]): string {
+  const text = context.previousOutput;
   const sections: string[] = [];
 
   for (const fmt of formats) {
@@ -397,7 +628,7 @@ function formatOutput(text: string, formats: string[]): string {
         `## JSON\n\n\`\`\`json\n${JSON.stringify({ content: text, generatedAt: new Date().toISOString() }, null, 2)}\n\`\`\``
       );
     } else if (fmt === "drupal_json") {
-      sections.push(formatDrupalOutput(text));
+      sections.push(formatDrupalOutput(context));
     }
   }
 
@@ -405,36 +636,64 @@ function formatOutput(text: string, formats: string[]): string {
 }
 
 /**
- * NOVINAR Drupal-ready output format.
- * Expects the input to contain SEO JSON from the SEO step.
- * The article text was the input TO the SEO step, so we retrieve it
- * from the execution step results.
+ * Enhanced Drupal-ready output format.
+ * Uses full StepContext to pull article, SEO, research sources, and confidence.
  */
-function formatDrupalOutput(text: string): string {
-  let seo: {
-    titles?: { type: string; text: string }[];
-    metaDescription?: string;
-    keywords?: string[];
-    tags?: string[];
-    slug?: string;
-  } = {};
+function formatDrupalOutput(context: StepContext): string {
+  const text = context.previousOutput;
 
-  // Try to extract JSON from the text (SEO step output)
-  const jsonMatch = text.match(/\{[\s\S]*"titles"[\s\S]*\}/);
-  if (jsonMatch) {
-    try {
-      seo = JSON.parse(jsonMatch[0]);
-    } catch {
-      // Not valid JSON — treat whole text as article
+  // Try to find article text from a writing step (look for longest non-JSON text)
+  let articleText = "";
+  let seoJson: Record<string, unknown> = {};
+  let confidenceScore: number | null = null;
+  let sources: { url: string; title: string }[] = [];
+
+  // Scan all steps for relevant data
+  for (const [, stepData] of Object.entries(context.steps)) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const json = stepData.json as Record<string, any> | null;
+
+    // SEO step: has meta_title or titles
+    if (json && (json.meta_title || json.titles)) {
+      seoJson = json;
+    }
+
+    // Fact-check step: has confidence_score
+    if (json && typeof json.confidence_score === "number") {
+      confidenceScore = json.confidence_score;
+    }
+
+    // Research step: has facts/sources arrays
+    if (json && Array.isArray(json.sources)) {
+      sources = json.sources;
+    }
+
+    // Article: longest non-JSON text (heuristic)
+    if (!json && stepData.text.length > articleText.length) {
+      articleText = stepData.text;
     }
   }
 
-  // Build article HTML from the non-JSON part
-  const articlePart = text.replace(/```json[\s\S]*?```/g, "").replace(/\{[\s\S]*"titles"[\s\S]*\}/, "").trim();
+  // Fallback: use previousOutput if no article found
+  if (!articleText) articleText = text;
+
+  // Legacy SEO extraction from text (backward compat for old NOVINAR preset)
+  if (Object.keys(seoJson).length === 0) {
+    const jsonMatch = text.match(/\{[\s\S]*"titles"[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        seoJson = JSON.parse(jsonMatch[0]);
+        // Strip SEO JSON from article text
+        articleText = text.replace(/```json[\s\S]*?```/g, "").replace(/\{[\s\S]*"titles"[\s\S]*\}/, "").trim();
+      } catch {
+        // Not valid JSON
+      }
+    }
+  }
 
   // Convert markdown-ish article to HTML
-  const bodyHtml = articlePart
-    ? articlePart
+  const bodyHtml = articleText
+    ? articleText
         .split("\n\n")
         .map((block) => {
           const trimmed = block.trim();
@@ -452,25 +711,34 @@ function formatDrupalOutput(text: string): string {
         .join("\n")
     : `<p>${text}</p>`;
 
-  // Extract title from article (first h1 or first line)
-  const titleMatch = articlePart.match(/^#\s+(.+)/m);
-  const mainTitle = titleMatch?.[1] || seo.titles?.[0]?.text || "Untitled";
+  // Extract title
+  const titleMatch = articleText.match(/^#\s+(.+)/m);
+  const mainTitle = titleMatch?.[1] || (seoJson.meta_title as string) || (seoJson.titles as { text: string }[])?.[0]?.text || "Untitled";
 
-  // Extract lead/subtitle (first paragraph after title)
-  const leadMatch = articlePart.match(/^#\s+.+\n\n(.+)/m);
-  const lead = leadMatch?.[1] || seo.metaDescription || "";
+  // Extract lead
+  const leadMatch = articleText.match(/^#\s+.+\n\n(.+)/m);
+  const lead = leadMatch?.[1] || (seoJson.meta_description as string) || (seoJson.metaDescription as string) || "";
 
   const drupalPayload = {
     title: mainTitle,
     subtitle: lead,
     body: bodyHtml,
-    seo: {
-      titleVariants: seo.titles || [],
-      metaDescription: seo.metaDescription || "",
-      keywords: seo.keywords || [],
-      tags: seo.tags || [],
-      slug: seo.slug || "",
+    summary: lead,
+    meta: {
+      meta_title: (seoJson.meta_title as string) || mainTitle,
+      meta_description: (seoJson.meta_description as string) || (seoJson.metaDescription as string) || lead,
+      keywords: (seoJson.keywords as string[]) || [],
+      slug: (seoJson.slug as string) || "",
+      social_title: (seoJson.social_title as string) || mainTitle,
+      social_description: (seoJson.social_description as string) || lead,
+      category_suggestion: (seoJson.category_suggestion as string) || "",
+      titleVariants: (seoJson.titles as unknown[]) || [],
+      tags: (seoJson.tags as string[]) || [],
     },
+    sources: sources.map((s) => ({ title: s.title, url: s.url })),
+    author: "AI uredništvo",
+    status: "draft",
+    confidence_score: confidenceScore,
     format: "drupal_article",
     generatedAt: new Date().toISOString(),
   };
