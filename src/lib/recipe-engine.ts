@@ -349,8 +349,10 @@ export async function executeRecipe(executionId: string): Promise<void> {
         },
       });
 
-      // Notify Telegram if applicable (non-blocking)
-      notifyTelegramCompletion(executionId).catch(() => {});
+      // Notify Telegram if applicable
+      try { await notifyTelegramCompletion(executionId); } catch (e) {
+        console.error("[Telegram notify] error:", e instanceof Error ? e.message : e);
+      }
       return;
     }
   }
@@ -380,8 +382,10 @@ export async function executeRecipe(executionId: string): Promise<void> {
     },
   });
 
-  // Notify Telegram if applicable (non-blocking)
-  notifyTelegramCompletion(executionId).catch(() => {});
+  // Notify Telegram if applicable
+  try { await notifyTelegramCompletion(executionId); } catch (e) {
+    console.error("[Telegram notify] error:", e instanceof Error ? e.message : e);
+  }
 }
 
 // ─── Cost ─────────────────────────────────────────────────────────────────
@@ -1022,9 +1026,40 @@ function formatDrupalOutput(context: StepContext): string {
 // ─── Telegram Notification ───────────────────────────────────────────
 
 /**
+ * Escape special characters for Telegram Markdown (legacy mode).
+ */
+function escMd(text: string): string {
+  return text.replace(/([*_`\[])/g, "\\$1");
+}
+
+/**
+ * Extract article title + subtitle from step results (output_format JSON).
+ */
+function extractArticleInfo(
+  stepResults: { outputFull: unknown; status: string }[]
+): { title?: string; subtitle?: string } | null {
+  for (const sr of [...stepResults].reverse()) {
+    if (sr.status !== "done" || !sr.outputFull) continue;
+    const full = sr.outputFull as { text?: string };
+    if (!full.text) continue;
+    try {
+      const parsed = JSON.parse(full.text);
+      if (parsed.title || parsed.body) {
+        return {
+          title: parsed.title?.substring(0, 100),
+          subtitle: (parsed.subtitle || parsed.summary || "")?.substring(0, 150),
+        };
+      }
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
+/**
  * Notify the Telegram user when a recipe execution completes (done or error).
- * Edits the original "processing" message with the result.
- * Non-critical — errors are silently caught.
+ * Edits the original "processing" message with a rich result summary.
  */
 async function notifyTelegramCompletion(executionId: string): Promise<void> {
   // Check if this execution has a Telegram message mapping
@@ -1038,34 +1073,81 @@ async function notifyTelegramCompletion(executionId: string): Promise<void> {
 
   const execution = await prisma.recipeExecution.findUnique({
     where: { id: executionId },
-    include: { recipe: { select: { name: true } } },
+    include: {
+      recipe: { select: { name: true } },
+      stepResults: {
+        orderBy: { stepIndex: "asc" },
+        select: { outputFull: true, status: true },
+      },
+    },
   });
   if (!execution) return;
 
   const recipeName = execution.recipe.name;
-  const durationSec = execution.finishedAt && execution.startedAt
-    ? Math.round((execution.finishedAt.getTime() - execution.startedAt.getTime()) / 1000)
-    : null;
-  const costStr = execution.totalCostCents > 0
-    ? `$${(execution.totalCostCents / 100).toFixed(3)}`
-    : "";
+  const durationSec =
+    execution.finishedAt && execution.startedAt
+      ? Math.round(
+          (execution.finishedAt.getTime() - execution.startedAt.getTime()) / 1000
+        )
+      : null;
+  const costStr =
+    execution.totalCostCents > 0
+      ? `$${(execution.totalCostCents / 100).toFixed(3)}`
+      : "";
 
   if (execution.status === "done") {
-    const parts = [`✅ *${recipeName}* — končano`];
-    if (durationSec) parts.push(`${durationSec}s`);
-    if (costStr) parts.push(costStr);
-    if (execution.confidenceScore != null) parts.push(`${execution.confidenceScore}%`);
-    if (execution.previewUrl) {
-      const baseUrl = process.env.NEXTAUTH_URL || "";
-      parts.push(`[Preview](${baseUrl}${execution.previewUrl})`);
+    const baseUrl = process.env.NEXTAUTH_URL || "";
+    const lines: string[] = [];
+
+    // Header
+    lines.push(`✅ *${escMd(recipeName)}* — končano`);
+
+    // Stats line
+    const stats: string[] = [];
+    if (durationSec) stats.push(`⏱ ${durationSec}s`);
+    if (costStr) stats.push(`💰 ${costStr}`);
+    if (execution.confidenceScore != null) {
+      const icon =
+        execution.confidenceScore > 80
+          ? "🟢"
+          : execution.confidenceScore > 50
+            ? "🟡"
+            : "🔴";
+      stats.push(`${icon} ${execution.confidenceScore}%`);
     }
-    await editMessage(tgMap.chatId, tgMap.messageId, parts.join(" • "));
+    if (stats.length > 0) lines.push(stats.join(" • "));
+
+    // Article title + subtitle from output
+    const articleInfo = extractArticleInfo(execution.stepResults);
+    if (articleInfo) {
+      lines.push("");
+      if (articleInfo.title) lines.push(`📰 *${escMd(articleInfo.title)}*`);
+      if (articleInfo.subtitle) lines.push(`_${escMd(articleInfo.subtitle)}_`);
+    }
+
+    // Warning flag
+    if (execution.warningFlag) {
+      const icon = execution.warningFlag === "high_risk" ? "🔴" : "⚠️";
+      const label =
+        execution.warningFlag === "high_risk"
+          ? "VISOKO TVEGANJE"
+          : "Potreben pregled";
+      lines.push(`\n${icon} ${label}`);
+    }
+
+    // Preview link
+    if (execution.previewUrl) {
+      lines.push(`\n🔗 [Odpri preview](${baseUrl}${execution.previewUrl})`);
+    }
+
+    await editMessage(tgMap.chatId, tgMap.messageId, lines.join("\n"));
   } else if (execution.status === "error") {
-    const errMsg = execution.errorMessage?.substring(0, 200) || "Unknown error";
+    const errMsg =
+      execution.errorMessage?.substring(0, 200) || "Unknown error";
     await editMessage(
       tgMap.chatId,
       tgMap.messageId,
-      `❌ *${recipeName}* — napaka\n\n${errMsg}`
+      `❌ *${escMd(recipeName)}* — napaka\n\n${escMd(errMsg)}`
     );
   }
 }
