@@ -60,6 +60,8 @@ model User {
   workspaceMemberships WorkspaceMember[]
   templateVersions  PromptTemplateVersion[]
   recipeVersions    RecipeVersion[]
+  telegramLink      TelegramLink?
+  telegramLinkCodes TelegramLinkCode[]
 
   activeWorkspace   Workspace? @relation("UserActiveWorkspace", fields: [activeWorkspaceId], references: [id])
 }
@@ -448,6 +450,7 @@ model RecipeExecution {
   recipe      Recipe              @relation(fields: [recipeId], references: [id])
   user        User                @relation(fields: [userId], references: [id])
   stepResults RecipeStepResult[]
+  telegramMap TelegramExecutionMap?
 
   @@index([userId, startedAt])
   @@index([status])
@@ -530,4 +533,42 @@ model AuthLog {
   @@index([email])
   @@index([createdAt])
   @@index([event])
+}
+
+// ─── Telegram Integration ──────────────────────────────────────────
+
+model TelegramLink {
+  id               String   @id @default(cuid())
+  userId           String   @unique          // 1 user = 1 Telegram link
+  telegramChatId   String   @unique          // Telegram chat ID (string, can be large)
+  telegramUsername  String?                  // @username for display
+  linkedAt         DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model TelegramLinkCode {
+  id        String    @id @default(cuid())
+  userId    String
+  code      String    @unique              // 6-digit code
+  expiresAt DateTime                       // 5 min TTL
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([code])
+  @@index([expiresAt])
+}
+
+model TelegramExecutionMap {
+  id          String   @id @default(cuid())
+  executionId String   @unique
+  chatId      String                       // Telegram chat ID
+  messageId   Int                          // Telegram message ID for editing
+  createdAt   DateTime @default(now())
+
+  execution RecipeExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+
+  @@index([executionId])
 }

@@ -38,6 +38,13 @@ export default function RecipesPage() {
   const [error, setError] = useState<string | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
 
+  // Telegram link state
+  const [telegramLinked, setTelegramLinked] = useState<boolean | null>(null);
+  const [telegramUsername, setTelegramUsername] = useState<string | null>(null);
+  const [linkCode, setLinkCode] = useState<string | null>(null);
+  const [linkCodeExpires, setLinkCodeExpires] = useState<string | null>(null);
+  const [linkLoading, setLinkLoading] = useState(false);
+
   // Input state
   const [inputText, setInputText] = useState("");
   const [inputMode, setInputMode] = useState<InputMode>("text");
@@ -53,11 +60,17 @@ export default function RecipesPage() {
     try {
       const fetches = [fetch("/api/recipes"), fetch("/api/recipes/executions")];
       if (isAdmin) fetches.push(fetch("/api/recipes/presets"));
+      fetches.push(fetch("/api/telegram/link-code"));
       const responses = await Promise.all(fetches);
       const data = await Promise.all(responses.map(r => r.json()));
       setRecipes(data[0].recipes || []);
       setExecutions(data[1].executions || []);
-      if (data[2]) setPresets(data[2].presets || []);
+      if (isAdmin && data[2]) setPresets(data[2].presets || []);
+      const tgData = isAdmin ? data[3] : data[2];
+      if (tgData) {
+        setTelegramLinked(tgData.linked || false);
+        setTelegramUsername(tgData.telegramUsername || null);
+      }
     } catch { /* ignore */ }
     finally { setLoading(false); }
   }, [isAdmin]);
@@ -296,6 +309,59 @@ export default function RecipesPage() {
             {presets.some(p => !p.alreadyCreated) ? "Click + to create from preset." : ""}{" "}
             {presets.some(p => p.alreadyCreated) ? "Click SYNC to update steps from code." : ""}
           </div>
+        </div>
+      )}
+
+      {/* Telegram Link */}
+      {telegramLinked !== null && (
+        <div style={{ marginBottom: "24px", padding: "12px 16px", border: "1px solid rgba(0, 136, 255, 0.3)", backgroundColor: "rgba(0, 136, 255, 0.03)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div>
+              <span style={{ fontSize: "11px", fontWeight: 700, color: "#0088ff", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                TELEGRAM
+              </span>
+              {telegramLinked ? (
+                <span style={{ marginLeft: "8px", fontSize: "11px", color: "#00ff88" }}>
+                  {"\u2713"} Povezano{telegramUsername ? ` (@${telegramUsername})` : ""}
+                </span>
+              ) : (
+                <span style={{ marginLeft: "8px", fontSize: "11px", color: "#5a6a7a" }}>
+                  Ni povezano
+                </span>
+              )}
+            </div>
+            <button
+              disabled={linkLoading}
+              onClick={async () => {
+                setLinkLoading(true);
+                try {
+                  const resp = await fetch("/api/telegram/link-code", { method: "POST" });
+                  const data = await resp.json();
+                  setLinkCode(data.code);
+                  setLinkCodeExpires(data.expiresAt);
+                } catch { /* ignore */ }
+                finally { setLinkLoading(false); }
+              }}
+              style={{
+                padding: "4px 14px", background: "transparent",
+                border: "1px solid #0088ff", color: "#0088ff",
+                fontFamily: "inherit", fontSize: "10px", fontWeight: 700,
+                cursor: linkLoading ? "wait" : "pointer", textTransform: "uppercase",
+              }}
+            >
+              {telegramLinked ? "RE-LINK" : "LINK TELEGRAM"}
+            </button>
+          </div>
+          {linkCode && (
+            <div style={{ marginTop: "8px", padding: "8px 12px", backgroundColor: "rgba(0, 136, 255, 0.06)", border: "1px solid rgba(0, 136, 255, 0.2)" }}>
+              <div style={{ fontSize: "12px", color: "#e0e0e0" }}>
+                {"Pošlji botu: "}<code style={{ color: "#0088ff", fontWeight: 700, fontSize: "14px" }}>/link {linkCode}</code>
+              </div>
+              <div style={{ fontSize: "10px", color: "#5a6a7a", marginTop: "2px" }}>
+                {"Koda poteče: "}{linkCodeExpires ? new Date(linkCodeExpires).toLocaleTimeString("sl-SI") : "5 min"}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

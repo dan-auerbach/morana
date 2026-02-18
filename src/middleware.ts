@@ -31,6 +31,7 @@ const PUBLIC_PATHS = [
   "/",                    // Home / login page
   "/api/auth",            // NextAuth endpoints (sign-in, callback, session, etc.)
   "/api/inngest",         // Inngest webhook (has its own signing key auth)
+  "/api/telegram/webhook", // Telegram webhook (has its own secret token auth)
   "/preview",             // Public recipe preview (no auth, noindex)
   "/_next",               // Next.js static assets
   "/favicon.ico",

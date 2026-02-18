@@ -349,6 +349,8 @@ export async function executeRecipe(executionId: string): Promise<void> {
         },
       });
 
+      // Notify Telegram if applicable (non-blocking)
+      notifyTelegramCompletion(executionId).catch(() => {});
       return;
     }
   }
@@ -377,6 +379,9 @@ export async function executeRecipe(executionId: string): Promise<void> {
       finishedAt: new Date(),
     },
   });
+
+  // Notify Telegram if applicable (non-blocking)
+  notifyTelegramCompletion(executionId).catch(() => {});
 }
 
 // ─── Cost ─────────────────────────────────────────────────────────────────
@@ -1012,4 +1017,55 @@ function formatDrupalOutput(context: StepContext): string {
   };
 
   return JSON.stringify(drupalPayload, null, 2);
+}
+
+// ─── Telegram Notification ───────────────────────────────────────────
+
+/**
+ * Notify the Telegram user when a recipe execution completes (done or error).
+ * Edits the original "processing" message with the result.
+ * Non-critical — errors are silently caught.
+ */
+async function notifyTelegramCompletion(executionId: string): Promise<void> {
+  // Check if this execution has a Telegram message mapping
+  const tgMap = await prisma.telegramExecutionMap.findUnique({
+    where: { executionId },
+  });
+  if (!tgMap) return; // Not from Telegram
+
+  // Lazy import to avoid circular deps / loading when Telegram is not configured
+  const { editMessage } = await import("./telegram");
+
+  const execution = await prisma.recipeExecution.findUnique({
+    where: { id: executionId },
+    include: { recipe: { select: { name: true } } },
+  });
+  if (!execution) return;
+
+  const recipeName = execution.recipe.name;
+  const durationSec = execution.finishedAt && execution.startedAt
+    ? Math.round((execution.finishedAt.getTime() - execution.startedAt.getTime()) / 1000)
+    : null;
+  const costStr = execution.totalCostCents > 0
+    ? `$${(execution.totalCostCents / 100).toFixed(3)}`
+    : "";
+
+  if (execution.status === "done") {
+    const parts = [`✅ *${recipeName}* — končano`];
+    if (durationSec) parts.push(`${durationSec}s`);
+    if (costStr) parts.push(costStr);
+    if (execution.confidenceScore != null) parts.push(`${execution.confidenceScore}%`);
+    if (execution.previewUrl) {
+      const baseUrl = process.env.NEXTAUTH_URL || "";
+      parts.push(`[Preview](${baseUrl}${execution.previewUrl})`);
+    }
+    await editMessage(tgMap.chatId, tgMap.messageId, parts.join(" • "));
+  } else if (execution.status === "error") {
+    const errMsg = execution.errorMessage?.substring(0, 200) || "Unknown error";
+    await editMessage(
+      tgMap.chatId,
+      tgMap.messageId,
+      `❌ *${recipeName}* — napaka\n\n${errMsg}`
+    );
+  }
 }
