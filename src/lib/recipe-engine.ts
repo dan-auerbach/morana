@@ -1026,10 +1026,10 @@ function formatDrupalOutput(context: StepContext): string {
 // ─── Telegram Notification ───────────────────────────────────────────
 
 /**
- * Escape special characters for Telegram Markdown (legacy mode).
+ * Escape special characters for Telegram HTML parse mode.
  */
-function escMd(text: string): string {
-  return text.replace(/([*_`\[])/g, "\\$1");
+function escHtml(text: string): string {
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 /**
@@ -1059,14 +1059,20 @@ function extractArticleInfo(
 
 /**
  * Notify the Telegram user when a recipe execution completes (done or error).
- * Edits the original "processing" message with a rich result summary.
+ * Edits the original "processing" message with a rich HTML result summary.
  */
 async function notifyTelegramCompletion(executionId: string): Promise<void> {
+  console.log(`[Telegram notify] Starting for execution=${executionId}`);
+
   // Check if this execution has a Telegram message mapping
   const tgMap = await prisma.telegramExecutionMap.findUnique({
     where: { executionId },
   });
-  if (!tgMap) return; // Not from Telegram
+  if (!tgMap) {
+    console.log(`[Telegram notify] No TelegramExecutionMap found, skipping`);
+    return;
+  }
+  console.log(`[Telegram notify] Found map: chatId=${tgMap.chatId}, messageId=${tgMap.messageId}`);
 
   // Lazy import to avoid circular deps / loading when Telegram is not configured
   const { editMessage } = await import("./telegram");
@@ -1081,7 +1087,11 @@ async function notifyTelegramCompletion(executionId: string): Promise<void> {
       },
     },
   });
-  if (!execution) return;
+  if (!execution) {
+    console.log(`[Telegram notify] Execution not found in DB`);
+    return;
+  }
+  console.log(`[Telegram notify] Execution status=${execution.status}, previewUrl=${execution.previewUrl}`);
 
   const recipeName = execution.recipe.name;
   const durationSec =
@@ -1100,7 +1110,7 @@ async function notifyTelegramCompletion(executionId: string): Promise<void> {
     const lines: string[] = [];
 
     // Header
-    lines.push(`✅ *${escMd(recipeName)}* — končano`);
+    lines.push(`✅ <b>${escHtml(recipeName)}</b> — končano`);
 
     // Stats line
     const stats: string[] = [];
@@ -1121,8 +1131,8 @@ async function notifyTelegramCompletion(executionId: string): Promise<void> {
     const articleInfo = extractArticleInfo(execution.stepResults);
     if (articleInfo) {
       lines.push("");
-      if (articleInfo.title) lines.push(`📰 *${escMd(articleInfo.title)}*`);
-      if (articleInfo.subtitle) lines.push(`_${escMd(articleInfo.subtitle)}_`);
+      if (articleInfo.title) lines.push(`📰 <b>${escHtml(articleInfo.title)}</b>`);
+      if (articleInfo.subtitle) lines.push(`<i>${escHtml(articleInfo.subtitle)}</i>`);
     }
 
     // Warning flag
@@ -1135,19 +1145,26 @@ async function notifyTelegramCompletion(executionId: string): Promise<void> {
       lines.push(`\n${icon} ${label}`);
     }
 
-    // Preview link
+    // Preview link (with web page preview enabled for embed)
     if (execution.previewUrl) {
-      lines.push(`\n🔗 [Odpri preview](${baseUrl}${execution.previewUrl})`);
+      lines.push(`\n🔗 <a href="${baseUrl}${execution.previewUrl}">Odpri preview</a>`);
     }
 
-    await editMessage(tgMap.chatId, tgMap.messageId, lines.join("\n"));
+    const ok = await editMessage(tgMap.chatId, tgMap.messageId, lines.join("\n"), "HTML", false);
+    if (!ok) {
+      console.error(`[Telegram notify] editMessage returned false for exec=${executionId}`);
+    }
   } else if (execution.status === "error") {
     const errMsg =
       execution.errorMessage?.substring(0, 200) || "Unknown error";
-    await editMessage(
+    const ok = await editMessage(
       tgMap.chatId,
       tgMap.messageId,
-      `❌ *${escMd(recipeName)}* — napaka\n\n${escMd(errMsg)}`
+      `❌ <b>${escHtml(recipeName)}</b> — napaka\n\n${escHtml(errMsg)}`,
+      "HTML",
     );
+    if (!ok) {
+      console.error(`[Telegram notify] editMessage (error) returned false for exec=${executionId}`);
+    }
   }
 }

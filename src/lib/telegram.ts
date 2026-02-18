@@ -137,13 +137,14 @@ export async function editMessage(
   chatId: string | number,
   messageId: number,
   text: string,
-  parseMode: "Markdown" | "MarkdownV2" | "HTML" | null = "Markdown"
+  parseMode: "Markdown" | "MarkdownV2" | "HTML" | null = "Markdown",
+  disablePreview: boolean = true,
 ): Promise<boolean> {
   const body: Record<string, unknown> = {
     chat_id: chatId,
     message_id: messageId,
     text,
-    disable_web_page_preview: true,
+    disable_web_page_preview: disablePreview,
   };
   if (parseMode) body.parse_mode = parseMode;
 
@@ -155,10 +156,10 @@ export async function editMessage(
 
   const data = await resp.json();
   if (!data.ok) {
-    console.error("[Telegram] editMessage failed:", data.description);
+    console.error("[Telegram] editMessage failed:", data.description, `chatId=${chatId} msgId=${messageId}`);
     // Fallback: retry without parse mode
     if (parseMode) {
-      return editMessage(chatId, messageId, text, null);
+      return editMessage(chatId, messageId, text, null, disablePreview);
     }
     return false;
   }
