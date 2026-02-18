@@ -1058,25 +1058,97 @@ function extractArticleInfo(
 }
 
 /**
- * Notify the Telegram user when a recipe execution completes (done or error).
- * Edits the original "processing" message with a rich HTML result summary.
+ * Build the HTML completion text for a Telegram notification.
  */
-async function notifyTelegramCompletion(executionId: string): Promise<void> {
+function buildCompletionText(
+  execution: {
+    status: string;
+    recipe: { name: string };
+    finishedAt: Date | null;
+    startedAt: Date;
+    totalCostCents: number;
+    confidenceScore: number | null;
+    warningFlag: string | null;
+    previewUrl: string | null;
+    errorMessage: string | null;
+    stepResults: { outputFull: unknown; status: string }[];
+  }
+): string {
+  const recipeName = execution.recipe.name;
+  const durationSec =
+    execution.finishedAt && execution.startedAt
+      ? Math.round(
+          (execution.finishedAt.getTime() - execution.startedAt.getTime()) / 1000
+        )
+      : null;
+  const costStr =
+    execution.totalCostCents > 0
+      ? `$${(execution.totalCostCents / 100).toFixed(3)}`
+      : "";
+
+  if (execution.status === "error") {
+    const errMsg = execution.errorMessage?.substring(0, 200) || "Unknown error";
+    return `❌ <b>${escHtml(recipeName)}</b> — napaka\n\n${escHtml(errMsg)}`;
+  }
+
+  const baseUrl = process.env.NEXTAUTH_URL || "";
+  const lines: string[] = [];
+
+  // Header
+  lines.push(`✅ <b>${escHtml(recipeName)}</b> — končano`);
+
+  // Stats line
+  const stats: string[] = [];
+  if (durationSec) stats.push(`⏱ ${durationSec}s`);
+  if (costStr) stats.push(`💰 ${costStr}`);
+  if (execution.confidenceScore != null) {
+    const icon =
+      execution.confidenceScore > 80
+        ? "🟢"
+        : execution.confidenceScore > 50
+          ? "🟡"
+          : "🔴";
+    stats.push(`${icon} ${execution.confidenceScore}%`);
+  }
+  if (stats.length > 0) lines.push(stats.join(" • "));
+
+  // Article title + subtitle from output
+  const articleInfo = extractArticleInfo(execution.stepResults);
+  if (articleInfo) {
+    lines.push("");
+    if (articleInfo.title) lines.push(`📰 <b>${escHtml(articleInfo.title)}</b>`);
+    if (articleInfo.subtitle) lines.push(`<i>${escHtml(articleInfo.subtitle)}</i>`);
+  }
+
+  // Warning flag
+  if (execution.warningFlag) {
+    const icon = execution.warningFlag === "high_risk" ? "🔴" : "⚠️";
+    const label =
+      execution.warningFlag === "high_risk"
+        ? "VISOKO TVEGANJE"
+        : "Potreben pregled";
+    lines.push(`\n${icon} ${label}`);
+  }
+
+  // Preview link
+  if (execution.previewUrl) {
+    lines.push(`\n🔗 <a href="${baseUrl}${execution.previewUrl}">Odpri preview</a>`);
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * Notify the Telegram user when a recipe execution completes (done or error).
+ * Bulletproof: tries editMessage → sendMessage fallback → direct user lookup.
+ */
+export async function notifyTelegramCompletion(executionId: string): Promise<void> {
   console.log(`[Telegram notify] Starting for execution=${executionId}`);
 
-  // Check if this execution has a Telegram message mapping
-  const tgMap = await prisma.telegramExecutionMap.findUnique({
-    where: { executionId },
-  });
-  if (!tgMap) {
-    console.log(`[Telegram notify] No TelegramExecutionMap found, skipping`);
-    return;
-  }
-  console.log(`[Telegram notify] Found map: chatId=${tgMap.chatId}, messageId=${tgMap.messageId}`);
+  // Import telegram functions
+  const { editMessage, sendMessage } = await import("./telegram");
 
-  // Lazy import to avoid circular deps / loading when Telegram is not configured
-  const { editMessage } = await import("./telegram");
-
+  // Load execution data
   const execution = await prisma.recipeExecution.findUnique({
     where: { id: executionId },
     include: {
@@ -1091,80 +1163,53 @@ async function notifyTelegramCompletion(executionId: string): Promise<void> {
     console.log(`[Telegram notify] Execution not found in DB`);
     return;
   }
+  if (execution.status !== "done" && execution.status !== "error") {
+    console.log(`[Telegram notify] Execution status=${execution.status}, not terminal — skipping`);
+    return;
+  }
   console.log(`[Telegram notify] Execution status=${execution.status}, previewUrl=${execution.previewUrl}`);
 
-  const recipeName = execution.recipe.name;
-  const durationSec =
-    execution.finishedAt && execution.startedAt
-      ? Math.round(
-          (execution.finishedAt.getTime() - execution.startedAt.getTime()) / 1000
-        )
-      : null;
-  const costStr =
-    execution.totalCostCents > 0
-      ? `$${(execution.totalCostCents / 100).toFixed(3)}`
-      : "";
+  const text = buildCompletionText(execution);
+  const hasPreviewLink = execution.status === "done" && !!execution.previewUrl;
 
-  if (execution.status === "done") {
-    const baseUrl = process.env.NEXTAUTH_URL || "";
-    const lines: string[] = [];
+  // Strategy 1: Try to edit the original "processing" message
+  const tgMap = await prisma.telegramExecutionMap.findUnique({
+    where: { executionId },
+  });
 
-    // Header
-    lines.push(`✅ <b>${escHtml(recipeName)}</b> — končano`);
-
-    // Stats line
-    const stats: string[] = [];
-    if (durationSec) stats.push(`⏱ ${durationSec}s`);
-    if (costStr) stats.push(`💰 ${costStr}`);
-    if (execution.confidenceScore != null) {
-      const icon =
-        execution.confidenceScore > 80
-          ? "🟢"
-          : execution.confidenceScore > 50
-            ? "🟡"
-            : "🔴";
-      stats.push(`${icon} ${execution.confidenceScore}%`);
+  if (tgMap) {
+    console.log(`[Telegram notify] Found tgMap: chatId=${tgMap.chatId}, msgId=${tgMap.messageId}`);
+    const edited = await editMessage(tgMap.chatId, tgMap.messageId, text, "HTML", !hasPreviewLink);
+    if (edited) {
+      console.log(`[Telegram notify] ✅ Edited message successfully`);
+      return;
     }
-    if (stats.length > 0) lines.push(stats.join(" • "));
+    // Fallback: send a NEW message to the same chat
+    console.warn(`[Telegram notify] editMessage failed, sending new message to chat=${tgMap.chatId}`);
+    const msgId = await sendMessage(tgMap.chatId, text, "HTML");
+    if (msgId) {
+      console.log(`[Telegram notify] ✅ Sent new message (fallback) msgId=${msgId}`);
+      return;
+    }
+    console.error(`[Telegram notify] sendMessage also failed for chat=${tgMap.chatId}`);
+  } else {
+    console.log(`[Telegram notify] No tgMap found for execution=${executionId}`);
+  }
 
-    // Article title + subtitle from output
-    const articleInfo = extractArticleInfo(execution.stepResults);
-    if (articleInfo) {
-      lines.push("");
-      if (articleInfo.title) lines.push(`📰 <b>${escHtml(articleInfo.title)}</b>`);
-      if (articleInfo.subtitle) lines.push(`<i>${escHtml(articleInfo.subtitle)}</i>`);
+  // Strategy 2: Find TelegramLink for this user and send directly
+  console.log(`[Telegram notify] Looking up TelegramLink for userId=${execution.userId}`);
+  const link = await prisma.telegramLink.findUnique({
+    where: { userId: execution.userId },
+  });
+  if (link) {
+    console.log(`[Telegram notify] Found TelegramLink, sending to chatId=${link.telegramChatId}`);
+    const msgId = await sendMessage(link.telegramChatId, text, "HTML");
+    if (msgId) {
+      console.log(`[Telegram notify] ✅ Sent direct message msgId=${msgId}`);
+    } else {
+      console.error(`[Telegram notify] Direct sendMessage failed for chat=${link.telegramChatId}`);
     }
-
-    // Warning flag
-    if (execution.warningFlag) {
-      const icon = execution.warningFlag === "high_risk" ? "🔴" : "⚠️";
-      const label =
-        execution.warningFlag === "high_risk"
-          ? "VISOKO TVEGANJE"
-          : "Potreben pregled";
-      lines.push(`\n${icon} ${label}`);
-    }
-
-    // Preview link (with web page preview enabled for embed)
-    if (execution.previewUrl) {
-      lines.push(`\n🔗 <a href="${baseUrl}${execution.previewUrl}">Odpri preview</a>`);
-    }
-
-    const ok = await editMessage(tgMap.chatId, tgMap.messageId, lines.join("\n"), "HTML", false);
-    if (!ok) {
-      console.error(`[Telegram notify] editMessage returned false for exec=${executionId}`);
-    }
-  } else if (execution.status === "error") {
-    const errMsg =
-      execution.errorMessage?.substring(0, 200) || "Unknown error";
-    const ok = await editMessage(
-      tgMap.chatId,
-      tgMap.messageId,
-      `❌ <b>${escHtml(recipeName)}</b> — napaka\n\n${escHtml(errMsg)}`,
-      "HTML",
-    );
-    if (!ok) {
-      console.error(`[Telegram notify] editMessage (error) returned false for exec=${executionId}`);
-    }
+  } else {
+    console.log(`[Telegram notify] No TelegramLink found for user=${execution.userId}, giving up`);
   }
 }

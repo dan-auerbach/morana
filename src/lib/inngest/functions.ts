@@ -155,10 +155,11 @@ export const recipeExecutionJob = inngest.createFunction(
       return { skipped: true, reason: `status=${existing?.status}` };
     }
 
+    let execError: unknown = null;
     try {
       await executeRecipe(executionId);
-      return { success: true };
     } catch (err: unknown) {
+      execError = err;
       const message = err instanceof Error ? err.message : "Unknown error";
       console.error("[recipeExecutionJob] error:", message);
       // Mark as error if engine didn't already
@@ -172,8 +173,23 @@ export const recipeExecutionJob = inngest.createFunction(
           },
         })
         .catch(() => {});
-      throw err; // re-throw so Inngest records the failure
     }
+
+    // ALWAYS notify Telegram (safety net — executeRecipe also tries, but this ensures it runs)
+    try {
+      const { notifyTelegramCompletion } = await import("../recipe-engine");
+      await notifyTelegramCompletion(executionId);
+    } catch (notifyErr) {
+      console.error(
+        "[recipeExecutionJob] Telegram notify failed:",
+        notifyErr instanceof Error ? notifyErr.message : notifyErr
+      );
+    }
+
+    if (execError) {
+      throw execError; // re-throw so Inngest records the failure
+    }
+    return { success: true };
   }
 );
 

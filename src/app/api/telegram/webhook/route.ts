@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { inngest } from "@/lib/inngest/client";
@@ -465,9 +465,12 @@ async function executeFromTelegram(
       `[Telegram] Inngest unavailable, using direct execution:`,
       inngestError instanceof Error ? inngestError.message : inngestError
     );
-    // Direct execution in background (don't await)
-    executeRecipe(execution.id).catch((err) => {
-      console.error(`[Telegram] Direct execution failed for ${execution.id}:`, err);
+    after(async () => {
+      try {
+        await executeRecipe(execution.id);
+      } catch (err) {
+        console.error(`[Telegram] Direct execution failed for ${execution.id}:`, err);
+      }
     });
   }
 }
