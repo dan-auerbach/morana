@@ -1,6 +1,6 @@
 # MORANA — Internal AI Operations Terminal
 
-**Version:** 3.0.0
+**Version:** 3.1.0
 **Stack:** Next.js 16 | React 19 | TypeScript | Prisma 7 | PostgreSQL (Neon) + pgvector | Tailwind CSS 4
 **Hosting:** Vercel (serverless) | Cloudflare R2 (storage)
 **UI Theme:** Dark hacker/terminal aesthetic
@@ -14,12 +14,12 @@ MORANA je interni AI operations terminal za medijsko podjetje. Združuje več AI
 
 | Modul | Provider | Opis |
 |-------|----------|------|
-| **LLM** | Anthropic Claude, OpenAI GPT-5 mini/GPT-5.2/GPT-4o, Google Gemini | Multi-turn chat z URL fetching, RAG, prompt templates, web search |
+| **LLM** | Anthropic Claude, OpenAI GPT-5 mini/GPT-5.2/GPT-4o, Google Gemini | Multi-turn chat z URL fetching, RAG, prompt templates, web search, **multimodal vision** |
 | **STT** | Soniox | Transkripcija zvoka (SL, EN) |
 | **TTS** | ElevenLabs | Sinteza govora z voice settings, model izbiro, SFX generiranje |
 | **Image** | Flux (fal.ai), Gemini Flash, Face Swap, FLUX.2 Edit | Generiranje, urejanje, face swap, multi-reference editing |
 | **Video** | Grok Imagine Video (fal.ai) | Text→Video, Image→Video, Video→Video |
-| **Recipes** | Multi-provider | Multi-step AI pipeline builder z audio podporo |
+| **Recipes** | Multi-provider | Multi-step AI pipeline builder z audio, image+text in video podporo |
 | **Jobs** | — | Background job dashboard z monitoring |
 
 ### Ključne zmožnosti
@@ -38,8 +38,11 @@ MORANA je interni AI operations terminal za medijsko podjetje. Združuje več AI
 - RAG knowledge base s pgvector embeddingi (PDF/TXT upload)
 - Avtomatsko URL fetching iz uporabniških sporočil (Mozilla Readability)
 - Cost preview pred vsako AI operacijo
-- **Multi-step AI recepti z audio input podporo** (file upload, URL, transcript paste)
-- **Recipe preset sistem** — preddefinirani pipelini (NOVINAR) z one-click instantiation
+- **Multi-step AI recepti z audio, image+text in video podporo** (file upload, URL, transcript paste, presigned R2 upload)
+- **Recipe preset sistem** — preddefinirani pipelini (NOVINAR, NOVINAR AUTO 1, URL POVZETEK, INTERVJU > ČLANEK, STORY > VIDEO) z one-click instantiation in auto-sync
+- **Presigned R2 upload** — brskalnik naloži datoteke direktno na Cloudflare R2 prek presigned URL, bypass Next.js body limit
+- **Multimodalna LLM podpora (vision)** — slike se pošljejo v LLM kot base64 (podpora za Anthropic, OpenAI, Gemini)
+- **Video generacija v receptih** — img2video/text2video z fal.ai v recipe pipeline (executeVideoStep z queue polling)
 - **Async recipe execution** — Inngest background processing, non-blocking API
 - **Recipe versioning** — avtomatske verzije ob spremembi korakov
 - **Aggregated cost tracking** — totalCostCents + costBreakdownJson per execution
@@ -55,7 +58,7 @@ MORANA je interni AI operations terminal za medijsko podjetje. Združuje več AI
 - MIME magic-bytes validacija za file uploade
 - Error message sanitizacija (brez internih leakov)
 - **Responsive nav z admin dropdownom, user dropdownom in overflow sistemom**
-- Cloudflare R2 storage za datoteke, TTS audio in recipe audio uploade
+- Cloudflare R2 storage za datoteke, TTS audio, recipe audio/image uploade
 - Inngest async task queue za dolgotrajne procese (zahteva signing key)
 - Vercel deployment z maxDuration za dolgotrajne API route
 - **MORANA branded favicon** (zeleni terminal square)
@@ -579,9 +582,11 @@ Indeksi: `email`, `createdAt`, `event`
 | `/api/recipes` | POST | Ustvari recept z inputKind, inputModes, defaultLang, uiHints (admin) |
 | `/api/recipes/[id]` | GET, PATCH, DELETE | CRUD za recept (admin) |
 | `/api/recipes/[id]/steps` | PUT | Zamenjaj vse korake recepta (admin) |
-| `/api/recipes/[id]/execute` | POST | Zaženi izvedbo (maxDuration: 30s). Podpira JSON in multipart/form-data za audio upload. **Execution je asinhrona** — endpoint shrani inpute, pošlje Inngest event in takoj vrne `{ execution: { id, status: "pending" } }`. Frontend nato polira za napredek. |
+| `/api/recipes/[id]/execute` | POST | Zaženi izvedbo (maxDuration: 30s). Prejme JSON z `inputData` (storageKey reference za datoteke uploadane prek `/api/upload`). **Execution je asinhrona** — endpoint shrani inpute, pošlje Inngest event in takoj vrne `{ execution: { id, status: "pending" } }`. Frontend nato polira za napredek. |
 | `/api/recipes/presets` | GET | Seznam dostopnih presetov (admin) |
 | `/api/recipes/presets` | POST | Instantiiraj preset kot recept (admin, body: `{ presetKey }`) |
+| `/api/recipes/presets` | PUT | Sync preset — posodobi korake, inputKind, inputModes, defaultLang, uiHints (admin, body: `{ presetKey }`) |
+| `/api/upload` | POST | Presigned R2 upload URL (body: `{ fileName, fileSize, fileType, recipeId }`). Vrne `{ uploadUrl, storageKey }`. Podpira audio + image MIME type. |
 | `/api/recipes/executions` | GET | Seznam uporabnikovih izvedb |
 | `/api/recipes/executions/[id]` | GET | Podrobnosti izvedbe |
 | `/api/recipes/executions/[id]` | POST | Cancel izvedbo |
@@ -656,12 +661,34 @@ Gemini je na voljo samo če je `GEMINI_API_KEY` nastavljen.
 
 **Web Search mode** (`runLLMWebSearch`):
 - Uporablja OpenAI Responses API (`openai.responses.create()`) z `web_search_preview` toolom
-- Vedno uporablja GPT-4o (hardcoded) — web search ni podprt na vseh modelih
+- Vedno uporablja GPT-5.2 (hardcoded) — web search ni podprt na vseh modelih
 - `search_context_size: "low"` za stroškovno optimizacijo (~$25/1K klicev)
 - Citati se ekstrahirajo iz `url_citation` anotacij in shranijo v `Message.citationsJson`
 - Fallback: če Responses API vrne napako, pad nazaj na standardni `runLLMChat()` brez web searcha
 - Toggle je viden samo za OpenAI modele v LLM chat headerju
 - Ob prehodu na non-OpenAI model se web search avtomatsko izklopi
+
+**Multimodalna podpora (Vision):**
+
+LLM klici podpirajo opcijsko pošiljanje slik skupaj z besedilom. Tip `ChatMessage` ima opcijsko `images?: ImageAttachment[]` polje (backward compatible — obstoječi klici brez slik delujejo nespremenjeno).
+
+```typescript
+type ImageAttachment = { base64: string; mimeType: string };
+type ChatMessage = { role: "user" | "assistant"; content: string; images?: ImageAttachment[] };
+```
+
+Ko `images` obstaja, se per-provider formatira v nativen multimodalen format:
+
+| Provider | Format |
+|----------|--------|
+| Anthropic | Content array: `[{ type: "image", source: { type: "base64", media_type, data } }, { type: "text", text }]` |
+| OpenAI Chat | Content array: `[{ type: "image_url", image_url: { url: "data:mime;base64,..." } }, { type: "text", text }]` |
+| OpenAI Responses (webSearch) | Input array: `[{ type: "input_image", image_url: "data:mime;base64,..." }, { type: "input_text", text }]` |
+| Gemini | Parts array: `[{ inlineData: { mimeType, data } }, { text }]` |
+
+**Size guard:** Max 4MB base64 (~3MB raw). Slike večje od te meje se preskočijo z warningom — varno za vse providerje (Anthropic limit 5MB, OpenAI 20MB).
+
+**V recipe engine:** `executeLLMStep()` avtomatsko naloži sliko iz R2 ko `context.input.imageStorageKey` obstaja. Slika se prebere z `getObjectAsBase64()` in posreduje v `ChatMessage.images`. To pomeni da vsak recept z `imageStorageKey` v inputu avtomatsko dobi multimodalni LLM.
 
 ### STT — Soniox
 
@@ -931,6 +958,7 @@ Vsak recept ima `inputKind` ki določa tip vhoda in `inputModes` ki definira dov
 | `text` | `["text"]` | Textarea za paste besedila |
 | `audio` | `["file", "url", "text"]` | Tabs: Upload file / Audio URL / Paste transcript |
 | `image` | `["file", "url"]` | Upload ali URL |
+| `image_text` | `["file"]` | Upload slike + textarea za besedilo (hkrati) |
 | `none` | `[]` | Brez vhoda (samo pipeline koraki) |
 
 Za audio recepte (npr. NOVINAR):
@@ -938,18 +966,73 @@ Za audio recepte (npr. NOVINAR):
 - **Audio URL:** URL se shrani v `inputData.audioUrl`
 - **Transcript paste:** Besedilo se shrani v `inputData.transcriptText` — STT korak se avtomatsko preskoči
 
+Za image_text recepte (npr. STORY > VIDEO):
+- **Image upload:** Slika se uploada na R2 prek presigned URL, reference se shrani v `inputData.imageStorageKey` + `inputData.imageMimeType`
+- **Text:** Besedilo se shrani v `inputData.text`
+- UI prikaže upload zono za sliko (levo) + textarea za zgodbo (desno) hkrati, pink accent (#ff6b9d)
+
+### Presigned R2 upload (`/api/upload`)
+
+Datoteke (audio + slike) se nalagajo direktno na Cloudflare R2 prek presigned URL-jev. To bypassa Next.js body size limite (1MB action handler + 10MB middleware clone).
+
+**Flow:**
+```
+1. Frontend → POST /api/upload { fileName, fileSize, fileType, recipeId }
+2. Backend generira presigned PUT URL (10 min TTL) + storageKey
+3. Frontend → PUT na R2 presigned URL z datoteko
+4. Frontend → POST /api/recipes/{id}/execute z { storageKey } (JSON, majhen payload)
+```
+
+**Podprti MIME tipi:**
+- Audio: `audio/mpeg`, `audio/mp3`, `audio/wav`, `audio/ogg`, `audio/flac`, `audio/mp4`, `audio/m4a`, `audio/aac`, `audio/webm`
+- Image: `image/png`, `image/jpeg`, `image/webp`
+
+**Max velikost:** 100MB
+
 ### Recipe preseti (`src/lib/recipe-presets.ts`)
 
-Preddefinirani pipeline templati za one-click creation:
+Preddefinirani pipeline templati za one-click creation. Admin vidi presete na `/recipes` in jih lahko instantiira z enim klikom ali sinhronizira (SYNC) obstoječe recepte z aktualno preset kodo.
+
+**Preseti se avtomatsko sinhronizirajo ob server startup** prek `instrumentation.ts`. PUT `/api/recipes/presets` zdaj posodobi tudi `inputKind`, `inputModes`, `defaultLang` in `uiHints` (ne samo korake).
 
 **NOVINAR preset:**
 ```
-Audio → Transkripcija (Soniox SL) → Članek (GPT-4o-mini) → SEO (GPT-4o-mini) → Drupal Output
+Audio → Transkripcija (Soniox SL) → Članek (GPT-5 mini) → SEO (GPT-5 mini) → Drupal Output
 ```
 - Input: audio file, URL, ali transcript
 - Output: Drupal-ready JSON s člankom, SEO metapodatki, HTML body
 
-Admin vidi presete na `/recipes` in jih lahko instantiira z enim klikom. Preset ustvari Recipe + RecipeSteps v bazi.
+**NOVINAR AUTO 1 preset:**
+```
+Tema (text) → Klasifikator (Gemini) → Web Research (GPT-5.2, pogojno) → Outline (pogojno, dynamic model) → Članek (dynamic model) → SEO (GPT-5 mini) → Fact Check (GPT-5.2, pogojno) → Drupal JSON
+```
+- Input: kratka tema (text)
+- 7 korakov z conditional execution, dynamic model selection, web search
+- Output: Drupal JSON + SEO + confidence score + javni preview link
+
+**URL POVZETEK preset:**
+```
+URL(i) → STT → Outline (GPT-5.2) → Članek (GPT-5.2, fetchUrls) → SEO (GPT-5 mini) → Fact Check (GPT-5.2) → Drupal JSON
+```
+- Input: URL-ji + tema (text), `fetchUrls: true`
+- 7 korakov, dynamic model za nekatere korake
+- Output: Drupal JSON s povzetkom spletnih strani
+
+**INTERVJU > ČLANEK preset:**
+```
+Audio → STT (Soniox) → Članek z 5 citati (GPT-5.2) → SEO (GPT-5 mini) → Drupal JSON
+```
+- Input: audio posnetek intervjuja
+- 4 koraki, članek z izpostavljenimi citati (blockquote)
+- Output: Drupal JSON s strukturiranim člankom
+
+**STORY > VIDEO preset:**
+```
+Fotografija + zgodba → LLM Video Prompt (GPT-5.2, webSearch, vision) → Video (fal.ai img2video, 5s, 480p, 16:9)
+```
+- Input: `image_text` — upload fotografije + kratka zgodba
+- 2 koraka, LLM vidi sliko (multimodal) in naredi cinematic prompt
+- Output: 5-sekundni video v 480p
 
 ### Execution engine (`src/lib/recipe-engine.ts`)
 
@@ -961,7 +1044,8 @@ executeRecipe(executionId):
     3. Update execution progress (step N/total, %)
     4. Execute step based on type:
        - stt: skip if transcript provided, else fetch audio from R2/URL → Soniox
-       - llm: build prompt from config → runLLMChat → cost tracking
+       - llm: build prompt from config → load image if imageStorageKey (multimodal) → runLLMChat/runLLMWebSearch → cost tracking
+       - video: get prompt from previousOutput → get image signed URL → submit to fal.ai → poll (backoff, max 280s) → download → upload to R2 → create File + RunOutput
        - output_format: format text as markdown/html/json/drupal_json
        - tts/image: placeholder (not yet implemented in pipeline)
     5. Pipe output → next step input
@@ -1008,10 +1092,12 @@ Recipe builder s form-based step management:
 ### User UI (`/recipes`)
 
 - Seznam aktivnih receptov z opisom in step pregledom
+- Badges: AUDIO (cyan), IMAGE+TEXT (pink)
 - Input mode tabs za audio recepte (Upload / URL / Transcript)
-- Language selector (SL / EN)
-- File upload z drag-and-click (prikaže ime in velikost)
-- "QUEUED..." stanje po kliku na execute
+- Image+text recepti: upload zona za sliko (levo) + textarea za zgodbo (desno), pink accent (#ff6b9d), "CREATE VIDEO" gumb
+- Language selector (SL / EN) za audio recepte
+- File upload z presigned R2 URL (prikaže ime in velikost, upload status na gumbu)
+- "QUEUED..." / "GENERATING VIDEO..." / "Uploading image..." stanje med izvajanjem
 - Execution history z auto-polling (3s)
 - Cost prikaz per execution (v $)
 
@@ -1021,6 +1107,7 @@ Step-by-step timeline s statusom, trajanjem, inputom in outputom. Auto-polling z
 - Verzija recepta (vN badge)
 - Skupni strošek izvedbe (v $)
 - Per-step audit trail (SHA256 hashi, provider response ID) v collapsed "Audit Trail" sekciji
+- **Video player:** Avtodetekcija video JSON output (`videoUrl` polje) → `<video>` element z controls, autoplay, loop, muted, playsInline. Metapodatki (dimenzije, trajanje, fps) + DOWNLOAD link. Pink accent za video output.
 
 ---
 
@@ -1300,6 +1387,22 @@ npx prisma migrate deploy
 ---
 
 ## Changelog
+
+### v3.1.0 (2026-02-18)
+
+- **Presigned R2 upload:** Brskalnik naloži datoteke direktno na Cloudflare R2 prek presigned URL. Bypass Next.js body size limit (1MB action handler + 10MB middleware clone). Podpira audio in image MIME type. Nov `/api/upload` endpoint.
+- **STORY > VIDEO preset:** Fotografija + zgodba → LLM (GPT-5.2, webSearch, multimodal vision) → img2video 5s 480p 16:9. LLM vidi naloženo sliko in analizira vizualne elemente (osebe, barve, kompozicijo) za generiranje cinematic video prompta.
+- **Multimodalna LLM podpora (vision):** LLM koraki v receptih zdaj prejemajo slike iz R2 kot base64 ko `imageStorageKey` obstaja v inputu. Podprti vsi 3 providerji (Anthropic, OpenAI, Gemini) + Responses API webSearch. 4MB base64 size guard.
+- **URL POVZETEK preset:** URL-ji + tema → STT → Outline → Članek → SEO → Fact Check → Drupal JSON. 7 korakov z `fetchUrls: true`, dynamic model selection.
+- **INTERVJU > ČLANEK preset:** Audio intervju → STT → Članek z 5 izpostavljenimi citati (blockquote) → SEO → Drupal JSON. 4 koraki.
+- **image_text inputKind:** Nov tip vhoda za recepte — upload slike + textarea za besedilo hkrati. Pink UI accent (#ff6b9d) z "CREATE VIDEO" gumbom.
+- **Video step v recipe engine:** `executeVideoStep()` z fal.ai queue polling (backoff 2-8s, max 280s timeout). Podpira img2video, text2video. Rezultat: video upload na R2 + File + RunOutput zapisi.
+- **Video player na execution detail:** Avtodetekcija video JSON output → `<video>` player z autoplay, loop, download link, metadata (dimenzije, trajanje, fps).
+- **Recipe preset sync fix:** PUT `/api/recipes/presets` zdaj posodobi `inputKind`, `inputModes`, `defaultLang` in `uiHints` (prej samo name/description/koraki).
+- **Preset auto-sync:** `instrumentation.ts` sinhronizira presete ob server startup.
+- **Article detection fix:** `formatDrupalOutput()` preferira tekst z markdown headingi (`# ## ###`) pred najdaljšim tekstom. Rešuje problem kjer je STT transcript (daljši) prevladal nad člankom.
+- **Upload status UX:** Ločen `uploadStatus` state prikazan na RUN gumbu ("Uploading file...", "Uploading image...") namesto v rdečem error bannerju.
+- **Storage utility:** Nova `getObjectAsBase64()` funkcija v `storage.ts` za branje R2 objektov kot base64 string (za multimodalni LLM).
 
 ### v2.8.0 (2026-02-17)
 
