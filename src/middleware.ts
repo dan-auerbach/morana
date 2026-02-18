@@ -94,15 +94,15 @@ export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const userAgent = req.headers.get("user-agent");
 
-  // Block bots on all routes except robots.txt
-  if (pathname !== "/robots.txt" && isBot(userAgent)) {
-    const response = new NextResponse("Forbidden", { status: 403 });
+  // Allow public paths FIRST (before bot detection — webhooks like Telegram have bot user-agents)
+  if (isPublicPath(pathname)) {
+    const response = NextResponse.next();
     return addSecurityHeaders(response);
   }
 
-  // Allow public paths
-  if (isPublicPath(pathname)) {
-    const response = NextResponse.next();
+  // Block bots on all routes except robots.txt
+  if (pathname !== "/robots.txt" && isBot(userAgent)) {
+    const response = new NextResponse("Forbidden", { status: 403 });
     return addSecurityHeaders(response);
   }
 
