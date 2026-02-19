@@ -1,8 +1,44 @@
-import { parseHTML } from "linkedom";
 import type { AdapterResult, CandidateArticle } from "../types";
 
-const FETCH_TIMEOUT_MS = 5000;
+const FETCH_TIMEOUT_MS = 10_000;
 const USER_AGENT = "Morana/1.0 NewsScout";
+
+/**
+ * Extract text content between XML tags.
+ * Handles CDATA sections: <![CDATA[...]]>
+ */
+function tagContent(xml: string, tag: string): string | null {
+  // Match <tag>...</tag> or <tag ...>...</tag> (non-greedy)
+  const re = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, "i");
+  const match = xml.match(re);
+  if (!match) return null;
+  let content = match[1].trim();
+  // Strip CDATA wrapper
+  const cdata = content.match(/^<!\[CDATA\[([\s\S]*?)\]\]>$/);
+  if (cdata) content = cdata[1].trim();
+  return content || null;
+}
+
+/**
+ * Extract href attribute from Atom <link> element.
+ */
+function atomLinkHref(xml: string): string | null {
+  const match = xml.match(/<link[^>]*href=["']([^"']+)["'][^>]*\/?>/i);
+  return match ? match[1] : null;
+}
+
+/**
+ * Split XML into items/entries by tag.
+ */
+function splitByTag(xml: string, tag: string): string[] {
+  const items: string[] = [];
+  const re = new RegExp(`<${tag}[\\s>][\\s\\S]*?</${tag}>`, "gi");
+  let match;
+  while ((match = re.exec(xml)) !== null) {
+    items.push(match[0]);
+  }
+  return items;
+}
 
 export async function fetchRSS(
   feedUrl: string,
@@ -28,15 +64,14 @@ export async function fetchRSS(
   }
 
   try {
-    const { document } = parseHTML(xml);
-
     // Try RSS <item> elements first
-    const items = document.querySelectorAll("item");
+    const items = splitByTag(xml, "item");
     if (items.length > 0) {
-      for (const item of items) {
-        const title = item.querySelector("title")?.textContent?.trim();
-        const link = item.querySelector("link")?.textContent?.trim();
-        const pubDate = item.querySelector("pubDate")?.textContent?.trim();
+      for (const itemXml of items) {
+        const title = tagContent(itemXml, "title");
+        const link = tagContent(itemXml, "link");
+        const pubDate = tagContent(itemXml, "pubDate")
+          || tagContent(itemXml, "dc:date");
         if (!title || !link) continue;
 
         articles.push({
@@ -49,13 +84,12 @@ export async function fetchRSS(
       }
     } else {
       // Try Atom <entry> elements
-      const entries = document.querySelectorAll("entry");
-      for (const entry of entries) {
-        const title = entry.querySelector("title")?.textContent?.trim();
-        const linkEl = entry.querySelector("link");
-        const link = linkEl?.getAttribute("href") || linkEl?.textContent?.trim();
-        const updated = entry.querySelector("updated")?.textContent?.trim()
-          || entry.querySelector("published")?.textContent?.trim();
+      const entries = splitByTag(xml, "entry");
+      for (const entryXml of entries) {
+        const title = tagContent(entryXml, "title");
+        const link = atomLinkHref(entryXml) || tagContent(entryXml, "link");
+        const updated = tagContent(entryXml, "updated")
+          || tagContent(entryXml, "published");
         if (!title || !link) continue;
 
         articles.push({
