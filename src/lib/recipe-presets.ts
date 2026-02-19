@@ -917,28 +917,21 @@ RULES FOR GREAT VIDEO PROMPTS:
 
 // ─── LONGEVITY URL ──────────────────────────────────────────────────────
 //
-// URL → Source Analysis → Scientific Research → Expert Article → SEO → Fact-check → Drupal Publish
+// URL → Source Analysis → Article → SEO → Drupal Output → Drupal Publish
 //
-// Purpose: Turn any health/longevity/biohacking web source into a high-quality
-// English article for a longevity-focused audience, then push directly to Drupal.
-//
-// Quality approach:
-//   - Always performs web research (health content demands verification)
-//   - Scientific writing with proper source attribution
-//   - Strict medical fact-check with evidence grading
-//   - Source article always cited with link
-//   - Drupal publish as draft for editorial review
+// Purpose: Turn any health/longevity web source into a polished English article
+// with attractive headline, proper source attribution, and publish to Drupal.
 //
 const LONGEVITY_URL_PRESET: RecipePreset = {
   key: "longevity-url",
   name: "LONGEVITY URL",
-  description: "URL → research → expert longevity article (EN) → SEO → fact-check → Drupal publish.",
+  description: "URL → longevity article (EN) → SEO → Drupal publish.",
   inputKind: "text",
   inputModes: ["text"],
   defaultLang: "en",
   uiHints: {
     label: "Longevity URL → Drupal",
-    description: "Paste a URL — AI reads the source, researches the science, writes an expert English article for your longevity audience, and publishes to Drupal.",
+    description: "Paste a URL — AI reads the source, writes an engaging English article for your longevity audience, and publishes to Drupal.",
     placeholder: "Paste article URL (e.g. https://www.nature.com/articles/...)",
   },
   steps: [
@@ -957,16 +950,14 @@ You will receive the full content of a web page. Analyze it thoroughly and retur
 Return this exact structure:
 {
   "complexity": "low" | "medium" | "high",
-  "needs_web": true,
   "topic_type": "research_study" | "clinical_trial" | "supplement" | "lifestyle" | "biohacking" | "nutrition" | "exercise" | "mental_health" | "genetics" | "technology" | "policy" | "review" | "other",
-  "evidence_tier": "peer_reviewed" | "preprint" | "expert_opinion" | "anecdotal" | "press_release" | "mixed",
   "recommended_length": <number of words>,
-  "risk_level": "low" | "medium" | "high",
   "source_language": "en" | "de" | "sl" | "es" | "fr" | "other",
   "source_title": "title of the original article",
   "source_url": "the URL provided by the user",
   "source_date": "publication date if found, or null",
   "source_author": "author name(s) if found, or null",
+  "source_publication": "name of the publication/website",
   "key_claims": [
     { "claim": "specific factual claim", "evidence_basis": "what supports it in the source" }
   ],
@@ -979,135 +970,75 @@ Return this exact structure:
 
 Guidelines:
 - complexity: "low" for single-finding news, "medium" for multi-faceted topics, "high" for deep mechanistic or review articles
-- needs_web: ALWAYS true for health/longevity content (verification is mandatory)
-- evidence_tier: classify the quality of evidence presented
-- risk_level: "high" for specific health claims, dosage recommendations, or disease treatment; "medium" for general wellness; "low" for lifestyle/exercise
+- recommended_length: 400-600 for low, 600-900 for medium, 900-1400 for high
 - key_claims: extract EVERY specific factual claim (numbers, percentages, study results)
 - source_summary: be EXHAUSTIVE — include all data points, study parameters, sample sizes, effect sizes, mechanisms, expert names and their affiliations`,
         userPromptTemplate: "Analyze this source for a longevity article:\n\n{{original_input}}",
       },
     },
 
-    // ── Step 1: SCIENTIFIC RESEARCH (always runs for health content) ──
+    // ── Step 1: ARTICLE WRITING ──
     {
       stepIndex: 1,
-      name: "Scientific Research",
-      type: "llm",
-      config: {
-        modelId: "gpt-5.2",
-        webSearch: true,
-        systemPrompt: `You are a longevity research assistant with expertise in geroscience, molecular biology, and clinical medicine.
-
-Given a source article analysis about a longevity/health topic, perform thorough supplementary research.
-
-Return STRICT JSON only:
-{
-  "facts": [
-    { "claim": "verified factual statement", "source": "source name", "url": "source url", "evidence_quality": "strong" | "moderate" | "weak" }
-  ],
-  "sources": [
-    { "title": "source title", "url": "source url", "type": "study" | "review" | "expert" | "institution" | "news" }
-  ],
-  "related_studies": [
-    { "title": "study title", "journal": "journal", "year": "year", "key_finding": "one-sentence finding", "url": "doi or pubmed url if available" }
-  ],
-  "expert_context": "2-3 sentences of expert context: where does this fit in the current scientific landscape? Is the evidence converging or controversial?",
-  "mechanism_summary": "Brief explanation of the biological mechanism if applicable (e.g. mTOR pathway, senolytic action, telomere dynamics)",
-  "practical_implications": "What does this mean for someone interested in longevity? Any actionable takeaways?",
-  "caveats": ["important limitations or nuances", "e.g. mouse study only", "small sample size", "correlation not causation"],
-  "key_figures": ["researcher names or institutions relevant to this topic"]
-}
-
-Research priorities:
-1. Find the ORIGINAL peer-reviewed study if the source is a news article about research
-2. Look for meta-analyses or systematic reviews on the same topic
-3. Find expert commentary or rebuttals
-4. Check if the findings have been replicated
-5. Identify any conflicts of interest or funding sources
-6. Prioritize: PubMed, Nature, Science, Cell, The Lancet, NEJM, clinicaltrials.gov
-7. Include practical context from longevity-focused experts (Attia, Sinclair, Longo, etc.) if relevant`,
-        userPromptTemplate: `Research this longevity topic thoroughly.
-
-SOURCE URL: {{original_input}}
-
-SOURCE ANALYSIS:
-{{step.0.text}}`,
-      },
-    },
-
-    // ── Step 2: EXPERT ARTICLE WRITING ──
-    {
-      stepIndex: 2,
       name: "Article",
       type: "llm",
       config: {
         modelStrategy: "auto",
         modelStrategySource: { stepIndex: 0, field: "complexity" },
         modelStrategyMap: { low: "gpt-5.2", medium: "gpt-5.2", high: "claude-sonnet-4-5-20250929" },
-        systemPrompt: `You are an expert health and longevity journalist writing for an educated audience that follows aging research, biohacking, and healthspan optimization. Write in English.
+        systemPrompt: `You are an expert health and longevity journalist writing for an educated audience passionate about aging research, biohacking, and healthspan optimization. Write in English.
 
 YOUR AUDIENCE:
 - Health-conscious readers who understand basic biology
 - They want depth, not dumbed-down summaries
-- They value evidence quality and scientific nuance
-- They want actionable insights when appropriate
+- They value actionable insights
 - They follow researchers like Peter Attia, David Sinclair, Valter Longo, Rhonda Patrick
 
 ARTICLE STRUCTURE:
 
-1. # HEADLINE — compelling, specific, avoids clickbait. Max 12 words. Should convey the key finding or insight.
+1. # HEADLINE — **attractive, engaging, makes the reader want to click**. Max 12 words. Convey the most exciting finding or insight. Be bold but honest. Examples of good headlines:
+   - "This Overlooked Mineral May Add Years to Your Life"
+   - "Scientists Reverse Aging Markers in Human Cells With a Single Compound"
+   - "Why Your Morning Routine Might Be Sabotaging Your Longevity"
 
-2. LEAD PARAGRAPH — 2-3 sentences that answer: What happened? Why does it matter for longevity? What's the evidence quality?
+2. LEAD PARAGRAPH — 2-3 punchy sentences. Hook the reader. What's the key discovery and why should they care?
 
 3. BODY — organized into clear sections with ## subheadings:
+   - Present the core finding with specific data when available
+   - Explain the biological mechanism in accessible but precise language (name pathways like mTOR, AMPK, sirtuins — but explain them briefly)
+   - Give practical takeaways when appropriate — what can readers actually do with this info?
+   - Mention limitations briefly if important (animal study, small sample, etc.) — but don't overdo caveats, keep the article engaging
 
-   a. **The Finding / Key Insight** — What exactly was discovered or reported? Include specific data: effect sizes, p-values, sample sizes, duration.
-
-   b. **The Science** — Explain the biological mechanism in accessible but precise language. Don't shy away from naming pathways (mTOR, AMPK, sirtuins, etc.) but briefly explain them.
-
-   c. **The Evidence** — How strong is this evidence? Peer-reviewed? RCT or observational? Human or animal model? Replicated? Include a brief evidence quality assessment.
-
-   d. **Expert Context** — What do leading researchers say? Where does this fit in the broader field? Is the scientific community aligned or divided?
-
-   e. **Practical Takeaways** — What, if anything, can readers do with this information? Be responsible: clearly distinguish between "established" and "experimental."
-
-   f. **Caveats & Limitations** — What are the important limitations? What questions remain unanswered?
-
-4. SOURCE ATTRIBUTION — End with:
+4. SOURCE ATTRIBUTION — End with a clearly formatted source line:
    **Source:** [Original Article Title](URL) — Author, Publication, Date
+
+   Use the exact source_title, source_url, source_author, source_publication, and source_date from the source analysis. If author or date are null, omit them gracefully.
 
 FORMATTING:
 - Use ## for section headings
 - Use **bold** for key terms and important data points
 - Use > blockquotes for direct expert quotes
 - Use bullet points for lists of findings, compounds, or practical tips
-- Include specific numbers: "a **23% reduction** in all-cause mortality (HR 0.77, 95% CI 0.68-0.87)"
 
 RULES:
-- NEVER fabricate data, studies, or quotes — use ONLY what's in the source analysis and research
-- If a claim has weak evidence, SAY SO explicitly
-- Don't use sensationalist language ("breakthrough", "miracle", "game-changer")
-- DO use precise scientific language where appropriate
-- Attribute every major claim to its source
-- If dosages are mentioned, include them but add "consult a healthcare provider" caveat
-- Distinguish between human and animal studies clearly
-- Article length should match complexity: 600-800 words (low), 800-1200 (medium), 1200-1800 (high)`,
-        userPromptTemplate: `Write an expert longevity article based on this source.
+- NEVER fabricate data, studies, or quotes — use ONLY what's in the source analysis
+- Attribute claims to the original source naturally in the text
+- Write with energy and authority — avoid dry, academic tone
+- Article length should match complexity (see recommended_length in source analysis)
+- If the source is in a non-English language, write the article entirely in English`,
+        userPromptTemplate: `Write an engaging longevity article based on this source.
 
 ORIGINAL URL:
 {{original_input}}
 
-SOURCE ANALYSIS (contains all key data from the original):
-{{step.0.text}}
-
-SCIENTIFIC RESEARCH (supplementary evidence and expert context):
-{{step.1.text}}`,
+SOURCE ANALYSIS (contains all extracted data from the original):
+{{step.0.text}}`,
       },
     },
 
-    // ── Step 3: SEO ENGINE (English, longevity niche) ──
+    // ── Step 2: SEO ENGINE ──
     {
-      stepIndex: 3,
+      stepIndex: 2,
       name: "SEO",
       type: "llm",
       config: {
@@ -1117,121 +1048,49 @@ SCIENTIFIC RESEARCH (supplementary evidence and expert context):
 Return STRICT JSON only:
 {
   "meta_title": "SEO title, max 60 chars — include primary keyword",
-  "meta_description": "SEO meta description, 150-160 chars — compelling, includes keyword, hints at evidence quality",
+  "meta_description": "SEO meta description, 150-160 chars — compelling, includes keyword",
   "keywords": ["primary keyword", "secondary keyword", "long-tail phrase", "related term", "related term"],
   "slug": "url-friendly-slug-with-keywords",
-  "social_title": "Social media title, max 70 chars — slightly more engaging than meta_title",
+  "social_title": "Social media title, max 70 chars — engaging, shareable",
   "social_description": "Social media description, max 200 chars — emphasize the most interesting finding",
   "category_suggestion": "one of: aging-research, supplements, nutrition, exercise, biohacking, mental-health, genetics, longevity-tech, clinical-trials",
   "titles": [
     {"type": "informational", "text": "Clear, factual headline"},
-    {"type": "curiosity", "text": "Headline that sparks curiosity without clickbait"},
+    {"type": "curiosity", "text": "Headline that sparks curiosity"},
     {"type": "benefit", "text": "Headline focused on the reader benefit"}
   ],
-  "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"],
-  "schema_type": "Article" | "MedicalWebPage" | "ScholarlyArticle"
+  "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"]
 }
 
 RULES:
 - Target longevity/health search queries
 - Keywords: 5-8, mix of head terms and long-tail phrases
-- Include scientific terms that researchers search for (e.g. "rapamycin longevity", "NAD+ aging")
+- Include scientific terms that researchers search for
 - Tags: 5-7 topical tags
-- schema_type: use MedicalWebPage for health claims, ScholarlyArticle for research coverage
-- Slug: lowercase, hyphens, include primary keyword
-- Avoid medical claims in meta description that could trigger YMYL penalties — frame as "research suggests" not "proven to"`,
-        userPromptTemplate: "Generate SEO metadata for this longevity article:\n\n{{step.2.text}}",
+- Slug: lowercase, hyphens, include primary keyword`,
+        userPromptTemplate: "Generate SEO metadata for this longevity article:\n\n{{step.1.text}}",
       },
     },
 
-    // ── Step 4: MEDICAL FACT CHECK ──
+    // ── Step 3: DRUPAL OUTPUT ──
     {
-      stepIndex: 4,
-      name: "Fact Check",
-      type: "llm",
-      config: {
-        modelId: "gpt-5.2",
-        webSearch: true,
-        systemPrompt: `You are a medical fact-checker for a longevity publication. Health misinformation can cause real harm, so be thorough and conservative.
-
-Analyze the article for:
-1. Factual accuracy of all health/science claims
-2. Proper representation of evidence quality
-3. Appropriate caveats and disclaimers
-4. Source fidelity (does the article accurately represent the original source?)
-
-Return STRICT JSON only:
-{
-  "verified_claims": [
-    { "claim": "claim from article", "status": "verified", "source": "verification source", "evidence_grade": "A" | "B" | "C" | "D" }
-  ],
-  "flagged_claims": [
-    { "claim": "problematic claim", "issue": "why it's problematic", "severity": "warning" | "error", "suggestion": "how to fix" }
-  ],
-  "corrections": [
-    { "original": "text in article", "corrected": "suggested correction", "reason": "why" }
-  ],
-  "evidence_assessment": {
-    "overall_grade": "A" | "B" | "C" | "D" | "F",
-    "grade_explanation": "one sentence explaining the grade",
-    "strongest_evidence": "the best-supported claim",
-    "weakest_evidence": "the least-supported claim"
-  },
-  "source_fidelity": "accurate" | "embellished" | "distorted" | "misleading",
-  "health_safety": {
-    "contains_dosage_claims": true | false,
-    "contains_treatment_claims": true | false,
-    "has_appropriate_disclaimers": true | false,
-    "risk_assessment": "description of any health risks from following the article's advice"
-  },
-  "overall_verdict": "safe" | "needs_review" | "high_risk",
-  "confidence_score": <0-100>,
-  "summary": "2-3 sentence assessment"
-}
-
-Evidence grading:
-- A: Multiple RCTs or meta-analyses in humans
-- B: Single RCT or multiple large observational studies in humans
-- C: Animal studies, small human studies, or preliminary evidence
-- D: In vitro, theoretical, or anecdotal evidence only
-
-confidence_score:
-- 90-100: All claims verified with strong evidence, proper caveats present
-- 70-89: Minor issues, some claims could use better qualification
-- 50-69: Significant concerns, some claims overstate the evidence
-- <50: Major problems, health misinformation risk`,
-        userPromptTemplate: `Fact-check this longevity article. Be strict — health content demands high accuracy.
-
-ARTICLE:
-{{step.2.text}}
-
-SOURCE ANALYSIS (original data):
-{{step.0.json}}
-
-SCIENTIFIC RESEARCH (supplementary evidence):
-{{step.1.json}}`,
-      },
-    },
-
-    // ── Step 5: DRUPAL OUTPUT ──
-    {
-      stepIndex: 5,
+      stepIndex: 3,
       name: "Drupal Output",
       type: "output_format",
       config: {
         formats: ["drupal_json"],
-        description: "Compile final Drupal JSON payload with article, SEO, sources, and confidence score",
+        description: "Compile final Drupal JSON payload with article and SEO metadata",
       },
     },
 
-    // ── Step 6: DRUPAL PUBLISH ──
+    // ── Step 4: DRUPAL PUBLISH ──
     {
-      stepIndex: 6,
+      stepIndex: 4,
       name: "Drupal Publish",
       type: "drupal_publish",
       config: {
-        mode: "draft",
-        description: "Publish article to Drupal as draft for editorial review",
+        mode: "publish",
+        description: "Publish article to Drupal",
       },
     },
   ],

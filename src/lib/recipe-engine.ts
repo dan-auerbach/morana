@@ -914,8 +914,8 @@ async function executeDrupalPublishStep(
     return { text: "[Skipped: no drupal_json output found in previous steps]", runId: null, providerResponseId: null };
   }
 
-  // Determine mode from config
-  const mode = (config.description?.includes("publish") ? "publish" : "draft") as "draft" | "publish";
+  // Determine mode from config (explicit mode field, fallback to draft)
+  const mode = (config.mode === "publish" ? "publish" : "draft") as "draft" | "publish";
 
   // Decrypt credentials and build client
   const credentials = decryptCredentials(integration.credentialsEnc);
