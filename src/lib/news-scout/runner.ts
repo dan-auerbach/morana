@@ -115,7 +115,7 @@ export async function executeNewsScoutRun(runId: string): Promise<void> {
       log(logs, "rank", `LLM done: ${rankResult.inputTokens} in / ${rankResult.outputTokens} out | ${rankResult.latencyMs}ms | ${costCents}¢`);
 
       await logUsage({
-        runId: run.id,
+        runId: null, // NewsScoutRun is not a Run — no FK relation
         userId: run.userId || "system",
         provider: "openai",
         model: topic.model,

@@ -2,7 +2,7 @@ import { prisma } from "./prisma";
 import { estimateCostCents } from "./config";
 
 export async function logUsage(params: {
-  runId: string;
+  runId: string | null;
   userId: string;
   provider: string;
   model: string;
