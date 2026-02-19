@@ -29,6 +29,7 @@ const adminLinks = [
   { href: "/admin/knowledge", label: "Knowledge" },
   { href: "/admin/models", label: "Models" },
   { href: "/admin/integrations/drupal", label: "Drupal" },
+  { href: "/admin/news-scout", label: "News Scout" },
   { href: "/admin/analytics", label: "Analytics" },
   { href: "/admin/auth-logs", label: "Auth Logs" },
   { href: "/admin/workspaces", label: "Workspaces" },

@@ -20,6 +20,7 @@ MORANA je interni AI operations terminal za medijsko podjetje. Združuje več AI
 | **Image** | Flux (fal.ai), Gemini Flash, Face Swap, FLUX.2 Edit | Generiranje, urejanje, face swap, multi-reference editing |
 | **Video** | Grok Imagine Video (fal.ai) | Text→Video, Image→Video, Video→Video |
 | **Recipes** | Multi-provider | Multi-step AI pipeline builder z audio, image+text in video podporo |
+| **News Scout** | OpenAI GPT-5 mini (configurable) | Daily news scanning, ranking, TOP 3 URL delivery via Telegram |
 | **Jobs** | — | Background job dashboard z monitoring |
 
 ### Ključne zmožnosti
@@ -1108,6 +1109,49 @@ Step-by-step timeline s statusom, trajanjem, inputom in outputom. Auto-polling z
 - Skupni strošek izvedbe (v $)
 - Per-step audit trail (SHA256 hashi, provider response ID) v collapsed "Audit Trail" sekciji
 - **Video player:** Avtodetekcija video JSON output (`videoUrl` polje) → `<video>` element z controls, autoplay, loop, muted, playsInline. Metapodatki (dimenzije, trajanje, fps) + DOWNLOAD link. Pink accent za video output.
+
+---
+
+## News Scout
+
+**Stran:** `/admin/news-scout`
+**Namen:** Dnevno (ali ročno) skeniranje definiranih novic in vračanje TOP 3 URL-jev za izbrano temo.
+
+### Arhitektura
+
+News Scout sestoji iz:
+1. **Fetch adapters** — RSS/Atom, Google News RSS, HTML scraping (s CSS selektorji), X/Twitter stub
+2. **Filter pipeline** — časovni filter (24h), paywall detekcija, negativni ključne besede
+3. **Dedup** — URL kanonizacija (strip UTM/tracking params) + trigram Jaccard podobnost naslovov (>0.85 = ista zgodba)
+4. **LLM Ranker** — GPT-5 mini (nastavljiv per topic) oceni pomembnost, bralni potencial, deljivost, raznolikost
+5. **Runner** — orkestrator ki zažene celoten pipeline: fetch → filter → dedup → rank → save → Telegram notify
+
+### Modeli (Prisma)
+
+- `NewsScoutTopic` — tema za skeniranje (name, description, model, negativeFilters, maxSourcesPerRun)
+- `NewsScoutSource` — vir novic (type: rss/google_news/html/x, baseUrl, rssUrl, selectors)
+- `NewsScoutRun` — zapis izvajanja (status, resultUrls, resultMeta, logs, costCents)
+
+Sources so workspace-scoped — vsi aktivni viri se uporabijo za vse teme v workspace-u.
+
+### Cron & Manual
+
+- **Dnevni cron:** `0 6 * * *` (6:00 UTC) — za vse aktivne teme z aktivnimi workspace-i
+- **Ročni trigger:** Admin UI "Run Now" gumb per topic
+
+### Telegram Delivery
+
+Po zaključku runa se rezultati pošljejo vsem workspace članom s povezanim Telegram računom (HTML parse mode).
+
+### API
+
+- `GET/POST /api/admin/news-scout/topics` — CRUD teme
+- `PATCH/DELETE /api/admin/news-scout/topics/:id`
+- `GET/POST /api/admin/news-scout/sources` — CRUD viri
+- `PATCH/DELETE /api/admin/news-scout/sources/:id`
+- `GET /api/admin/news-scout/runs` — seznam runov (filter: `?topicId=`)
+- `POST /api/admin/news-scout/runs` — trigger manual run
+- `GET /api/admin/news-scout/runs/:id` — detail runa z logi
 
 ---
 

@@ -465,4 +465,61 @@ export const drupalPublishJob = inngest.createFunction(
   }
 );
 
-export const inngestFunctions = [sttJob, ttsJob, recipeExecutionJob, falImageJob, drupalPublishJob];
+// ─── News Scout Jobs ────────────────────────────────────
+export const newsScoutJob = inngest.createFunction(
+  { id: "news-scout-run", retries: 1 },
+  { event: "news-scout/run" },
+  async ({ event }) => {
+    const { runId } = event.data as { runId: string };
+
+    // Idempotency: skip if run not in "running" state
+    const existing = await prisma.newsScoutRun.findUnique({
+      where: { id: runId },
+      select: { status: true },
+    });
+    if (!existing || existing.status !== "running") {
+      return { skipped: true, reason: `status=${existing?.status}` };
+    }
+
+    const { executeNewsScoutRun } = await import("../news-scout/runner");
+    await executeNewsScoutRun(runId);
+    return { success: true };
+  }
+);
+
+export const newsScoutCronJob = inngest.createFunction(
+  { id: "news-scout-daily" },
+  { cron: "0 6 * * *" },
+  async () => {
+    // Load all active topics with active workspaces
+    const topics = await prisma.newsScoutTopic.findMany({
+      where: {
+        isActive: true,
+        workspace: { isActive: true },
+      },
+      select: { id: true, workspaceId: true },
+    });
+
+    if (topics.length === 0) return { skipped: true, reason: "no active topics" };
+
+    const runs = [];
+    for (const topic of topics) {
+      const run = await prisma.newsScoutRun.create({
+        data: {
+          workspaceId: topic.workspaceId,
+          topicId: topic.id,
+          status: "running",
+        },
+      });
+      await inngest.send({
+        name: "news-scout/run",
+        data: { runId: run.id },
+      });
+      runs.push(run.id);
+    }
+
+    return { triggered: runs.length, runIds: runs };
+  }
+);
+
+export const inngestFunctions = [sttJob, ttsJob, recipeExecutionJob, falImageJob, drupalPublishJob, newsScoutJob, newsScoutCronJob];

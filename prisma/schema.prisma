@@ -88,6 +88,9 @@ model Workspace {
   usageEvents     UsageEvent[]
   usersActive     User[]  @relation("UserActiveWorkspace")
   drupalIntegration IntegrationDrupal?
+  newsScoutTopics  NewsScoutTopic[]
+  newsScoutSources NewsScoutSource[]
+  newsScoutRuns    NewsScoutRun[]
 
   @@index([slug])
 }
@@ -595,4 +598,64 @@ model TelegramExecutionMap {
   execution RecipeExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
 
   @@index([executionId])
+}
+
+// ─── News Scout ──────────────────────────────────────────────
+
+model NewsScoutTopic {
+  id               String   @id @default(cuid())
+  workspaceId      String
+  name             String
+  description      String               // e.g. "Longevity news"
+  negativeFilters  Json     @default("[]")  // string[]
+  maxSourcesPerRun Int      @default(100)
+  model            String   @default("gpt-5-mini")
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  workspace Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  runs      NewsScoutRun[]
+
+  @@index([workspaceId])
+}
+
+model NewsScoutSource {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  type        String               // "rss" | "google_news" | "html" | "x"
+  baseUrl     String
+  rssUrl      String?
+  selectors   Json?                // {listSelector, titleSelector, linkSelector, dateSelector}
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+}
+
+model NewsScoutRun {
+  id             String    @id @default(cuid())
+  workspaceId    String
+  topicId        String
+  userId         String?              // null = cron
+  status         String    @default("running")  // "running"|"done"|"error"
+  resultUrls     Json?                // string[3]
+  resultMeta     Json?                // [{url,title,reason}]
+  logs           Json?                // RunLog[]
+  errorMessage   String?   @db.Text
+  costCents      Int       @default(0)
+  candidateCount Int       @default(0)
+  createdAt      DateTime  @default(now())
+  finishedAt     DateTime?
+
+  workspace Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  topic     NewsScoutTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([topicId])
+  @@index([createdAt])
 }
