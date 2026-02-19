@@ -13,6 +13,9 @@ import {
   type VideoResolution,
 } from "./providers/fal-video";
 import { createHash, randomUUID } from "crypto";
+import { decryptCredentials } from "./drupal/crypto";
+import { sanitizeHtml } from "./drupal/sanitize";
+import { DrupalClient } from "./drupal/client";
 
 function sha256(text: string): string {
   return createHash("sha256").update(text, "utf8").digest("hex");
@@ -54,6 +57,10 @@ type StepConfig = {
   videoDuration?: number;       // seconds (1-15)
   videoResolution?: "480p" | "720p";
   videoAspectRatio?: string;    // "16:9", "9:16", etc.
+  // Engine v2: drupal publish configuration
+  mode?: "draft" | "publish";
+  integrationId?: string;
+  sourceStepIndex?: number;
 };
 
 type InputData = {
@@ -275,6 +282,8 @@ export async function executeRecipe(executionId: string): Promise<void> {
         stepOut = await executeVideoStep(execution.userId, workspaceId, config, context);
       } else if (step.type === "output_format") {
         stepOut = { text: formatOutput(context, config.formats || ["markdown"]), runId: null, providerResponseId: null };
+      } else if (step.type === "drupal_publish") {
+        stepOut = await executeDrupalPublishStep(execution.userId, workspaceId, config, context);
       } else {
         // TTS, Image — not yet implemented
         stepOut = { text: context.previousOutput || `[Step ${step.name}: ${step.type} processing not implemented]`, runId: null, providerResponseId: null };
@@ -850,6 +859,97 @@ async function executeVideoStep(
     });
     throw err;
   }
+}
+
+// ─── Drupal Publish Step ──────────────────────────────────────────────────
+
+/**
+ * Execute a drupal_publish step: find the drupal_json output from a previous step,
+ * load the workspace's Drupal integration, and publish directly.
+ * Gracefully skips if no integration is configured.
+ */
+async function executeDrupalPublishStep(
+  userId: string,
+  workspaceId: string | null,
+  config: StepConfig,
+  context: StepContext
+): Promise<StepOutput> {
+  if (!workspaceId) {
+    return { text: "[Skipped: no workspace — Drupal integration requires a workspace]", runId: null, providerResponseId: null };
+  }
+
+  // Load Drupal integration for workspace
+  const integration = await prisma.integrationDrupal.findUnique({
+    where: { workspaceId },
+  });
+  if (!integration || !integration.isEnabled) {
+    return { text: "[Skipped: no Drupal integration configured for this workspace]", runId: null, providerResponseId: null };
+  }
+  if (!integration.credentialsEnc) {
+    return { text: "[Skipped: Drupal integration has no credentials configured]", runId: null, providerResponseId: null };
+  }
+
+  // Find drupal_json payload from previous steps
+  let drupalPayload: { title?: string; body?: string; summary?: string } | null = null;
+
+  // Look for output with format: "drupal_article" (from formatDrupalOutput)
+  for (const [, stepData] of Object.entries(context.steps)) {
+    try {
+      const parsed = typeof stepData.json === "object" && stepData.json !== null
+        ? stepData.json as Record<string, unknown>
+        : JSON.parse(stepData.text);
+      if (parsed && parsed.format === "drupal_article" && parsed.title) {
+        drupalPayload = {
+          title: parsed.title as string,
+          body: parsed.body as string,
+          summary: (parsed.summary || parsed.subtitle || "") as string,
+        };
+      }
+    } catch {
+      // Not parseable JSON, skip
+    }
+  }
+
+  if (!drupalPayload || !drupalPayload.title || !drupalPayload.body) {
+    return { text: "[Skipped: no drupal_json output found in previous steps]", runId: null, providerResponseId: null };
+  }
+
+  // Determine mode from config
+  const mode = (config.description?.includes("publish") ? "publish" : "draft") as "draft" | "publish";
+
+  // Decrypt credentials and build client
+  const credentials = decryptCredentials(integration.credentialsEnc);
+  const client = new DrupalClient({
+    baseUrl: integration.baseUrl,
+    adapterType: integration.adapterType as "jsonapi" | "custom_rest",
+    authType: integration.authType as "basic" | "bearer_token",
+    credentials,
+    defaultContentType: integration.defaultContentType,
+    bodyFormat: integration.bodyFormat,
+  });
+
+  const sanitizedBody = sanitizeHtml(drupalPayload.body);
+
+  const result = await client.publish({
+    title: drupalPayload.title,
+    body_html: sanitizedBody,
+    summary: drupalPayload.summary,
+    status: mode,
+  });
+
+  const outputJson = {
+    nodeId: result.nodeId,
+    nodeUuid: result.nodeUuid,
+    url: result.url,
+    drupalStatus: result.status,
+    publishedAt: new Date().toISOString(),
+  };
+
+  return {
+    text: JSON.stringify(outputJson),
+    runId: null,
+    providerResponseId: null,
+  };
 }
 
 // ─── Output Formatting ────────────────────────────────────────────────────

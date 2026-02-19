@@ -87,6 +87,7 @@ model Workspace {
   runs            Run[]
   usageEvents     UsageEvent[]
   usersActive     User[]  @relation("UserActiveWorkspace")
+  drupalIntegration IntegrationDrupal?
 
   @@index([slug])
 }
@@ -559,6 +560,29 @@ model TelegramLinkCode {
 
   @@index([code])
   @@index([expiresAt])
+}
+
+// ─── Drupal Integration ──────────────────────────────────────────
+
+model IntegrationDrupal {
+  id                String   @id @default(cuid())
+  workspaceId       String
+  name              String   @default("Drupal")
+  baseUrl           String               // e.g. https://drupal.domain.tld
+  adapterType       String   @default("jsonapi")  // "jsonapi" | "custom_rest"
+  authType          String   @default("bearer_token") // "basic" | "bearer_token"
+  credentialsEnc    String?  @db.Text     // AES-256-GCM encrypted JSON { username?, password?, token? }
+  defaultContentType String  @default("article")
+  fieldMap          Json?                 // custom field mapping overrides
+  bodyFormat        String   @default("full_html") // Drupal text format
+  isEnabled         Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId])  // one Drupal integration per workspace
+  @@index([workspaceId])
 }
 
 model TelegramExecutionMap {

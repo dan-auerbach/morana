@@ -380,6 +380,17 @@ KLASIFIKACIJA:
         description: "Sestavi finalni Drupal JSON payload z člankom, SEO, viri in confidence score",
       },
     },
+
+    // ── Step 7: DRUPAL PUBLISH (optional — only runs if integration configured) ──
+    {
+      stepIndex: 7,
+      name: "Drupal Publish",
+      type: "drupal_publish",
+      config: {
+        mode: "draft",
+        description: "Objavi članek v Drupal kot osnutek (draft)",
+      },
+    },
   ],
 };
 

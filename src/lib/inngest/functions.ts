@@ -1,4 +1,5 @@
 import { inngest } from "./client";
+import { NonRetriableError } from "inngest";
 import { prisma } from "../prisma";
 import { runSTT } from "../providers/stt";
 import { runTTS } from "../providers/tts";
@@ -11,6 +12,9 @@ import { uploadToR2, getObjectFromR2 } from "../storage";
 import { logUsage } from "../usage";
 import { executeRecipe } from "../recipe-engine";
 import { v4 as uuid } from "uuid";
+import { decryptCredentials } from "../drupal/crypto";
+import { sanitizeHtml } from "../drupal/sanitize";
+import { DrupalClient } from "../drupal/client";
 
 export const sttJob = inngest.createFunction(
   { id: "stt-transcribe", retries: 2 },
@@ -343,4 +347,122 @@ export const falImageJob = inngest.createFunction(
   }
 );
 
-export const inngestFunctions = [sttJob, ttsJob, recipeExecutionJob, falImageJob];
+// ─── Drupal Publish Job ──────────────────────────────────
+export const drupalPublishJob = inngest.createFunction(
+  { id: "drupal-publish", retries: 2 },
+  { event: "drupal/publish" },
+  async ({ event }) => {
+    const { executionId, integrationId, payload, mode, userId } = event.data as {
+      executionId: string | null;
+      integrationId: string;
+      payload: { title: string; body: string; summary?: string };
+      mode: "draft" | "publish";
+      userId: string;
+    };
+
+    // 1. Load integration config
+    const integration = await prisma.integrationDrupal.findUnique({
+      where: { id: integrationId },
+    });
+    if (!integration) {
+      throw new NonRetriableError("Drupal integration not found");
+    }
+    if (!integration.isEnabled) {
+      throw new NonRetriableError("Drupal integration is disabled");
+    }
+
+    // 2. Decrypt credentials
+    if (!integration.credentialsEnc) {
+      throw new NonRetriableError("No credentials configured for Drupal integration");
+    }
+    let credentials: { username?: string; password?: string; token?: string };
+    try {
+      credentials = decryptCredentials(integration.credentialsEnc);
+    } catch {
+      throw new NonRetriableError("Failed to decrypt Drupal credentials");
+    }
+
+    // 3. Sanitize body HTML
+    const sanitizedBody = sanitizeHtml(payload.body);
+
+    // 4. Build client and publish
+    const client = new DrupalClient({
+      baseUrl: integration.baseUrl,
+      adapterType: integration.adapterType as "jsonapi" | "custom_rest",
+      authType: integration.authType as "basic" | "bearer_token",
+      credentials,
+      defaultContentType: integration.defaultContentType,
+      bodyFormat: integration.bodyFormat,
+    });
+
+    try {
+      const result = await client.publish({
+        title: payload.title,
+        body_html: sanitizedBody,
+        summary: payload.summary,
+        status: mode,
+      });
+
+      // 5. Save result to RecipeStepResult if executionId provided
+      if (executionId) {
+        // Find the drupal_publish step result
+        const stepResults = await prisma.recipeStepResult.findMany({
+          where: { executionId },
+          orderBy: { stepIndex: "desc" },
+        });
+        const drupalStep = stepResults.find(
+          (sr) => sr.status === "pending" || sr.status === "running"
+        );
+        if (drupalStep) {
+          await prisma.recipeStepResult.update({
+            where: { id: drupalStep.id },
+            data: {
+              status: "done",
+              outputPreview: `Published to Drupal: node/${result.nodeId}`,
+              outputFull: {
+                nodeId: result.nodeId,
+                nodeUuid: result.nodeUuid,
+                url: result.url,
+                drupalStatus: result.status,
+              },
+              finishedAt: new Date(),
+            },
+          });
+        }
+      }
+
+      return { nodeId: result.nodeId, nodeUuid: result.nodeUuid, url: result.url };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Drupal publish failed";
+
+      // Save error to step result if executionId provided
+      if (executionId) {
+        const stepResults = await prisma.recipeStepResult.findMany({
+          where: { executionId },
+          orderBy: { stepIndex: "desc" },
+        });
+        const drupalStep = stepResults.find(
+          (sr) => sr.status === "pending" || sr.status === "running"
+        );
+        if (drupalStep) {
+          await prisma.recipeStepResult.update({
+            where: { id: drupalStep.id },
+            data: {
+              status: "error",
+              errorMessage: message,
+              finishedAt: new Date(),
+            },
+          });
+        }
+      }
+
+      // 4xx errors from Drupal are non-retryable
+      if (message.includes("error 4")) {
+        throw new NonRetriableError(message);
+      }
+      throw err;
+    }
+  }
+);
+
+export const inngestFunctions = [sttJob, ttsJob, recipeExecutionJob, falImageJob, drupalPublishJob];
