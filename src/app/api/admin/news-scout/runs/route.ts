@@ -58,8 +58,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Topic not found" }, { status: 404 });
     }
 
+    // Create the run record first
+    let run;
     try {
-      const run = await prisma.newsScoutRun.create({
+      run = await prisma.newsScoutRun.create({
         data: {
           workspaceId,
           topicId,
@@ -67,16 +69,35 @@ export async function POST(req: NextRequest) {
           status: "running",
         },
       });
+    } catch (err) {
+      console.error("[NewsScout Runs] DB create error:", err);
+      return NextResponse.json({ error: "Failed to create run" }, { status: 500 });
+    }
 
+    // Dispatch to Inngest (non-blocking — run is already created)
+    try {
       await inngest.send({
         name: "news-scout/run",
         data: { runId: run.id },
       });
-
-      return NextResponse.json({ run }, { status: 201 });
     } catch (err) {
-      console.error("[NewsScout Runs] Trigger error:", err);
-      return NextResponse.json({ error: "Failed to trigger run" }, { status: 500 });
+      console.error("[NewsScout Runs] Inngest send error:", err);
+      // Run exists but Inngest failed — execute inline as fallback
+      try {
+        const { executeNewsScoutRun } = await import("@/lib/news-scout/runner");
+        // Fire and forget — don't block the response
+        executeNewsScoutRun(run.id).catch((e) => {
+          console.error("[NewsScout Runs] Inline execution error:", e);
+        });
+      } catch (importErr) {
+        console.error("[NewsScout Runs] Import error:", importErr);
+        await prisma.newsScoutRun.update({
+          where: { id: run.id },
+          data: { status: "error", errorMessage: "Failed to dispatch job", finishedAt: new Date() },
+        });
+      }
     }
+
+    return NextResponse.json({ run }, { status: 201 });
   }, req);
 }
