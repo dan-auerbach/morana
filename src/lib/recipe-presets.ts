@@ -917,21 +917,21 @@ RULES FOR GREAT VIDEO PROMPTS:
 
 // ─── LONGEVITY URL ──────────────────────────────────────────────────────
 //
-// URL → Source Analysis → Article → SEO → Drupal Output → Drupal Publish
+// URL → Source Analysis → Article → Image Prompt → Image → SEO → Drupal Output → Drupal Publish
 //
 // Purpose: Turn any health/longevity web source into a polished English article
-// with attractive headline, proper source attribution, and publish to Drupal.
+// with attractive headline, featured image, proper source attribution, and publish to Drupal.
 //
 const LONGEVITY_URL_PRESET: RecipePreset = {
   key: "longevity-url",
   name: "LONGEVITY URL",
-  description: "URL → longevity article (EN) → SEO → Drupal publish.",
+  description: "URL → longevity article (EN) → featured image → SEO → Drupal publish.",
   inputKind: "text",
   inputModes: ["text"],
   defaultLang: "en",
   uiHints: {
     label: "Longevity URL → Drupal",
-    description: "Paste a URL — AI reads the source, writes an engaging English article for your longevity audience, and publishes to Drupal.",
+    description: "Paste a URL — AI reads the source, writes an engaging English article with featured image, and publishes to Drupal.",
     placeholder: "Paste article URL (e.g. https://www.nature.com/articles/...)",
   },
   steps: [
@@ -992,40 +992,45 @@ YOUR AUDIENCE:
 - Health-conscious readers who understand basic biology
 - They want depth, not dumbed-down summaries
 - They value actionable insights
-- They follow researchers like Peter Attia, David Sinclair, Valter Longo, Rhonda Patrick
 
 ARTICLE STRUCTURE:
 
-1. # HEADLINE — **attractive, engaging, makes the reader want to click**. Max 12 words. Convey the most exciting finding or insight. Be bold but honest. Examples of good headlines:
-   - "This Overlooked Mineral May Add Years to Your Life"
-   - "Scientists Reverse Aging Markers in Human Cells With a Single Compound"
-   - "Why Your Morning Routine Might Be Sabotaging Your Longevity"
+1. # HEADLINE — attractive, engaging, makes the reader want to click. Max 10 words. Be bold but honest.
 
-2. LEAD PARAGRAPH — 2-3 punchy sentences. Hook the reader. What's the key discovery and why should they care?
+2. LEAD PARAGRAPH — 2-3 punchy sentences. Hook the reader immediately.
 
-3. BODY — organized into clear sections with ## subheadings:
-   - Present the core finding with specific data when available
-   - Explain the biological mechanism in accessible but precise language (name pathways like mTOR, AMPK, sirtuins — but explain them briefly)
-   - Give practical takeaways when appropriate — what can readers actually do with this info?
-   - Mention limitations briefly if important (animal study, small sample, etc.) — but don't overdo caveats, keep the article engaging
+3. BODY — organized with ## subheadings:
 
-4. SOURCE ATTRIBUTION — End with a clearly formatted source line:
+   CRITICAL RULE FOR SUBHEADINGS:
+   - ## subheadings must be SHORT: 2-5 words MAXIMUM
+   - Good: "## The Key Finding", "## How It Works", "## What You Can Do", "## The Bottom Line"
+   - BAD: "## Why This Matters for Anyone Interested in Living Longer" (TOO LONG!)
+   - NEVER put explanatory text in subheadings — keep explanations in body paragraphs
+
+   Body sections should cover:
+   - The core finding with specific data
+   - The biological mechanism (name pathways like mTOR, AMPK — explain briefly)
+   - Practical takeaways when appropriate
+   - Brief limitations if important
+
+4. SOURCE ATTRIBUTION — End with:
    **Source:** [Original Article Title](URL) — Author, Publication, Date
 
-   Use the exact source_title, source_url, source_author, source_publication, and source_date from the source analysis. If author or date are null, omit them gracefully.
+   Use the exact source_title, source_url, source_author, source_publication, and source_date from the source analysis. If author or date are null, omit them.
 
 FORMATTING:
-- Use ## for section headings
-- Use **bold** for key terms and important data points
-- Use > blockquotes for direct expert quotes
-- Use bullet points for lists of findings, compounds, or practical tips
+- ## for section headings (2-5 words only!)
+- **bold** for key terms
+- > blockquotes for direct quotes
+- Bullet points (- item) for lists — each item on its own line
+- [link text](url) for links — these WILL be rendered as clickable links
 
 RULES:
-- NEVER fabricate data, studies, or quotes — use ONLY what's in the source analysis
-- Attribute claims to the original source naturally in the text
-- Write with energy and authority — avoid dry, academic tone
-- Article length should match complexity (see recommended_length in source analysis)
-- If the source is in a non-English language, write the article entirely in English`,
+- NEVER fabricate data or quotes — use ONLY what's in the source analysis
+- Subheadings MUST be 2-5 words. This is non-negotiable.
+- Write with energy and authority
+- Article length should match recommended_length from source analysis
+- If source is non-English, write entirely in English`,
         userPromptTemplate: `Write an engaging longevity article based on this source.
 
 ORIGINAL URL:
@@ -1036,9 +1041,48 @@ SOURCE ANALYSIS (contains all extracted data from the original):
       },
     },
 
-    // ── Step 2: SEO ENGINE ──
+    // ── Step 2: IMAGE PROMPT ──
     {
       stepIndex: 2,
+      name: "Image Prompt",
+      type: "llm",
+      config: {
+        modelId: "gpt-5-mini",
+        systemPrompt: `You are an AI image prompt engineer specializing in editorial and health/science imagery.
+
+Given an article about longevity/health, create a single image generation prompt for a featured article photo.
+
+OUTPUT: Return ONLY the image prompt text. No explanations, no JSON, no markdown.
+
+STYLE GUIDELINES:
+- Professional editorial photography style or elegant scientific illustration
+- Clean, modern, high-quality aesthetic suitable for a premium health publication
+- Avoid text, logos, or watermarks in the image
+- Use natural lighting, warm tones, and clean composition
+- For science topics: abstract molecular/cellular visualization, lab imagery, or conceptual art
+- For lifestyle topics: aspirational healthy living scenes, nature, movement
+- For supplement/nutrition: elegant food photography, botanical illustrations
+- NEVER include human faces or recognizable people (use silhouettes, backs, or abstract figures)
+- Keep it under 80 words, be specific and vivid`,
+        userPromptTemplate: "Create a featured image prompt for this longevity article:\n\n{{step.1.text}}",
+      },
+    },
+
+    // ── Step 3: IMAGE GENERATION ──
+    {
+      stepIndex: 3,
+      name: "Featured Image",
+      type: "image",
+      config: {
+        imageModel: "fal-ai/flux/schnell",
+        imageSize: "landscape_16_9",
+        description: "Generate featured image using Flux Schnell",
+      },
+    },
+
+    // ── Step 4: SEO ENGINE ──
+    {
+      stepIndex: 4,
       name: "SEO",
       type: "llm",
       config: {
@@ -1065,27 +1109,26 @@ Return STRICT JSON only:
 RULES:
 - Target longevity/health search queries
 - Keywords: 5-8, mix of head terms and long-tail phrases
-- Include scientific terms that researchers search for
 - Tags: 5-7 topical tags
 - Slug: lowercase, hyphens, include primary keyword`,
         userPromptTemplate: "Generate SEO metadata for this longevity article:\n\n{{step.1.text}}",
       },
     },
 
-    // ── Step 3: DRUPAL OUTPUT ──
+    // ── Step 5: DRUPAL OUTPUT ──
     {
-      stepIndex: 3,
+      stepIndex: 5,
       name: "Drupal Output",
       type: "output_format",
       config: {
         formats: ["drupal_json"],
-        description: "Compile final Drupal JSON payload with article and SEO metadata",
+        description: "Compile final Drupal JSON payload with article, SEO, and featured image",
       },
     },
 
-    // ── Step 4: DRUPAL PUBLISH ──
+    // ── Step 6: DRUPAL PUBLISH ──
     {
-      stepIndex: 4,
+      stepIndex: 6,
       name: "Drupal Publish",
       type: "drupal_publish",
       config: {

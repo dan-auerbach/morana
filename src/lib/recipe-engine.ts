@@ -16,6 +16,13 @@ import { createHash, randomUUID } from "crypto";
 import { decryptCredentials } from "./drupal/crypto";
 import { sanitizeHtml } from "./drupal/sanitize";
 import { DrupalClient } from "./drupal/client";
+import {
+  submitImageJob,
+  getImageJobStatus,
+  getImageJobResult,
+  downloadFalImage,
+  type FalImageSize,
+} from "./providers/fal-image";
 
 function sha256(text: string): string {
   return createHash("sha256").update(text, "utf8").digest("hex");
@@ -57,6 +64,9 @@ type StepConfig = {
   videoDuration?: number;       // seconds (1-15)
   videoResolution?: "480p" | "720p";
   videoAspectRatio?: string;    // "16:9", "9:16", etc.
+  // Engine v2: image step configuration
+  imageModel?: string;    // fal.ai model ID (default: fal-ai/flux/schnell)
+  imageSize?: string;     // fal.ai image size preset or {width, height}
   // Engine v2: drupal publish configuration
   mode?: "draft" | "publish";
   integrationId?: string;
@@ -282,10 +292,12 @@ export async function executeRecipe(executionId: string): Promise<void> {
         stepOut = await executeVideoStep(execution.userId, workspaceId, config, context);
       } else if (step.type === "output_format") {
         stepOut = { text: formatOutput(context, config.formats || ["markdown"]), runId: null, providerResponseId: null };
+      } else if (step.type === "image") {
+        stepOut = await executeImageStep(execution.userId, workspaceId, config, context);
       } else if (step.type === "drupal_publish") {
         stepOut = await executeDrupalPublishStep(execution.userId, workspaceId, config, context);
       } else {
-        // TTS, Image — not yet implemented
+        // TTS — not yet implemented
         stepOut = { text: context.previousOutput || `[Step ${step.name}: ${step.type} processing not implemented]`, runId: null, providerResponseId: null };
       }
 
@@ -861,6 +873,140 @@ async function executeVideoStep(
   }
 }
 
+// ─── Image Step ──────────────────────────────────────────────────────────
+
+/**
+ * Execute an image generation step using fal.ai.
+ * Uses the previous step output as the prompt (typically from an LLM prompt-generator step).
+ * Supports config: imageModel (default flux/schnell), imageSize (default landscape_16_9).
+ */
+async function executeImageStep(
+  userId: string,
+  workspaceId: string | null,
+  config: StepConfig,
+  context: StepContext
+): Promise<StepOutput> {
+  const prompt = context.previousOutput?.trim();
+  if (!prompt) throw new Error("Image step requires a prompt from the previous step");
+
+  const modelId = config.imageModel || "fal-ai/flux/schnell";
+  const imageSize: FalImageSize = (config.imageSize as FalImageSize) || "landscape_16_9";
+
+  // Create Run record for cost tracking
+  const run = await prisma.run.create({
+    data: {
+      userId,
+      type: "image",
+      status: "queued",
+      provider: "fal",
+      model: modelId,
+      workspaceId: workspaceId || undefined,
+    },
+  });
+
+  try {
+    // Submit to fal.ai queue
+    const queueResult = await submitImageJob(modelId, {
+      prompt,
+      image_size: imageSize,
+      num_images: 1,
+      output_format: "jpeg",
+      enable_safety_checker: true,
+    });
+
+    await prisma.run.update({
+      where: { id: run.id },
+      data: { status: "running", providerJobId: queueResult.request_id },
+    });
+
+    // Poll for completion (schnell: ~2-5s, dev: ~10-20s)
+    const start = Date.now();
+    const MAX_POLL_MS = 60_000;
+    let pollInterval = 1000;
+    let completed = false;
+
+    while (Date.now() - start < MAX_POLL_MS) {
+      await new Promise((r) => setTimeout(r, pollInterval));
+      pollInterval = Math.min(pollInterval * 1.3, 5000);
+
+      const status = await getImageJobStatus(modelId, queueResult.request_id);
+      if (status.status === "COMPLETED") {
+        completed = true;
+        break;
+      }
+    }
+
+    if (!completed) {
+      await prisma.run.update({
+        where: { id: run.id },
+        data: { status: "error", errorMessage: "Image generation timed out", finishedAt: new Date() },
+      });
+      throw new Error("Image generation timed out");
+    }
+
+    // Get result
+    const result = await getImageJobResult(modelId, queueResult.request_id);
+    const latencyMs = Date.now() - start;
+
+    if (!result.images || result.images.length === 0) {
+      throw new Error("No image returned from generation");
+    }
+
+    const img = result.images[0];
+    const { buffer, contentType } = await downloadFalImage(img.url);
+    const ext = contentType.includes("png") ? "png" : "jpg";
+    const storageKey = `image/output/${run.id}/${randomUUID()}.${ext}`;
+    await uploadToR2(storageKey, buffer, contentType, buffer.length);
+
+    const file = await prisma.file.create({
+      data: {
+        userId,
+        runId: run.id,
+        kind: "output",
+        mime: contentType,
+        size: buffer.length,
+        storageKey,
+      },
+    });
+
+    await prisma.run.update({
+      where: { id: run.id },
+      data: { status: "done", finishedAt: new Date() },
+    });
+
+    await logUsage({
+      runId: run.id,
+      userId,
+      provider: "fal",
+      model: modelId,
+      units: { images: 1 },
+      latencyMs,
+      workspaceId: workspaceId || undefined,
+    });
+
+    const outputJson = {
+      imageFileId: file.id,
+      imageUrl: `/api/files/${file.id}`,
+      storageKey,
+      width: img.width,
+      height: img.height,
+    };
+
+    return {
+      text: JSON.stringify(outputJson),
+      runId: run.id,
+      providerResponseId: null,
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Image generation failed";
+    await prisma.run.update({
+      where: { id: run.id },
+      data: { status: "error", errorMessage: msg, finishedAt: new Date() },
+    });
+    throw err;
+  }
+}
+
 // ─── Drupal Publish Step ──────────────────────────────────────────────────
 
 /**
@@ -1071,30 +1217,65 @@ function formatDrupalOutput(context: StepContext): string {
   bodyArticleText = bodyArticleText.trim();
 
   // Convert markdown-ish article to HTML (using stripped body text)
-  const bold = (s: string) => s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  const inline = (s: string) => {
+    let r = s;
+    // Links: [text](url) → <a href="url">text</a>
+    r = r.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+    // Bold: **text** → <strong>text</strong>
+    r = r.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+    // Italic: *text* → <em>text</em>  (but not already-processed <strong>)
+    r = r.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, "<em>$1</em>");
+    return r;
+  };
   const bodyHtml = bodyArticleText
     ? bodyArticleText
         .split("\n\n")
         .map((block) => {
           const trimmed = block.trim();
           if (!trimmed) return "";
-          if (trimmed.startsWith("# ")) return `<h1>${bold(trimmed.slice(2))}</h1>`;
-          if (trimmed.startsWith("## ")) return `<h2>${bold(trimmed.slice(3))}</h2>`;
-          if (trimmed.startsWith("### ")) return `<h3>${bold(trimmed.slice(4))}</h3>`;
+          if (trimmed.startsWith("# ")) return `<h1>${inline(trimmed.slice(2))}</h1>`;
+          if (trimmed.startsWith("## ")) return `<h2>${inline(trimmed.slice(3))}</h2>`;
+          if (trimmed.startsWith("### ")) return `<h3>${inline(trimmed.slice(4))}</h3>`;
+          // Lists: handle blocks where lines start with - or *
           if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
-            const items = trimmed.split("\n").map((l) => `<li>${bold(l.replace(/^[-*]\s*/, ""))}</li>`);
-            return `<ul>${items.join("")}</ul>`;
+            const items = trimmed.split("\n").map((l) => `<li>${inline(l.replace(/^[-*]\s*/, ""))}</li>`);
+            return `<ul>${items.join("\n")}</ul>`;
+          }
+          // Numbered lists: lines starting with 1. 2. etc.
+          if (/^\d+\.\s/.test(trimmed)) {
+            const items = trimmed.split("\n").map((l) => `<li>${inline(l.replace(/^\d+\.\s*/, ""))}</li>`);
+            return `<ol>${items.join("\n")}</ol>`;
           }
           if (trimmed.startsWith("> ")) {
-            // Blockquote: may be multi-line (each line starting with >)
-            const quoteLines = trimmed.split("\n").map((l) => bold(l.replace(/^>\s*/, ""))).join("<br>");
+            const quoteLines = trimmed.split("\n").map((l) => inline(l.replace(/^>\s*/, ""))).join("<br>");
             return `<blockquote>${quoteLines}</blockquote>`;
           }
-          return `<p>${bold(trimmed)}</p>`;
+          return `<p>${inline(trimmed)}</p>`;
         })
         .filter(Boolean)
         .join("\n")
-    : `<p>${bold(text)}</p>`;
+    : `<p>${inline(text)}</p>`;
+
+  // Scan for featured image (from image generation step)
+  let featuredImage: { fileId?: string; url?: string; storageKey?: string; width?: number; height?: number } | null = null;
+  for (const [, stepData] of Object.entries(context.steps)) {
+    try {
+      const parsed = (typeof stepData.json === "object" && stepData.json !== null
+        ? stepData.json
+        : JSON.parse(stepData.text)) as Record<string, unknown>;
+      if (parsed && parsed.imageFileId) {
+        featuredImage = {
+          fileId: parsed.imageFileId as string,
+          url: parsed.imageUrl as string,
+          storageKey: parsed.storageKey as string,
+          width: parsed.width as number,
+          height: parsed.height as number,
+        };
+      }
+    } catch {
+      // Not JSON
+    }
+  }
 
   const drupalPayload = {
     title: mainTitle,
@@ -1113,6 +1294,7 @@ function formatDrupalOutput(context: StepContext): string {
       tags: (seoJson.tags as string[]) || [],
     },
     sources: sources.map((s) => ({ title: s.title, url: s.url })),
+    featuredImage: featuredImage || undefined,
     author: "AI uredništvo",
     status: "draft",
     confidence_score: confidenceScore,
