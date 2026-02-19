@@ -929,7 +929,7 @@ async function executeImageStep(
       await new Promise((r) => setTimeout(r, pollInterval));
       pollInterval = Math.min(pollInterval * 1.3, 5000);
 
-      const status = await getImageJobStatus(modelId, queueResult.request_id);
+      const status = await getImageJobStatus(modelId, queueResult.request_id, queueResult.status_url);
       if (status.status === "COMPLETED") {
         completed = true;
         break;
@@ -945,7 +945,7 @@ async function executeImageStep(
     }
 
     // Get result
-    const result = await getImageJobResult(modelId, queueResult.request_id);
+    const result = await getImageJobResult(modelId, queueResult.request_id, queueResult.response_url);
     const latencyMs = Date.now() - start;
 
     if (!result.images || result.images.length === 0) {
