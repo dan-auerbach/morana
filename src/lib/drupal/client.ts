@@ -8,6 +8,8 @@ export type DrupalPublishResult = {
   nodeUuid: string;
   url?: string;
   status: string;
+  imageUploaded?: boolean;
+  imageError?: string;
 };
 
 export type DrupalPublishPayload = {
@@ -309,6 +311,8 @@ export class DrupalClient {
     const nodeUuid = String(data?.id || "");
 
     // Upload featured image if provided
+    let imageUploaded = false;
+    let imageError: string | undefined;
     if (payload.featuredImage && nodeUuid) {
       try {
         await this.uploadFeaturedImage(
@@ -319,9 +323,10 @@ export class DrupalClient {
           payload.featuredImage.contentType,
           payload.featuredImage.alt || payload.title
         );
+        imageUploaded = true;
       } catch (err) {
-        // Log but don't fail the publish — node was already created
-        console.error("[DrupalClient] Featured image upload failed:", err instanceof Error ? err.message : err);
+        imageError = err instanceof Error ? err.message : String(err);
+        console.error("[DrupalClient] Featured image upload failed:", imageError);
       }
     }
 
@@ -330,14 +335,18 @@ export class DrupalClient {
       nodeUuid,
       url: data?.links?.self?.href,
       status: isPublished ? "published" : "draft",
+      imageUploaded,
+      imageError,
     };
   }
 
   // ─── Featured Image Upload ─────────────────────────────────
 
   /**
-   * Upload a featured image to a node's field_image via JSON:API binary upload.
-   * POST /jsonapi/node/{contentType}/{uuid}/field_image
+   * Upload a featured image to a node via Drupal JSON:API.
+   * Two-step process:
+   *   1. POST binary to /jsonapi/node/{bundle}/field_image → creates file entity
+   *   2. PATCH /jsonapi/node/{bundle}/{uuid} → sets relationship + alt text
    */
   private async uploadFeaturedImage(
     nodeUuid: string,
@@ -348,10 +357,12 @@ export class DrupalClient {
     alt: string
   ): Promise<void> {
     const imageFieldName = this.config.fieldMap?.imageField || "field_image";
-    const url = `${this.config.baseUrl}/jsonapi/node/${contentType}/${nodeUuid}/${imageFieldName}`;
 
-    // Upload binary image to the node's image field
-    const resp = await fetchWithTimeout(url, {
+    // Step 1: Upload binary file to Drupal via JSON:API file upload endpoint
+    // POST /jsonapi/node/{bundle}/{field_name} — creates a file entity
+    const uploadUrl = `${this.config.baseUrl}/jsonapi/node/${contentType}/${imageFieldName}`;
+
+    const uploadResp = await fetchWithTimeout(uploadUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/octet-stream",
@@ -360,33 +371,49 @@ export class DrupalClient {
         Authorization: buildAuthHeader(this.config),
       },
       body: new Uint8Array(imageBuffer),
-    }, 30_000); // longer timeout for image upload
+    }, 30_000);
 
-    if (!resp.ok) {
-      const errorText = await resp.text().catch(() => "");
-      throw new Error(`Image upload ${resp.status}: ${errorText.slice(0, 300)}`);
+    if (!uploadResp.ok) {
+      const errorText = await uploadResp.text().catch(() => "");
+      throw new Error(`File upload ${uploadResp.status}: ${errorText.slice(0, 500)}`);
     }
 
-    // Set alt text on the image field via PATCH
-    const fileJson = await resp.json();
-    const fileId = fileJson?.data?.id;
-    if (fileId && alt) {
-      const patchUrl = `${this.config.baseUrl}/jsonapi/node/${contentType}/${nodeUuid}/relationships/${imageFieldName}`;
-      await fetchWithTimeout(patchUrl, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/vnd.api+json",
-          Accept: "application/vnd.api+json",
-          Authorization: buildAuthHeader(this.config),
-        },
-        body: JSON.stringify({
-          data: {
-            type: "file--file",
-            id: fileId,
-            meta: { alt },
+    const fileJson = await uploadResp.json();
+    const fileUuid = fileJson?.data?.id;
+    if (!fileUuid) {
+      throw new Error("File upload succeeded but no file UUID in response");
+    }
+
+    // Step 2: PATCH the node to set the image field relationship with alt text
+    const patchUrl = `${this.config.baseUrl}/jsonapi/node/${contentType}/${nodeUuid}`;
+
+    const patchResp = await fetchWithTimeout(patchUrl, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/vnd.api+json",
+        Accept: "application/vnd.api+json",
+        Authorization: buildAuthHeader(this.config),
+      },
+      body: JSON.stringify({
+        data: {
+          type: `node--${contentType}`,
+          id: nodeUuid,
+          relationships: {
+            [imageFieldName]: {
+              data: {
+                type: "file--file",
+                id: fileUuid,
+                meta: { alt },
+              },
+            },
           },
-        }),
-      });
+        },
+      }),
+    });
+
+    if (!patchResp.ok) {
+      const errorText = await patchResp.text().catch(() => "");
+      throw new Error(`Image relationship PATCH ${patchResp.status}: ${errorText.slice(0, 500)}`);
     }
   }
 

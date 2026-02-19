@@ -1115,6 +1115,8 @@ async function executeDrupalPublishStep(
     nodeUuid: result.nodeUuid,
     url: result.url,
     drupalStatus: result.status,
+    imageUploaded: result.imageUploaded || false,
+    imageError: result.imageError || undefined,
     publishedAt: new Date().toISOString(),
   };
 
