@@ -190,6 +190,22 @@ export default function NewsScoutPage() {
     loadRuns();
   }
 
+  // ── Run actions ──
+  async function cancelRun(id: string) {
+    await fetch(`/api/admin/news-scout/runs/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "error", errorMessage: "Cancelled by admin" }),
+    });
+    loadRuns();
+  }
+
+  async function deleteRun(id: string) {
+    if (!confirm("Delete this run?")) return;
+    await fetch(`/api/admin/news-scout/runs/${id}`, { method: "DELETE" });
+    loadRuns();
+  }
+
   // ── Source CRUD ──
   function resetSourceForm() {
     setSourceForm({ name: "", type: "rss", baseUrl: "", rssUrl: "", selectors: "" });
@@ -472,13 +488,13 @@ export default function NewsScoutPage() {
           </div>
 
           <div style={{ border: "1px solid #1e2a3a", borderRadius: "4px" }}>
-            <div style={{ ...s.row, gridTemplateColumns: "2fr 1fr 3fr 1fr 1fr 1fr", color: "#5a6a7a", borderBottom: "1px solid #1e2a3a", fontSize: "10px", textTransform: "uppercase" }}>
-              <span>Topic</span><span>Status</span><span>Results</span><span>Candidates</span><span>Cost</span><span>Duration</span>
+            <div style={{ ...s.row, gridTemplateColumns: "2fr 1fr 3fr 1fr 1fr 1fr 80px", color: "#5a6a7a", borderBottom: "1px solid #1e2a3a", fontSize: "10px", textTransform: "uppercase" }}>
+              <span>Topic</span><span>Status</span><span>Results</span><span>Candidates</span><span>Cost</span><span>Duration</span><span>Actions</span>
             </div>
             {runs.map((run) => (
               <div key={run.id}>
                 <div
-                  style={{ ...s.row, gridTemplateColumns: "2fr 1fr 3fr 1fr 1fr 1fr", cursor: "pointer" }}
+                  style={{ ...s.row, gridTemplateColumns: "2fr 1fr 3fr 1fr 1fr 1fr 80px", cursor: "pointer" }}
                   onClick={() => setExpandedRunId(expandedRunId === run.id ? null : run.id)}
                 >
                   <span style={{ fontWeight: 600, color: "#c9d1d9" }}>{run.topic.name}</span>
@@ -504,6 +520,12 @@ export default function NewsScoutPage() {
                   <span style={{ color: "#8b949e" }}>{run.candidateCount}</span>
                   <span style={{ color: "#8b949e" }}>{run.costCents > 0 ? `${(run.costCents / 100).toFixed(3)}$` : "-"}</span>
                   <span style={{ color: "#8b949e" }}>{formatDuration(run.createdAt, run.finishedAt)}</span>
+                  <span style={{ display: "flex", gap: "4px" }} onClick={(e) => e.stopPropagation()}>
+                    {run.status === "running" && (
+                      <button onClick={() => cancelRun(run.id)} style={{ ...s.btn("#ffcc00", "transparent", "rgba(255,204,0,0.3)"), fontSize: "10px", padding: "2px 6px" }}>Cancel</button>
+                    )}
+                    <button onClick={() => deleteRun(run.id)} style={{ ...s.btn("#ff4444", "transparent", "rgba(255,68,68,0.3)"), fontSize: "10px", padding: "2px 6px" }}>Del</button>
+                  </span>
                 </div>
 
                 {/* Expanded detail */}
