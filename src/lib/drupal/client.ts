@@ -17,6 +17,12 @@ export type DrupalPublishPayload = {
   status: "draft" | "publish";
   contentType?: string;
   bodyFormat?: string;
+  featuredImage?: {
+    buffer: Buffer;
+    filename: string;
+    contentType: string;
+    alt?: string;
+  };
 };
 
 export type DrupalTestResult = {
@@ -300,13 +306,88 @@ export class DrupalClient {
 
     const json = await resp.json();
     const data = json.data;
+    const nodeUuid = String(data?.id || "");
+
+    // Upload featured image if provided
+    if (payload.featuredImage && nodeUuid) {
+      try {
+        await this.uploadFeaturedImage(
+          nodeUuid,
+          contentType,
+          payload.featuredImage.buffer,
+          payload.featuredImage.filename,
+          payload.featuredImage.contentType,
+          payload.featuredImage.alt || payload.title
+        );
+      } catch (err) {
+        // Log but don't fail the publish — node was already created
+        console.error("[DrupalClient] Featured image upload failed:", err instanceof Error ? err.message : err);
+      }
+    }
 
     return {
       nodeId: String(data?.attributes?.drupal_internal__nid || ""),
-      nodeUuid: String(data?.id || ""),
+      nodeUuid,
       url: data?.links?.self?.href,
       status: isPublished ? "published" : "draft",
     };
+  }
+
+  // ─── Featured Image Upload ─────────────────────────────────
+
+  /**
+   * Upload a featured image to a node's field_image via JSON:API binary upload.
+   * POST /jsonapi/node/{contentType}/{uuid}/field_image
+   */
+  private async uploadFeaturedImage(
+    nodeUuid: string,
+    contentType: string,
+    imageBuffer: Buffer,
+    filename: string,
+    imageMime: string,
+    alt: string
+  ): Promise<void> {
+    const imageFieldName = this.config.fieldMap?.imageField || "field_image";
+    const url = `${this.config.baseUrl}/jsonapi/node/${contentType}/${nodeUuid}/${imageFieldName}`;
+
+    // Upload binary image to the node's image field
+    const resp = await fetchWithTimeout(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/octet-stream",
+        Accept: "application/vnd.api+json",
+        "Content-Disposition": `file; filename="${filename}"`,
+        Authorization: buildAuthHeader(this.config),
+      },
+      body: new Uint8Array(imageBuffer),
+    }, 30_000); // longer timeout for image upload
+
+    if (!resp.ok) {
+      const errorText = await resp.text().catch(() => "");
+      throw new Error(`Image upload ${resp.status}: ${errorText.slice(0, 300)}`);
+    }
+
+    // Set alt text on the image field via PATCH
+    const fileJson = await resp.json();
+    const fileId = fileJson?.data?.id;
+    if (fileId && alt) {
+      const patchUrl = `${this.config.baseUrl}/jsonapi/node/${contentType}/${nodeUuid}/relationships/${imageFieldName}`;
+      await fetchWithTimeout(patchUrl, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/vnd.api+json",
+          Accept: "application/vnd.api+json",
+          Authorization: buildAuthHeader(this.config),
+        },
+        body: JSON.stringify({
+          data: {
+            type: "file--file",
+            id: fileId,
+            meta: { alt },
+          },
+        }),
+      });
+    }
   }
 
   // ─── Custom REST Adapter ────────────────────────────────────

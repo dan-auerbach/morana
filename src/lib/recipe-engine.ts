@@ -1036,7 +1036,7 @@ async function executeDrupalPublishStep(
   }
 
   // Find drupal_json payload from previous steps
-  let drupalPayload: { title?: string; body?: string; summary?: string } | null = null;
+  let drupalPayload: { title?: string; body?: string; summary?: string; featuredImage?: { storageKey?: string; fileId?: string } } | null = null;
 
   // Look for output with format: "drupal_article" (from formatDrupalOutput)
   for (const [, stepData] of Object.entries(context.steps)) {
@@ -1049,6 +1049,7 @@ async function executeDrupalPublishStep(
           title: parsed.title as string,
           body: parsed.body as string,
           summary: (parsed.summary || parsed.subtitle || "") as string,
+          featuredImage: parsed.featuredImage as { storageKey?: string; fileId?: string } | undefined,
         };
       }
     } catch {
@@ -1072,15 +1073,41 @@ async function executeDrupalPublishStep(
     credentials,
     defaultContentType: integration.defaultContentType,
     bodyFormat: integration.bodyFormat,
+    fieldMap: integration.fieldMap as Record<string, string> | null,
   });
 
   const sanitizedBody = sanitizeHtml(drupalPayload.body);
+
+  // Download featured image from R2 if available
+  let featuredImageData: { buffer: Buffer; filename: string; contentType: string } | undefined;
+  if (drupalPayload.featuredImage?.storageKey) {
+    try {
+      const r2Obj = await getObjectFromR2(drupalPayload.featuredImage.storageKey);
+      if (r2Obj.Body) {
+        const bytes = await r2Obj.Body.transformToByteArray();
+        const ext = drupalPayload.featuredImage.storageKey.split(".").pop() || "jpg";
+        featuredImageData = {
+          buffer: Buffer.from(bytes),
+          filename: `featured-image.${ext}`,
+          contentType: r2Obj.ContentType || `image/${ext === "jpg" ? "jpeg" : ext}`,
+        };
+      }
+    } catch (err) {
+      console.error("[drupal_publish] Failed to download featured image from R2:", err instanceof Error ? err.message : err);
+    }
+  }
 
   const result = await client.publish({
     title: drupalPayload.title,
     body_html: sanitizedBody,
     summary: drupalPayload.summary,
     status: mode,
+    featuredImage: featuredImageData ? {
+      buffer: featuredImageData.buffer,
+      filename: featuredImageData.filename,
+      contentType: featuredImageData.contentType,
+      alt: drupalPayload.title,
+    } : undefined,
   });
 
   const outputJson = {
@@ -1198,7 +1225,9 @@ function formatDrupalOutput(context: StepContext): string {
 
   // Extract title and lead FIRST, then strip them from body
   const titleMatch = articleText.match(/^#\s+(.+)/m);
-  const mainTitle = titleMatch?.[1] || (seoJson.meta_title as string) || (seoJson.titles as { text: string }[])?.[0]?.text || "Untitled";
+  const rawTitle = titleMatch?.[1] || (seoJson.meta_title as string) || (seoJson.titles as { text: string }[])?.[0]?.text || "Untitled";
+  // Strip markdown bold/italic from title (LLMs sometimes wrap titles in **)
+  const mainTitle = rawTitle.replace(/\*+/g, "").trim();
 
   const leadMatch = articleText.match(/^#\s+.+\n\n(.+)/m);
   const lead = leadMatch?.[1] || (seoJson.meta_description as string) || (seoJson.metaDescription as string) || "";
