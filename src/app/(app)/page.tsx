@@ -1,14 +1,16 @@
 "use client";
 
 import { useSession, signIn } from "next-auth/react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 
-const tools = [
-  { href: "/llm", label: "LLM", desc: "Chat with Anthropic Sonnet or Gemini Flash", cmd: "> run llm --model sonnet" },
-  { href: "/stt", label: "STT", desc: "Transcribe audio (Soniox)", cmd: "> run stt --engine soniox" },
-  { href: "/tts", label: "TTS", desc: "Generate audio (ElevenLabs)", cmd: "> run tts --voice rachel" },
-  { href: "/history", label: "HISTORY", desc: "View all runs", cmd: "> query runs --all" },
-  { href: "/usage", label: "USAGE", desc: "Track costs and API usage", cmd: "> stats --costs --usage" },
+const MODULE_CARDS = [
+  { href: "/recipes", module: "recipes", label: "RECIPES", desc: "Multi-step AI pipelines", cmd: "> run recipe --name novinar" },
+  { href: "/llm", module: "llm", label: "LLM", desc: "Chat with Anthropic Sonnet or Gemini Flash", cmd: "> run llm --model sonnet" },
+  { href: "/stt", module: "stt", label: "STT", desc: "Transcribe audio (Soniox)", cmd: "> run stt --engine soniox" },
+  { href: "/tts", module: "tts", label: "TTS", desc: "Generate audio (ElevenLabs)", cmd: "> run tts --voice rachel" },
+  { href: "/image", module: "image", label: "IMAGE", desc: "Generate & edit images (Flux, Gemini)", cmd: "> run image --model flux-dev" },
+  { href: "/video", module: "video", label: "VIDEO", desc: "Generate video (Grok Imagine)", cmd: "> run video --prompt scene" },
 ];
 
 const ASCII_LOGO = `
@@ -21,6 +23,21 @@ const ASCII_LOGO = `
 
 export default function Home() {
   const { data: session, status } = useSession();
+  const [allowedModules, setAllowedModules] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    if (session) {
+      fetch("/api/user/modules")
+        .then((r) => r.json())
+        .then((d) => setAllowedModules(d.allowedModules ?? null))
+        .catch(() => {});
+    }
+  }, [session]);
+
+  const visibleCards = MODULE_CARDS.filter((c) => {
+    if (allowedModules === null) return true;
+    return allowedModules.includes(c.module);
+  });
 
   if (status === "loading") {
     return (
@@ -97,7 +114,7 @@ export default function Home() {
         <br />
         <span style={{ color: "#00ff88" }}>$</span> status{" "}
         <span style={{ color: "#00ff88" }}>ONLINE</span>{" "}
-        <span style={{ color: "#5a6a7a" }}>| session active | {tools.length} modules loaded</span>
+        <span style={{ color: "#5a6a7a" }}>| session active | {visibleCards.length} modules loaded</span>
       </div>
 
       <div
@@ -115,7 +132,7 @@ export default function Home() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {tools.map((t) => (
+        {visibleCards.map((t) => (
           <Link
             key={t.href}
             href={t.href}
