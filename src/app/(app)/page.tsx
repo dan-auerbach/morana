@@ -23,19 +23,21 @@ const ASCII_LOGO = `
 
 export default function Home() {
   const { data: session, status } = useSession();
-  const [allowedModules, setAllowedModules] = useState<string[] | null>(null);
+  // undefined = not loaded yet, null = all allowed, string[] = restricted
+  const [allowedModules, setAllowedModules] = useState<string[] | null | undefined>(undefined);
 
   useEffect(() => {
     if (session) {
       fetch("/api/user/modules")
         .then((r) => r.json())
         .then((d) => setAllowedModules(d.allowedModules ?? null))
-        .catch(() => {});
+        .catch(() => setAllowedModules(null));
     }
   }, [session]);
 
+  const modulesLoaded = allowedModules !== undefined;
   const visibleCards = MODULE_CARDS.filter((c) => {
-    if (allowedModules === null) return true;
+    if (allowedModules === null || allowedModules === undefined) return true;
     return allowedModules.includes(c.module);
   });
 
@@ -131,6 +133,11 @@ export default function Home() {
         Available Modules
       </div>
 
+      {!modulesLoaded ? (
+        <div style={{ color: "#00ff88", fontSize: "13px", padding: "12px 0" }}>
+          <span style={{ animation: "blink 1s step-end infinite" }}>_</span> Loading modules...
+        </div>
+      ) : (
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {visibleCards.map((t) => (
           <Link
@@ -180,6 +187,7 @@ export default function Home() {
           </Link>
         ))}
       </div>
+      )}
     </div>
   );
 }

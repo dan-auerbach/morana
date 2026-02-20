@@ -132,7 +132,8 @@ export default function Nav() {
   const [workspaces, setWorkspaces] = useState<WsInfo[]>([]);
   const [activeWsId, setActiveWsId] = useState<string | null>(null);
   const [wsOpen, setWsOpen] = useState(false);
-  const [allowedModules, setAllowedModules] = useState<string[] | null>(null);
+  // undefined = not loaded yet, null = all allowed, string[] = restricted
+  const [allowedModules, setAllowedModules] = useState<string[] | null | undefined>(undefined);
 
   // Refs for click-outside
   const adminRef = useRef<HTMLDivElement>(null);
@@ -154,7 +155,7 @@ export default function Nav() {
       const resp = await fetch("/api/user/modules");
       const data = await resp.json();
       setAllowedModules(data.allowedModules ?? null);
-    } catch { /* ignore */ }
+    } catch { setAllowedModules(null); }
   }, []);
 
   useEffect(() => {
@@ -211,9 +212,11 @@ export default function Nav() {
   const isAdminRoute = pathname.startsWith("/admin");
 
   // Filter primary links based on allowed modules
+  // undefined = not loaded yet → hide module links; null = all allowed
   const filteredPrimaryLinks = primaryLinks.filter((l) => {
     const mod = MODULE_MAP[l.href];
     if (!mod) return true; // not a module link — always show
+    if (allowedModules === undefined) return false; // still loading — hide
     if (allowedModules === null) return true; // null = all allowed
     return allowedModules.includes(mod);
   });
