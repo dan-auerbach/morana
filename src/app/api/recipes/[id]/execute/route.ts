@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse, after } from "next/server";
 import { withAuth } from "@/lib/session";
+import { checkRateLimit, isModuleAllowed } from "@/lib/rate-limit";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { inngest } from "@/lib/inngest/client";
@@ -25,6 +26,15 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   return withAuth(async (user) => {
+    if (!(await isModuleAllowed(user.id, "recipes"))) {
+      return NextResponse.json({ error: "You don't have access to this module" }, { status: 403 });
+    }
+
+    const rl = await checkRateLimit(user.id);
+    if (!rl.allowed) {
+      return NextResponse.json({ error: rl.reason || "Rate limit reached" }, { status: 429 });
+    }
+
     const { id: recipeId } = await params;
 
     const recipe = await prisma.recipe.findUnique({

@@ -43,6 +43,7 @@ model User {
   maxRunsPerDay         Int?   // override global daily limit
   maxMonthlyCostCents   Int?   // monthly cost cap in CENTS (integer, no float rounding)
   allowedModels         Json?  // JSON array of model ID strings, null = all models allowed
+  allowedModules        Json?  // string[] e.g. ["llm","stt","tts","image","video","recipes"], null = all
 
   // Active workspace selection (cookie-backed, DB persisted)
   activeWorkspaceId     String?

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/session";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, isModuleAllowed } from "@/lib/rate-limit";
 import { prisma } from "@/lib/prisma";
 import {
   submitVideoJob,
@@ -24,6 +24,10 @@ const MAX_INPUT_SIZE = 50 * 1024 * 1024; // 50MB max for video/image input
 
 export async function POST(req: NextRequest) {
   return withAuth(async (user) => {
+    if (!(await isModuleAllowed(user.id, "video"))) {
+      return NextResponse.json({ error: "You don't have access to this module" }, { status: 403 });
+    }
+
     const rl = await checkRateLimit(user.id);
     if (!rl.allowed) {
       return NextResponse.json({ error: rl.reason || "Rate limit reached" }, { status: 429 });

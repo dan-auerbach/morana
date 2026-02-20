@@ -78,6 +78,26 @@ export async function checkRateLimit(
  * Returns true if allowedModels is null/empty (all models allowed),
  * or if the model is in the JSON array.
  */
+export const ALL_MODULES = ["llm", "stt", "tts", "image", "video", "recipes"] as const;
+export type ModuleName = (typeof ALL_MODULES)[number];
+
+/**
+ * Check if a user is allowed to use a specific module.
+ * Returns true if allowedModules is null/empty (all modules allowed),
+ * or if the module is in the JSON array.
+ */
+export async function isModuleAllowed(userId: string, module: ModuleName): Promise<boolean> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { allowedModules: true },
+  });
+  if (!user) return false;
+  if (user.allowedModules == null) return true;
+  const modules = user.allowedModules as unknown;
+  if (!Array.isArray(modules) || modules.length === 0) return true;
+  return modules.includes(module);
+}
+
 export async function isModelAllowed(userId: string, modelId: string): Promise<boolean> {
   const user = await prisma.user.findUnique({
     where: { id: userId },

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
+import { ALL_MODULES } from "@/lib/rate-limit";
 
 function requireAdmin(role: string) {
   if (role !== "admin") {
@@ -56,6 +57,7 @@ export async function GET(
           maxRunsPerDay: true,
           maxMonthlyCostCents: true,
           allowedModels: true,
+          allowedModules: true,
         },
       });
 
@@ -101,6 +103,7 @@ export async function GET(
         user: {
           ...targetUser,
           allowedModels: targetUser.allowedModels as string[] | null,
+          allowedModules: targetUser.allowedModules as string[] | null,
         },
         recentRuns,
         stats: {
@@ -143,6 +146,14 @@ export async function PATCH(
     if (body.allowedModels !== undefined) {
       const normalized = normalizeAllowedModels(body.allowedModels);
       data.allowedModels = normalized ?? Prisma.DbNull;
+    }
+    if (body.allowedModules !== undefined) {
+      if (body.allowedModules === null || !Array.isArray(body.allowedModules)) {
+        data.allowedModules = Prisma.DbNull;
+      } else {
+        const valid = body.allowedModules.filter((m: string) => (ALL_MODULES as readonly string[]).includes(m));
+        data.allowedModules = valid.length > 0 && valid.length < ALL_MODULES.length ? valid : Prisma.DbNull;
+      }
     }
 
     const updated = await prisma.user.update({

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/session";
-import { checkRateLimit, isModelAllowed } from "@/lib/rate-limit";
+import { checkRateLimit, isModelAllowed, isModuleAllowed } from "@/lib/rate-limit";
 import { prisma } from "@/lib/prisma";
 import { getApprovedModels, config } from "@/lib/config";
 import { runLLM } from "@/lib/providers/llm";
@@ -12,6 +12,10 @@ export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   return withAuth(async (user) => {
+    if (!(await isModuleAllowed(user.id, "llm"))) {
+      return NextResponse.json({ error: "You don't have access to this module" }, { status: 403 });
+    }
+
     const { modelId, prompt, sourceText } = await req.json();
 
     if (!modelId || !prompt) {

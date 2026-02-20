@@ -36,6 +36,16 @@ const adminLinks = [
   { href: "/admin", label: "Dashboard" },
 ];
 
+// Module mapping for access control — maps nav href to module name
+const MODULE_MAP: Record<string, string> = {
+  "/recipes": "recipes",
+  "/llm": "llm",
+  "/stt": "stt",
+  "/tts": "tts",
+  "/image": "image",
+  "/video": "video",
+};
+
 type WsInfo = { id: string; name: string; slug: string; role: string };
 
 /* ── Shared styles ───────────────────────────────────────── */
@@ -122,6 +132,7 @@ export default function Nav() {
   const [workspaces, setWorkspaces] = useState<WsInfo[]>([]);
   const [activeWsId, setActiveWsId] = useState<string | null>(null);
   const [wsOpen, setWsOpen] = useState(false);
+  const [allowedModules, setAllowedModules] = useState<string[] | null>(null);
 
   // Refs for click-outside
   const adminRef = useRef<HTMLDivElement>(null);
@@ -138,9 +149,20 @@ export default function Nav() {
     } catch { /* ignore */ }
   }, []);
 
+  const loadModules = useCallback(async () => {
+    try {
+      const resp = await fetch("/api/user/modules");
+      const data = await resp.json();
+      setAllowedModules(data.allowedModules ?? null);
+    } catch { /* ignore */ }
+  }, []);
+
   useEffect(() => {
-    if (session) loadWorkspaces();
-  }, [session, loadWorkspaces]);
+    if (session) {
+      loadWorkspaces();
+      loadModules();
+    }
+  }, [session, loadWorkspaces, loadModules]);
 
   // Close all dropdowns on route change
   useEffect(() => {
@@ -188,6 +210,14 @@ export default function Nav() {
 
   const isAdminRoute = pathname.startsWith("/admin");
 
+  // Filter primary links based on allowed modules
+  const filteredPrimaryLinks = primaryLinks.filter((l) => {
+    const mod = MODULE_MAP[l.href];
+    if (!mod) return true; // not a module link — always show
+    if (allowedModules === null) return true; // null = all allowed
+    return allowedModules.includes(mod);
+  });
+
   return (
     <nav
       style={{
@@ -214,8 +244,8 @@ export default function Nav() {
             <div className="nav-links-desktop" style={{ display: "flex", gap: "2px", alignItems: "center" }}>
               <span style={{ color: "#555", fontSize: "12px", marginRight: "4px" }}>//</span>
 
-              {/* Primary links — always visible on desktop */}
-              {primaryLinks.map((l) => (
+              {/* Primary links — filtered by allowed modules */}
+              {filteredPrimaryLinks.map((l) => (
                 <NavLink key={l.href} href={l.href} label={l.label} pathname={pathname} />
               ))}
 
@@ -420,7 +450,7 @@ export default function Nav() {
               // tools
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-              {[...primaryLinks, ...overflowLinks].map((l) => {
+              {[...filteredPrimaryLinks, ...overflowLinks].map((l) => {
                 const isActive = pathname === l.href || pathname.startsWith(l.href + "/");
                 return (
                   <Link

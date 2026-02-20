@@ -3,6 +3,8 @@
 import { useSession } from "next-auth/react";
 import { useState, useEffect, useCallback } from "react";
 
+const ALL_MODULES = ["llm", "stt", "tts", "image", "video", "recipes"] as const;
+
 type UserRow = {
   id: string;
   email: string;
@@ -14,12 +16,13 @@ type UserRow = {
   maxRunsPerDay: number | null;
   maxMonthlyCostCents: number | null;
   allowedModels: string[] | null;
+  allowedModules: string[] | null;
   monthlyCost: number;
   totalRuns: number;
 };
 
 type UserDetail = {
-  user: UserRow;
+  user: UserRow & { allowedModules: string[] | null };
   recentRuns: {
     id: string;
     type: string;
@@ -47,6 +50,7 @@ export default function AdminPage() {
   const [newMaxRuns, setNewMaxRuns] = useState("");
   const [newMaxCost, setNewMaxCost] = useState("");
   const [newModels, setNewModels] = useState("");
+  const [newModules, setNewModules] = useState<string[]>([...ALL_MODULES]);
   const [addError, setAddError] = useState("");
 
   // Edit user
@@ -85,11 +89,12 @@ export default function AdminPage() {
           maxRunsPerDay: newMaxRuns || null,
           maxMonthlyCostCents: newMaxCost ? parseInt(newMaxCost) : null,
           allowedModels: newModels ? newModels.split(",").map((s: string) => s.trim()).filter(Boolean) : null,
+          allowedModules: newModules.length === ALL_MODULES.length ? null : newModules,
         }),
       });
       const data = await resp.json();
       if (!resp.ok) { setAddError(data.error); return; }
-      setNewEmail(""); setNewRole("user"); setNewMaxRuns(""); setNewMaxCost(""); setNewModels("");
+      setNewEmail(""); setNewRole("user"); setNewMaxRuns(""); setNewMaxCost(""); setNewModels(""); setNewModules([...ALL_MODULES]);
       setShowAddForm(false);
       loadUsers();
     } catch { setAddError("Failed to add user"); }
@@ -136,6 +141,7 @@ export default function AdminPage() {
       maxRunsPerDay: u.maxRunsPerDay,
       maxMonthlyCostCents: u.maxMonthlyCostCents,
       allowedModels: u.allowedModels,
+      allowedModules: u.allowedModules,
     });
   }
 
@@ -202,6 +208,30 @@ export default function AdminPage() {
               <input value={newModels} onChange={(e) => setNewModels(e.target.value)} placeholder="claude-sonnet-4-5-20250929,gemini-2.0-flash" style={{ width: "100%", padding: "6px 10px", backgroundColor: "#111820", border: "1px solid #1e2a3a", color: "#e0e0e0", fontFamily: "inherit", fontSize: "12px" }} />
             </div>
           </div>
+          <div style={{ marginBottom: "12px" }}>
+            <label style={s.label}>--allowed-modules <span style={{ color: "#5a6a7a", fontWeight: 400, textTransform: "none" }}>(toggle to restrict)</span></label>
+            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+              {ALL_MODULES.map((mod) => {
+                const active = newModules.includes(mod);
+                return (
+                  <button
+                    key={mod}
+                    type="button"
+                    onClick={() => setNewModules(active ? newModules.filter((m) => m !== mod) : [...newModules, mod])}
+                    style={{
+                      padding: "4px 10px", border: "1px solid", fontFamily: "inherit", fontSize: "11px",
+                      fontWeight: 700, cursor: "pointer", textTransform: "uppercase",
+                      borderColor: active ? "#00ff88" : "#333",
+                      backgroundColor: active ? "rgba(0, 255, 136, 0.1)" : "transparent",
+                      color: active ? "#00ff88" : "#555",
+                    }}
+                  >
+                    {mod}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           {addError && <div style={{ color: "#ff4444", fontSize: "12px", marginBottom: "8px" }}>[ERROR] {addError}</div>}
           <button onClick={handleAddUser} style={{ padding: "6px 16px", background: "transparent", border: "1px solid #00ff88", color: "#00ff88", fontFamily: "inherit", fontSize: "12px", fontWeight: 700, cursor: "pointer", textTransform: "uppercase" }}>
             [  CREATE  ]
@@ -219,7 +249,7 @@ export default function AdminPage() {
           <table style={{ width: "100%", fontSize: "12px", borderCollapse: "collapse", fontFamily: "inherit" }}>
             <thead>
               <tr style={{ borderBottom: "1px solid #00ff88", textAlign: "left" }}>
-                {["EMAIL", "ROLE", "STATUS", "RUNS/DAY LIMIT", "MONTHLY $$ LIMIT", "MONTHLY COST", "TOTAL RUNS", "ACTIONS"].map((h) => (
+                {["EMAIL", "ROLE", "STATUS", "RUNS/DAY LIMIT", "MONTHLY $$ LIMIT", "MONTHLY COST", "MODULES", "TOTAL RUNS", "ACTIONS"].map((h) => (
                   <th key={h} style={{ padding: "8px 12px 8px 0", color: "#00ff88", fontWeight: 700, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.1em", whiteSpace: "nowrap" }}>{h}</th>
                 ))}
               </tr>
@@ -230,9 +260,9 @@ export default function AdminPage() {
                 const isDetail = detailId === u.id;
                 return (
                   <tr key={u.id}>
-                    <td colSpan={8} style={{ padding: 0 }}>
+                    <td colSpan={9} style={{ padding: 0 }}>
                       {/* Main row */}
-                      <div className="admin-user-row" style={{ display: "grid", gridTemplateColumns: "1fr 70px 80px 100px 100px 90px 80px 150px", alignItems: "center", borderBottom: "1px solid rgba(30, 42, 58, 0.5)", padding: "6px 0" }}>
+                      <div className="admin-user-row" style={{ display: "grid", gridTemplateColumns: "1fr 70px 80px 100px 100px 90px 120px 80px 150px", alignItems: "center", borderBottom: "1px solid rgba(30, 42, 58, 0.5)", padding: "6px 0" }}>
                         <div>
                           <span onClick={() => loadDetail(u.id)} style={{ color: "#e0e0e0", cursor: "pointer", textDecoration: "none" }}
                             onMouseEnter={(e) => { e.currentTarget.style.color = "#00ff88"; }}
@@ -271,6 +301,44 @@ export default function AdminPage() {
                           )}
                         </div>
                         <div><span style={{ color: "#ffcc00", fontSize: "11px" }}>${u.monthlyCost.toFixed(4)}</span></div>
+                        <div>
+                          {isEditing ? (
+                            <div style={{ display: "flex", gap: "2px", flexWrap: "wrap" }}>
+                              {ALL_MODULES.map((mod) => {
+                                const editMods = editData.allowedModules;
+                                const active = editMods === null || editMods === undefined || editMods.includes(mod);
+                                return (
+                                  <button
+                                    key={mod}
+                                    type="button"
+                                    onClick={() => {
+                                      const current = editData.allowedModules ?? [...ALL_MODULES];
+                                      const updated = active ? current.filter((m) => m !== mod) : [...current, mod];
+                                      setEditData({ ...editData, allowedModules: updated.length === ALL_MODULES.length ? null : updated });
+                                    }}
+                                    style={{
+                                      padding: "1px 4px", border: "1px solid", fontFamily: "inherit", fontSize: "9px",
+                                      fontWeight: 700, cursor: "pointer", textTransform: "uppercase",
+                                      borderColor: active ? "#00ff88" : "#333",
+                                      backgroundColor: active ? "rgba(0, 255, 136, 0.1)" : "transparent",
+                                      color: active ? "#00ff88" : "#555",
+                                    }}
+                                  >
+                                    {mod}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: "10px", color: "#5a6a7a" }}>
+                              {u.allowedModules === null ? (
+                                <span style={{ color: "#00ff88" }}>ALL</span>
+                              ) : (
+                                u.allowedModules.map((m) => m.toUpperCase()).join(", ")
+                              )}
+                            </span>
+                          )}
+                        </div>
                         <div><span style={{ color: "#00e5ff", fontSize: "11px" }}>{u.totalRuns}</span></div>
                         <div style={{ display: "flex", gap: "4px" }}>
                           {isEditing ? (
@@ -304,6 +372,12 @@ export default function AdminPage() {
                               <div style={{ fontSize: "18px", color: "#ffcc00", fontWeight: 700 }}>${detail.stats.monthlyCost}</div>
                             </div>
                           </div>
+                          {detail.user.allowedModules && detail.user.allowedModules.length > 0 && (
+                            <div style={{ fontSize: "11px", color: "#5a6a7a", marginBottom: "4px" }}>
+                              <span style={{ color: "#00ff88" }}>--allowed-modules:</span>{" "}
+                              {detail.user.allowedModules.map((m) => m.toUpperCase()).join(", ")}
+                            </div>
+                          )}
                           {detail.user.allowedModels && detail.user.allowedModels.length > 0 && (
                             <div style={{ fontSize: "11px", color: "#5a6a7a", marginBottom: "8px" }}>
                               <span style={{ color: "#00ff88" }}>--allowed-models:</span> {Array.isArray(detail.user.allowedModels) ? detail.user.allowedModels.join(", ") : String(detail.user.allowedModels)}

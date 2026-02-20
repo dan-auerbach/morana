@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/session";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, isModuleAllowed } from "@/lib/rate-limit";
 import { prisma } from "@/lib/prisma";
 import { runSoundEffect } from "@/lib/providers/tts";
 import { logUsage } from "@/lib/usage";
@@ -13,6 +13,10 @@ export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   return withAuth(async (user) => {
+    if (!(await isModuleAllowed(user.id, "tts"))) {
+      return NextResponse.json({ error: "You don't have access to this module" }, { status: 403 });
+    }
+
     const { prompt, durationSeconds, promptInfluence } = await req.json();
 
     if (!prompt || typeof prompt !== "string" || prompt.trim().length === 0) {

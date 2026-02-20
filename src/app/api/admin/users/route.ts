@@ -3,6 +3,7 @@ import { withAuth } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/generated/prisma/client";
 import { getApprovedModels } from "@/lib/config";
+import { ALL_MODULES } from "@/lib/rate-limit";
 
 function requireAdmin(role: string) {
   if (role !== "admin") {
@@ -31,6 +32,7 @@ export async function GET() {
           maxRunsPerDay: true,
           maxMonthlyCostCents: true,
           allowedModels: true,
+          allowedModules: true,
           _count: { select: { runs: true, usageEvents: true } },
         },
       });
@@ -57,8 +59,9 @@ export async function GET() {
         monthlyCostCents: costMap[u.id] || 0,
         monthlyCost: (costMap[u.id] || 0) / 100,
         totalRuns: u._count.runs,
-        // Return allowedModels as array for UI
+        // Return allowedModels/Modules as arrays for UI
         allowedModels: u.allowedModels as string[] | null,
+        allowedModules: u.allowedModules as string[] | null,
       }));
 
       return NextResponse.json({ users: usersWithStats });
@@ -124,7 +127,7 @@ export async function POST(req: NextRequest) {
     if (denied) return denied;
 
     const body = await req.json();
-    const { email, role, maxRunsPerDay, maxMonthlyCostCents, allowedModels } = body;
+    const { email, role, maxRunsPerDay, maxMonthlyCostCents, allowedModels, allowedModules } = body;
 
     if (!email || typeof email !== "string" || !email.includes("@")) {
       return NextResponse.json({ error: "Valid email is required" }, { status: 400 });
@@ -146,6 +149,13 @@ export async function POST(req: NextRequest) {
 
     const normalizedModels = normalizeAllowedModels(allowedModels);
 
+    // Validate allowedModules
+    let normalizedModules: string[] | null = null;
+    if (allowedModules != null && Array.isArray(allowedModules)) {
+      const valid = allowedModules.filter((m: string) => (ALL_MODULES as readonly string[]).includes(m));
+      normalizedModules = valid.length > 0 && valid.length < ALL_MODULES.length ? valid : null;
+    }
+
     // Pre-create user record so settings are ready when they sign in
     const newUser = await prisma.user.create({
       data: {
@@ -155,6 +165,7 @@ export async function POST(req: NextRequest) {
         maxRunsPerDay: maxRunsPerDay != null ? parseInt(maxRunsPerDay) : null,
         maxMonthlyCostCents: maxMonthlyCostCents != null ? parseInt(maxMonthlyCostCents) : null,
         allowedModels: normalizedModels ?? Prisma.DbNull,
+        allowedModules: normalizedModules ?? Prisma.DbNull,
       },
     });
 
