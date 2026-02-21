@@ -76,6 +76,24 @@ export type TelegramDocument = {
   file_size?: number;
 };
 
+export type TelegramVideo = {
+  file_id: string;
+  file_unique_id: string;
+  width: number;
+  height: number;
+  duration: number;
+  mime_type?: string;
+  file_size?: number;
+};
+
+export type TelegramVideoNote = {
+  file_id: string;
+  file_unique_id: string;
+  length: number;
+  duration: number;
+  file_size?: number;
+};
+
 export type TelegramMessage = {
   message_id: number;
   from?: TelegramUser;
@@ -87,6 +105,8 @@ export type TelegramMessage = {
   voice?: TelegramVoice;
   document?: TelegramDocument;
   photo?: TelegramPhotoSize[];
+  video?: TelegramVideo;
+  video_note?: TelegramVideoNote;
 };
 
 export type TelegramUpdate = {
@@ -269,7 +289,7 @@ export async function resolveUser(chatId: string | number): Promise<ResolvedTele
 export function extractFileInfo(msg: TelegramMessage): {
   fileId: string;
   mimeType: string;
-  type: "audio" | "image";
+  type: "audio" | "image" | "video";
 } | null {
   // Audio message
   if (msg.audio) {
@@ -289,11 +309,32 @@ export function extractFileInfo(msg: TelegramMessage): {
     };
   }
 
-  // Document (check if it's audio or image)
+  // Video message
+  if (msg.video) {
+    return {
+      fileId: msg.video.file_id,
+      mimeType: msg.video.mime_type || "video/mp4",
+      type: "video",
+    };
+  }
+
+  // Video note (round video)
+  if (msg.video_note) {
+    return {
+      fileId: msg.video_note.file_id,
+      mimeType: "video/mp4",
+      type: "video",
+    };
+  }
+
+  // Document (check if it's audio, video, or image)
   if (msg.document) {
     const mime = (msg.document.mime_type || "").toLowerCase();
     if (mime.startsWith("audio/")) {
       return { fileId: msg.document.file_id, mimeType: mime, type: "audio" };
+    }
+    if (mime.startsWith("video/")) {
+      return { fileId: msg.document.file_id, mimeType: mime, type: "video" };
     }
     if (mime.startsWith("image/")) {
       return { fileId: msg.document.file_id, mimeType: mime, type: "image" };
@@ -323,4 +364,154 @@ export function parseCommand(text: string): { command: string; args: string } | 
   const match = text.trim().match(/^\/(\w+)(?:@\w+)?\s*([\s\S]*)?$/);
   if (!match) return null;
   return { command: match[1].toLowerCase(), args: (match[2] || "").trim() };
+}
+
+// ─── Media Sending ────────────────────────────────────────────────────
+
+/**
+ * Send a chat action indicator (typing, upload_audio, upload_photo, etc.)
+ */
+export async function sendChatAction(
+  chatId: string | number,
+  action: "typing" | "upload_audio" | "upload_photo" | "upload_video" | "upload_document"
+): Promise<void> {
+  try {
+    await fetch(apiUrl("sendChatAction"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, action }),
+    });
+  } catch {
+    // Non-critical
+  }
+}
+
+/**
+ * Send a voice message (OGG opus, displayed as voice bubble in Telegram).
+ */
+export async function sendVoice(
+  chatId: string | number,
+  buffer: Buffer,
+  caption?: string,
+  duration?: number,
+  parseMode: "Markdown" | "HTML" | null = "Markdown"
+): Promise<number> {
+  const form = new FormData();
+  form.append("chat_id", String(chatId));
+  form.append("voice", new Blob([new Uint8Array(buffer)], { type: "audio/ogg" }), "voice.ogg");
+  if (caption) form.append("caption", caption);
+  if (duration) form.append("duration", String(duration));
+  if (parseMode) form.append("parse_mode", parseMode);
+
+  const resp = await fetch(apiUrl("sendVoice"), { method: "POST", body: form });
+  const data = await resp.json();
+  if (!data.ok) {
+    console.error("[Telegram] sendVoice failed:", data.description);
+    return 0;
+  }
+  return data.result?.message_id || 0;
+}
+
+/**
+ * Send an audio file to a Telegram chat.
+ */
+export async function sendAudio(
+  chatId: string | number,
+  buffer: Buffer,
+  filename: string,
+  caption?: string,
+  duration?: number,
+  parseMode: "Markdown" | "HTML" | null = "Markdown"
+): Promise<number> {
+  const form = new FormData();
+  form.append("chat_id", String(chatId));
+  form.append("audio", new Blob([new Uint8Array(buffer)]), filename);
+  if (caption) form.append("caption", caption);
+  if (duration) form.append("duration", String(duration));
+  if (parseMode) form.append("parse_mode", parseMode);
+
+  const resp = await fetch(apiUrl("sendAudio"), { method: "POST", body: form });
+  const data = await resp.json();
+  if (!data.ok) {
+    console.error("[Telegram] sendAudio failed:", data.description);
+    return 0;
+  }
+  return data.result?.message_id || 0;
+}
+
+/**
+ * Send a photo from a buffer.
+ */
+export async function sendPhoto(
+  chatId: string | number,
+  buffer: Buffer,
+  filename: string,
+  caption?: string,
+  parseMode: "Markdown" | "HTML" | null = "Markdown"
+): Promise<number> {
+  const form = new FormData();
+  form.append("chat_id", String(chatId));
+  form.append("photo", new Blob([new Uint8Array(buffer)]), filename);
+  if (caption) form.append("caption", caption);
+  if (parseMode) form.append("parse_mode", parseMode);
+
+  const resp = await fetch(apiUrl("sendPhoto"), { method: "POST", body: form });
+  const data = await resp.json();
+  if (!data.ok) {
+    console.error("[Telegram] sendPhoto failed:", data.description);
+    return 0;
+  }
+  return data.result?.message_id || 0;
+}
+
+/**
+ * Split long text into Telegram-safe chunks (max 4096 chars).
+ * Splits at newline boundaries when possible.
+ */
+export function splitMessage(text: string, maxLen = 4096): string[] {
+  if (text.length <= maxLen) return [text];
+
+  const chunks: string[] = [];
+  let remaining = text;
+
+  while (remaining.length > 0) {
+    if (remaining.length <= maxLen) {
+      chunks.push(remaining);
+      break;
+    }
+
+    // Try to split at a newline within the last 20% of the chunk
+    let splitAt = remaining.lastIndexOf("\n", maxLen);
+    if (splitAt < maxLen * 0.8) {
+      // No good newline break — split at space
+      splitAt = remaining.lastIndexOf(" ", maxLen);
+    }
+    if (splitAt <= 0) {
+      // No good break point — hard split
+      splitAt = maxLen;
+    }
+
+    chunks.push(remaining.slice(0, splitAt));
+    remaining = remaining.slice(splitAt).replace(/^\n/, ""); // trim leading newline
+  }
+
+  return chunks;
+}
+
+/**
+ * Send a long message, automatically splitting into multiple messages if needed.
+ * Returns array of message IDs.
+ */
+export async function sendLongMessage(
+  chatId: string | number,
+  text: string,
+  parseMode: "Markdown" | "MarkdownV2" | "HTML" | null = "Markdown"
+): Promise<number[]> {
+  const chunks = splitMessage(text);
+  const ids: number[] = [];
+  for (const chunk of chunks) {
+    const id = await sendMessage(chatId, chunk, parseMode);
+    ids.push(id);
+  }
+  return ids;
 }

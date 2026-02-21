@@ -68,6 +68,7 @@ model User {
   recipeVersions    RecipeVersion[]
   telegramLink      TelegramLink?
   telegramLinkCodes TelegramLinkCode[]
+  telegramSettings  TelegramUserSettings?
 
   activeWorkspace   Workspace? @relation("UserActiveWorkspace", fields: [activeWorkspaceId], references: [id])
 }
@@ -553,6 +554,23 @@ model TelegramLink {
   telegramChatId   String   @unique          // Telegram chat ID (string, can be large)
   telegramUsername  String?                  // @username for display
   linkedAt         DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model TelegramUserSettings {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  mode            String   @default("stt")     // "stt" | "llm" | "recipe"
+  sttLanguage     String   @default("sl")      // ISO code or "auto"
+  sttDiarize      Boolean  @default(false)
+  sttTranslateTo  String?                      // null = no translation, "en"/"sl"/etc
+  ttsVoiceId      String?                      // ElevenLabs voice ID
+  llmModelId      String?                      // e.g. "claude-sonnet-4-5-20250929"
+  llmSystemPrompt String?  @db.Text            // custom system prompt
+  imageProvider   String   @default("gemini")  // "gemini" | "fal"
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
