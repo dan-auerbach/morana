@@ -164,7 +164,9 @@ export default function STTPage() {
           body: JSON.stringify({ url, lang: language, diarize, translateTo: translateTo || undefined }),
         });
       }
-      const data = await resp.json();
+      let data;
+      const respText = await resp.text();
+      try { data = JSON.parse(respText); } catch { throw new Error(respText.slice(0, 200) || `Request failed (${resp.status})`); }
       if (!resp.ok) throw new Error(data.error || "Request failed");
       setRunId(data.runId);
       setStatus(data.status);

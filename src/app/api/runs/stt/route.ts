@@ -220,7 +220,7 @@ export async function POST(req: NextRequest) {
         where: { id: run.id },
         data: { status: "error", errorMessage: internalMessage, finishedAt: new Date() },
       });
-      return NextResponse.json({ error: "Transcription failed. Please try again." }, { status: 500 });
+      return NextResponse.json({ error: internalMessage }, { status: 500 });
     }
   }, req);
 }
