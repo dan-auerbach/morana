@@ -88,8 +88,8 @@ function generateSRT(tokens: STTToken[]): string {
 export default function STTPage() {
   const { data: session } = useSession();
   const [mode, setMode] = useState<"file" | "url">("file");
-  const [language, setLanguage] = useState("en");
-  const [diarize, setDiarize] = useState(false);
+  const [language, setLanguage] = useState("auto");
+  const [diarize, setDiarize] = useState(true);
   const [translateTo, setTranslateTo] = useState("");
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
@@ -378,10 +378,7 @@ export default function STTPage() {
               <label style={{ display: "block", marginBottom: "6px", fontSize: "11px", fontWeight: 700, color: "#00ff88", textTransform: "uppercase", letterSpacing: "0.1em" }}>--lang</label>
               <select
                 value={language}
-                onChange={(e) => {
-                  setLanguage(e.target.value);
-                  if (e.target.value === "auto") setTranslateTo("");
-                }}
+                onChange={(e) => setLanguage(e.target.value)}
                 style={{ padding: "8px 12px", backgroundColor: "#111820", border: "1px solid #1e2a3a", color: "#e0e0e0", fontFamily: "inherit", fontSize: "13px" }}
               >
                 {LANGUAGES.map((l) => (
@@ -395,8 +392,7 @@ export default function STTPage() {
               <select
                 value={translateTo}
                 onChange={(e) => setTranslateTo(e.target.value)}
-                disabled={language === "auto"}
-                style={{ padding: "8px 12px", backgroundColor: "#111820", border: "1px solid #1e2a3a", color: language === "auto" ? "#5a6a7a" : "#e0e0e0", fontFamily: "inherit", fontSize: "13px", opacity: language === "auto" ? 0.5 : 1 }}
+                style={{ padding: "8px 12px", backgroundColor: "#111820", border: "1px solid #1e2a3a", color: "#e0e0e0", fontFamily: "inherit", fontSize: "13px" }}
               >
                 <option value="">None</option>
                 {LANGUAGES.filter((l) => l.code !== "auto" && l.code !== language).map((l) => (
