@@ -274,6 +274,18 @@ export default function STTPage() {
       label: "Ključne točke",
       prompt: "Izlušči ključne točke iz spodnjega besedila. Naštej jih kot numbered list. Piši v slovenščini.",
     },
+    {
+      label: "Top citati",
+      prompt: "Iz spodnjega besedila izberi 5 najmočnejših, najbolj zanimivih ali provokativnih dobesednih citatov. Ohrani izvirno obliko — ne parafraziraj. Vsak citat zapiši v narekovajih, za njim pa navedi govorca (če je znan). Razvrsti jih od najmočnejšega navzdol. Piši v jeziku izvirnega besedila.",
+    },
+    {
+      label: "Novinarski članek",
+      prompt: "Na podlagi spodnjega transkripta napiši novinarski članek primeren za objavo v spletnem mediju. Struktura: privlačen naslov (headline), podnaslov (subtitle) v enem stavku, jedro članka (3–6 odstavkov, piramidalna struktura — najpomembnejše najprej), vsaj 2 dobesedna citata iz besedila v narekovajih z navedbo govorca, ter kratek zaključek. Piši v jeziku izvirnega besedila. Ne dodajaj informacij, ki niso v besedilu.",
+    },
+    {
+      label: "Facebook objava",
+      prompt: "Na podlagi spodnjega besedila napiši kratko, privlačno objavo za Facebook. Začni z močnim stavkom ali vprašanjem, ki pritegne pozornost (hook). Nato v 2–4 stavkih povzemi bistvo. Dodaj 1 dobesedni citat iz besedila, če je smiselno. Na koncu dodaj poziv k akciji (npr. 'Kaj menite?' ali 'Delite naprej'). Brez hashtagov. Piši v jeziku izvirnega besedila.",
+    },
   ];
 
   return (
