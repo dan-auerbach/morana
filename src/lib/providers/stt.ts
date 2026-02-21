@@ -33,48 +33,61 @@ export type STTResult = {
   translatedText?: string;
 };
 
+export type STTAudioSource =
+  | { buffer: Buffer | Uint8Array; mimeType: string }
+  | { audioUrl: string };
+
 /**
- * Upload audio file to Soniox, create a transcription, poll until done,
- * then fetch the transcript text.
+ * Transcribe audio via Soniox async API.
  *
- * On timeout: cancels the Soniox transcription job AND deletes the uploaded file.
+ * Accepts either a buffer (uploaded to Soniox) or an audioUrl
+ * (Soniox fetches directly — no memory/upload overhead for large files).
  */
 export async function runSTT(
-  audioBuffer: Buffer | Uint8Array,
-  mimeType: string,
+  audioSource: STTAudioSource,
   options: STTOptions
 ): Promise<STTResult> {
   const start = Date.now();
   const apiKey = getApiKey();
 
-  // --- Step 1: Upload audio file ---
-  const uploadForm = new FormData();
-  const blob = new Blob([new Uint8Array(audioBuffer)], { type: mimeType });
-  const ext = mimeExtension(mimeType);
-  uploadForm.append("file", blob, `audio${ext}`);
+  let fileId: string | null = null;
 
-  const uploadResp = await fetch(`${SONIOX_BASE}/files`, {
-    method: "POST",
-    headers: authHeaders(apiKey),
-    body: uploadForm,
-  });
+  // --- Step 1: Prepare audio source ---
+  const createBody: Record<string, unknown> = {
+    model: "stt-async-v4",
+  };
 
-  if (!uploadResp.ok) {
-    const errText = await uploadResp.text();
-    throw new Error(`Soniox file upload error ${uploadResp.status}: ${errText}`);
-  }
+  if ("audioUrl" in audioSource) {
+    // Soniox fetches directly from URL — no upload needed
+    createBody.audio_url = audioSource.audioUrl;
+  } else {
+    // Upload buffer to Soniox files API
+    const uploadForm = new FormData();
+    const blob = new Blob([new Uint8Array(audioSource.buffer)], { type: audioSource.mimeType });
+    const ext = mimeExtension(audioSource.mimeType);
+    uploadForm.append("file", blob, `audio${ext}`);
 
-  const uploadData = await uploadResp.json();
-  const fileId: string = uploadData.id;
-  if (!fileId) {
-    throw new Error(`Soniox file upload returned no id: ${JSON.stringify(uploadData)}`);
+    const uploadResp = await fetch(`${SONIOX_BASE}/files`, {
+      method: "POST",
+      headers: authHeaders(apiKey),
+      body: uploadForm,
+    });
+
+    if (!uploadResp.ok) {
+      const errText = await uploadResp.text();
+      throw new Error(`Soniox file upload error ${uploadResp.status}: ${errText}`);
+    }
+
+    const uploadData = await uploadResp.json();
+    fileId = uploadData.id;
+    if (!fileId) {
+      throw new Error(`Soniox file upload returned no id: ${JSON.stringify(uploadData)}`);
+    }
+
+    createBody.file_id = fileId;
   }
 
   // --- Step 2: Create transcription ---
-  const createBody: Record<string, unknown> = {
-    file_id: fileId,
-    model: "stt-async-v4",
-  };
 
   if (options.language === "auto") {
     createBody.enable_language_identification = true;
@@ -101,7 +114,7 @@ export async function runSTT(
   });
 
   if (!createResp.ok) {
-    cleanupFile(apiKey, fileId);
+    if (fileId) cleanupFile(apiKey, fileId);
     const errText = await createResp.text();
     throw new Error(`Soniox create transcription error ${createResp.status}: ${errText}`);
   }
@@ -109,13 +122,13 @@ export async function runSTT(
   const createData = await createResp.json();
   const transcriptionId: string = createData.id;
   if (!transcriptionId) {
-    cleanupFile(apiKey, fileId);
+    if (fileId) cleanupFile(apiKey, fileId);
     throw new Error(`Soniox create transcription returned no id: ${JSON.stringify(createData)}`);
   }
 
   // --- Step 3: Poll until transcription is complete ---
-  const maxWaitMs = 180_000; // 3 minutes max
-  const pollIntervalMs = 1500;
+  const maxWaitMs = 270_000; // 4.5 minutes (stay within Vercel 300s limit)
+  const pollIntervalMs = 2000;
   const deadline = Date.now() + maxWaitMs;
 
   let status = createData.status || "processing";
@@ -125,7 +138,7 @@ export async function runSTT(
     if (Date.now() > deadline) {
       // TIMEOUT KILL: cancel transcription + cleanup file
       await killTranscription(apiKey, transcriptionId, fileId);
-      throw new Error("Soniox transcription timed out after 180 seconds (job cancelled)");
+      throw new Error("Soniox transcription timed out after 270 seconds (job cancelled)");
     }
 
     await sleep(pollIntervalMs);
@@ -144,7 +157,7 @@ export async function runSTT(
   }
 
   if (status === "error" || status === "failed") {
-    cleanupFile(apiKey, fileId);
+    if (fileId) cleanupFile(apiKey, fileId);
     throw new Error(
       `Soniox transcription failed: ${transcriptionMeta.error_message || transcriptionMeta.error || "unknown error"}`
     );
@@ -201,7 +214,7 @@ export async function runSTT(
   }
 
   // --- Step 5: Clean up uploaded file (best effort) ---
-  cleanupFile(apiKey, fileId);
+  if (fileId) cleanupFile(apiKey, fileId);
 
   return {
     text,
@@ -245,7 +258,7 @@ function buildDiarizedText(tokens: STTToken[]): string {
  * Kill a Soniox transcription job and clean up the associated file.
  * Called on timeout to free Soniox resources.
  */
-async function killTranscription(apiKey: string, transcriptionId: string, fileId: string): Promise<void> {
+async function killTranscription(apiKey: string, transcriptionId: string, fileId: string | null): Promise<void> {
   try {
     await fetch(`${SONIOX_BASE}/transcriptions/${transcriptionId}`, {
       method: "DELETE",
@@ -254,7 +267,7 @@ async function killTranscription(apiKey: string, transcriptionId: string, fileId
   } catch {
     /* best effort */
   }
-  cleanupFile(apiKey, fileId);
+  if (fileId) cleanupFile(apiKey, fileId);
 }
 
 /** Best-effort delete of uploaded file on Soniox */

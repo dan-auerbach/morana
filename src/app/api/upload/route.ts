@@ -9,11 +9,15 @@ const ALLOWED_AUDIO_TYPES = [
   "audio/x-m4a", "audio/aac", "audio/webm",
 ];
 
+const ALLOWED_VIDEO_TYPES = [
+  "video/mp4", "video/webm", "video/quicktime", "video/x-msvideo", "video/x-matroska",
+];
+
 const ALLOWED_IMAGE_TYPES = [
   "image/png", "image/jpeg", "image/jpg", "image/webp",
 ];
 
-const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB
 
 /**
  * POST /api/upload — get a presigned URL for direct browser-to-R2 upload.
@@ -34,17 +38,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "fileName and fileType are required" }, { status: 400 });
     }
 
-    // Validate file type (audio or image)
+    // Validate file type (audio, video, or image)
     const normalizedType = (fileType || "").toLowerCase();
     const isAudio = ALLOWED_AUDIO_TYPES.includes(normalizedType) || normalizedType.startsWith("audio/");
+    const isVideo = ALLOWED_VIDEO_TYPES.includes(normalizedType) || normalizedType.startsWith("video/");
     const isImage = ALLOWED_IMAGE_TYPES.includes(normalizedType);
-    if (!isAudio && !isImage) {
+    if (!isAudio && !isVideo && !isImage) {
       return NextResponse.json({ error: `Unsupported file type: ${fileType}` }, { status: 400 });
     }
 
     // Validate file size
     if (fileSize && fileSize > MAX_FILE_SIZE) {
-      return NextResponse.json({ error: "File too large (max 100MB)" }, { status: 400 });
+      return NextResponse.json({ error: "File too large (max 500MB)" }, { status: 400 });
     }
 
     // Generate storage key

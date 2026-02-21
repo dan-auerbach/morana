@@ -2,7 +2,7 @@ import { prisma } from "./prisma";
 
 // Guardrails — all configurable via ENV
 export const config = {
-  maxFileSizeMb: parseInt(process.env.MAX_FILE_SIZE_MB || "50", 10),
+  maxFileSizeMb: parseInt(process.env.MAX_FILE_SIZE_MB || "500", 10),
   maxUrlFetchSeconds: parseInt(process.env.MAX_URL_FETCH_SECONDS || "60", 10),
   maxTtsChars: parseInt(process.env.MAX_TTS_CHARS || "10000", 10),
   maxLlmPromptChars: parseInt(process.env.MAX_LLM_PROMPT_CHARS || "200000", 10),
@@ -141,7 +141,7 @@ const defaultPricing: Record<string, { input: number; output: number; unit: stri
   "gpt-5-mini": { input: 0.25, output: 2.0, unit: "1M_tokens" },
   "gpt-5.2": { input: 1.75, output: 14.0, unit: "1M_tokens" },
   "gpt-4o": { input: 2.5, output: 10.0, unit: "1M_tokens" },
-  soniox: { input: 0.35, output: 0, unit: "per_minute" },
+  soniox: { input: 0.0017, output: 0, unit: "per_minute" },
   elevenlabs: { input: 0.30, output: 0, unit: "1k_chars" },
   "fal-ai/flux/schnell": { input: 0.025, output: 0, unit: "per_image" },
   "fal-ai/flux/dev": { input: 0.055, output: 0, unit: "per_image" },

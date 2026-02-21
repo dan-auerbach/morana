@@ -2,16 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { withAuth } from "@/lib/session";
 import { checkRateLimit, isModuleAllowed } from "@/lib/rate-limit";
 import { prisma } from "@/lib/prisma";
-import { config } from "@/lib/config";
-import { runSTT } from "@/lib/providers/stt";
+import { runSTT, STTAudioSource } from "@/lib/providers/stt";
 import { logUsage } from "@/lib/usage";
-import { validateMime } from "@/lib/mime-validate";
 import { validateFetchUrl } from "@/lib/url-validate";
 import { getActiveWorkspaceId } from "@/lib/workspace";
-import { getObjectFromR2, deleteFromR2 } from "@/lib/storage";
+import { getSignedDownloadUrl, deleteFromR2 } from "@/lib/storage";
 import { v4 as uuid } from "uuid";
 
-// Vercel serverless: STT polling can take up to 180s
+const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB
+
+// Vercel serverless: STT polling can take up to 270s
 export const maxDuration = 300;
 
 export async function POST(req: NextRequest) {
@@ -25,146 +25,36 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: rl.reason || "Rate limit reached" }, { status: 429 });
     }
 
-    const ALLOWED_AUDIO_TYPES = [
-      "audio/mpeg", "audio/mp3", "audio/wav", "audio/wave", "audio/x-wav",
-      "audio/ogg", "audio/flac", "audio/x-flac", "audio/mp4", "audio/m4a",
-      "audio/x-m4a", "audio/aac", "audio/webm",
-    ];
-    const ALLOWED_EXTENSIONS = [".mp3", ".wav", ".ogg", ".flac", ".m4a", ".aac", ".webm", ".wma"];
+    const body = await req.json();
+    const language = body.lang || "auto";
+    const diarize = !!body.diarize;
+    const translateTo = body.translateTo || "";
 
-    const contentType = req.headers.get("content-type") || "";
-    let audioBuffer: Buffer;
-    let mimeType: string;
-    let language = "en";
-    let diarize = false;
-    let translateTo = "";
+    let audioSource: STTAudioSource;
+    let r2KeyToCleanup: string | null = null;
+    const mimeType = body.mimeType || "audio/mpeg";
 
-    if (contentType.includes("multipart/form-data")) {
-      const formData = await req.formData();
-      const file = formData.get("file") as File | null;
-      language = (formData.get("language") as string) || "en";
-      diarize = (formData.get("diarize") as string) === "true";
-      translateTo = (formData.get("translateTo") as string) || "";
-
-      if (!file) {
-        return NextResponse.json({ error: "No file provided" }, { status: 400 });
+    if (body.storageKey) {
+      // File was uploaded to R2 via presigned URL.
+      // Generate a signed download URL so Soniox can fetch directly — no memory needed.
+      r2KeyToCleanup = body.storageKey;
+      const downloadUrl = await getSignedDownloadUrl(body.storageKey, 1800); // 30 min
+      audioSource = { audioUrl: downloadUrl };
+    } else if (body.url) {
+      const { url } = body;
+      if (typeof url !== "string") {
+        return NextResponse.json({ error: "url must be a string" }, { status: 400 });
       }
 
-      // Validate file type
-      const fileType = (file.type || "").toLowerCase();
-      const fileName = (file.name || "").toLowerCase();
-      const ext = fileName.substring(fileName.lastIndexOf("."));
-      const isAudioType = ALLOWED_AUDIO_TYPES.includes(fileType) || fileType.startsWith("audio/");
-      const isAudioExt = ALLOWED_EXTENSIONS.includes(ext);
-
-      if (!isAudioType && !isAudioExt) {
-        const isVideo = fileType.startsWith("video/") || [".mp4", ".mov", ".avi", ".mkv", ".webm"].includes(ext);
-        if (isVideo) {
-          return NextResponse.json(
-            { error: "Video files are not supported. Please extract the audio track first (e.g. using ffmpeg) and upload the audio file." },
-            { status: 400 }
-          );
-        }
-        return NextResponse.json(
-          { error: `Unsupported file format: ${fileType || ext}. Supported: MP3, WAV, OGG, FLAC, M4A, AAC, WebM audio.` },
-          { status: 400 }
-        );
+      // SSRF protection: validate URL before passing to Soniox
+      const urlCheck = await validateFetchUrl(url);
+      if (!urlCheck.valid) {
+        return NextResponse.json({ error: urlCheck.reason }, { status: 400 });
       }
 
-      if (file.size > config.maxFileSizeMb * 1024 * 1024) {
-        return NextResponse.json(
-          { error: `File exceeds ${config.maxFileSizeMb}MB limit` },
-          { status: 400 }
-        );
-      }
-
-      mimeType = file.type || "audio/mpeg";
-      audioBuffer = Buffer.from(await file.arrayBuffer());
-
-      // MIME magic-bytes validation
-      const mimeCheck = validateMime(audioBuffer, mimeType);
-      if (!mimeCheck.valid) {
-        return NextResponse.json(
-          { error: mimeCheck.message || "Content-type mismatch" },
-          { status: 400 }
-        );
-      }
+      audioSource = { audioUrl: urlCheck.url };
     } else {
-      const body = await req.json();
-      language = body.lang || "en";
-      diarize = !!body.diarize;
-      translateTo = body.translateTo || "";
-
-      if (body.storageKey) {
-        // File was uploaded to R2 via presigned URL
-        mimeType = body.mimeType || "audio/mpeg";
-        try {
-          const obj = await getObjectFromR2(body.storageKey);
-          const bytes = await obj.Body?.transformToByteArray();
-          if (!bytes) throw new Error("Failed to read file from storage");
-          audioBuffer = Buffer.from(bytes);
-          // Clean up R2 file — no longer needed after reading into memory
-          deleteFromR2(body.storageKey);
-        } catch (err: unknown) {
-          const message = err instanceof Error ? err.message : "Storage read error";
-          return NextResponse.json({ error: `Failed to read uploaded file: ${message}` }, { status: 400 });
-        }
-      } else if (body.url) {
-        const { url } = body;
-        if (typeof url !== "string") {
-          return NextResponse.json({ error: "url must be a string" }, { status: 400 });
-        }
-
-        // SSRF protection: validate URL before fetching
-        const urlCheck = await validateFetchUrl(url);
-        if (!urlCheck.valid) {
-          return NextResponse.json({ error: urlCheck.reason }, { status: 400 });
-        }
-
-        const controller = new AbortController();
-        const timeout = setTimeout(
-          () => controller.abort(),
-          config.maxUrlFetchSeconds * 1000
-        );
-
-        try {
-          const resp = await fetch(urlCheck.url, { signal: controller.signal, redirect: "error" });
-          clearTimeout(timeout);
-
-          if (!resp.ok) {
-            return NextResponse.json(
-              { error: `Failed to fetch URL: ${resp.status}` },
-              { status: 400 }
-            );
-          }
-
-          mimeType = resp.headers.get("content-type") || "audio/mpeg";
-          const arrayBuffer = await resp.arrayBuffer();
-          audioBuffer = Buffer.from(arrayBuffer);
-
-          if (audioBuffer.length > config.maxFileSizeMb * 1024 * 1024) {
-            return NextResponse.json(
-              { error: `Downloaded file exceeds ${config.maxFileSizeMb}MB limit` },
-              { status: 400 }
-            );
-          }
-
-          // MIME magic-bytes validation on downloaded content
-          const mimeCheck = validateMime(audioBuffer, mimeType);
-          if (!mimeCheck.valid) {
-            return NextResponse.json(
-              { error: mimeCheck.message || "Downloaded file content-type mismatch" },
-              { status: 400 }
-            );
-          }
-        } catch (err: unknown) {
-          clearTimeout(timeout);
-          const message = err instanceof Error ? err.message : "Fetch error";
-          return NextResponse.json({ error: `URL fetch failed: ${message}` }, { status: 400 });
-        }
-      } else {
-        return NextResponse.json({ error: "storageKey or url is required" }, { status: 400 });
-      }
+      return NextResponse.json({ error: "storageKey or url is required" }, { status: 400 });
     }
 
     const storageKey = `stt/input/${uuid()}/audio`;
@@ -189,11 +79,14 @@ export async function POST(req: NextRequest) {
     });
 
     try {
-      const result = await runSTT(audioBuffer, mimeType, {
+      const result = await runSTT(audioSource, {
         language,
         diarize,
         translateTo: translateTo || undefined,
       });
+
+      // Clean up R2 file after Soniox has fetched it
+      if (r2KeyToCleanup) deleteFromR2(r2KeyToCleanup);
 
       await prisma.run.update({
         where: { id: run.id },
@@ -233,6 +126,9 @@ export async function POST(req: NextRequest) {
         translatedText: result.translatedText,
       });
     } catch (err) {
+      // Clean up R2 even on error
+      if (r2KeyToCleanup) deleteFromR2(r2KeyToCleanup);
+
       const internalMessage = err instanceof Error ? err.message : "STT transcription failed";
       console.error("[STT] Processing error:", internalMessage);
       await prisma.run.update({

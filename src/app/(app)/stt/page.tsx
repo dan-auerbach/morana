@@ -381,13 +381,12 @@ export default function STTPage() {
                   </>
                 ) : (
                   <>
-                    <div style={{ color: "#00ff88", fontSize: "13px", marginBottom: "4px" }}>[ DROP AUDIO FILE OR CLICK ]</div>
-                    <div style={{ color: "#5a6a7a", fontSize: "11px" }}>Supported: .mp3, .wav, .m4a, .ogg, .flac, .aac, .webm</div>
-                    <div style={{ color: "#ff4444", fontSize: "10px", marginTop: "4px" }}>Video files not supported — extract audio first</div>
+                    <div style={{ color: "#00ff88", fontSize: "13px", marginBottom: "4px" }}>[ DROP AUDIO/VIDEO FILE OR CLICK ]</div>
+                    <div style={{ color: "#5a6a7a", fontSize: "11px" }}>Supported: .mp3, .wav, .m4a, .ogg, .flac, .aac, .webm, .mp4 — max 500MB</div>
                   </>
                 )}
               </div>
-              <input ref={fileRef} type="file" accept="audio/*,.mp3,.wav,.ogg,.flac,.m4a,.aac,.webm" style={{ display: "none" }} onChange={(e) => { const file = e.target.files?.[0]; if (file) { setFileName(file.name); setFileSizeBytes(file.size); setError(""); } }} />
+              <input ref={fileRef} type="file" accept="audio/*,video/mp4,.mp3,.wav,.ogg,.flac,.m4a,.aac,.webm,.mp4" style={{ display: "none" }} onChange={(e) => { const file = e.target.files?.[0]; if (file) { setFileName(file.name); setFileSizeBytes(file.size); setError(""); } }} />
             </div>
           ) : (
             <div>
