@@ -88,7 +88,7 @@ export async function runSTT(
   }
 
   if (options.translateTo) {
-    createBody.translation = { target_languages: [options.translateTo] };
+    createBody.translation = { type: "one_way", target_language: options.translateTo };
   }
 
   const createResp = await fetch(`${SONIOX_BASE}/transcriptions`, {
