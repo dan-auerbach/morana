@@ -1,0 +1,20 @@
+{
+  "title": "Nastavitve",
+  "subtitle": "uporabni\u0161ke nastavitve",
+  "theme": {
+    "title": "Tema",
+    "system": "Sistem",
+    "dark": "Temna",
+    "light": "Svetla"
+  },
+  "language": {
+    "title": "Jezik",
+    "description": "Jezik vmesnika"
+  },
+  "defaults": {
+    "title": "Privzete vrednosti",
+    "llmModel": "Privzeti LLM model",
+    "comingSoon": "(kmalu)",
+    "none": "Brez"
+  }
+}

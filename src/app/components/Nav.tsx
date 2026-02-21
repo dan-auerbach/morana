@@ -4,23 +4,25 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signIn, signOut } from "next-auth/react";
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useTheme } from "@/app/components/ThemeProvider";
+import { useLocale, useT } from "@/app/components/I18nProvider";
 
 /* ── Link definitions ────────────────────────────────────── */
 
 const primaryLinks = [
-  { href: "/recipes", label: "Recipes" },
-  { href: "/llm", label: "LLM" },
-  { href: "/stt", label: "STT" },
-  { href: "/tts", label: "TTS" },
-  { href: "/image", label: "Image" },
-  { href: "/video", label: "Video" },
+  { href: "/recipes", i18nKey: "recipes", label: "Recipes" },
+  { href: "/llm", i18nKey: "llm", label: "LLM" },
+  { href: "/stt", i18nKey: "stt", label: "STT" },
+  { href: "/tts", i18nKey: "tts", label: "TTS" },
+  { href: "/image", i18nKey: "image", label: "Image" },
+  { href: "/video", i18nKey: "video", label: "Video" },
 ];
 
 // Overflow items — visible at wider breakpoints, collapsed into "More" on narrow
 const overflowLinks = [
-  { href: "/jobs", label: "Jobs" },
-  { href: "/history", label: "History" },
-  { href: "/usage", label: "Usage" },
+  { href: "/jobs", i18nKey: "jobs", label: "Jobs" },
+  { href: "/history", i18nKey: "history", label: "History" },
+  { href: "/usage", i18nKey: "usage", label: "Usage" },
 ];
 
 const adminLinks = [
@@ -134,6 +136,11 @@ export default function Nav() {
   const [wsOpen, setWsOpen] = useState(false);
   // undefined = not loaded yet, null = all allowed, string[] = restricted
   const [allowedModules, setAllowedModules] = useState<string[] | null | undefined>(undefined);
+
+  // Theme, locale, i18n
+  const { theme, setTheme } = useTheme();
+  const { locale, setLocale } = useLocale();
+  const t = useT("nav");
 
   // Refs for click-outside
   const adminRef = useRef<HTMLDivElement>(null);
@@ -249,18 +256,18 @@ export default function Nav() {
 
               {/* Primary links — filtered by allowed modules */}
               {filteredPrimaryLinks.map((l) => (
-                <NavLink key={l.href} href={l.href} label={l.label} pathname={pathname} />
+                <NavLink key={l.href} href={l.href} label={t(l.i18nKey)} pathname={pathname} />
               ))}
 
               {/* Overflow links — visible at wider breakpoints */}
               {overflowLinks.map((l) => (
-                <NavLink key={l.href} href={l.href} label={l.label} pathname={pathname} className="nav-overflow-link" />
+                <NavLink key={l.href} href={l.href} label={t(l.i18nKey)} pathname={pathname} className="nav-overflow-link" />
               ))}
 
               {/* "More" dropdown — visible only at narrow desktop widths */}
               <div ref={moreRef} style={{ position: "relative" }} className="nav-more-btn">
                 <DropdownBtn
-                  label="More"
+                  label={t("more")}
                   isOpen={moreOpen}
                   onClick={() => { setMoreOpen(!moreOpen); setAdminOpen(false); }}
                   color="#6b7280"
@@ -287,7 +294,7 @@ export default function Nav() {
                           onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = isActive ? "rgba(0, 255, 136, 0.08)" : "transparent"; }}
                         >
                           <span style={{ color: isActive ? "#00e5ff" : "#444", marginRight: "6px" }}>&gt;</span>
-                          {l.label}
+                          {t(l.i18nKey)}
                         </Link>
                       );
                     })}
@@ -305,7 +312,7 @@ export default function Nav() {
                 {isAdmin && (
                   <div ref={adminRef} style={{ position: "relative" }} className="nav-admin-desktop">
                     <DropdownBtn
-                      label="Admin"
+                      label={t("admin")}
                       isOpen={adminOpen}
                       onClick={() => { setAdminOpen(!adminOpen); setUserOpen(false); setMoreOpen(false); setWsOpen(false); }}
                       color={isAdminRoute ? "#ff4444" : "#ff4444"}
@@ -376,6 +383,42 @@ export default function Nav() {
                   </div>
                 )}
 
+                {/* Theme toggle — desktop only */}
+                <button
+                  className="nav-user-desktop"
+                  onClick={() => {
+                    const next = theme === "system" ? "dark" : theme === "dark" ? "light" : "system";
+                    setTheme(next);
+                  }}
+                  aria-label="Toggle theme"
+                  title={theme === "system" ? "System" : theme === "dark" ? "Dark" : "Light"}
+                  style={{
+                    padding: "3px 8px", borderRadius: "4px",
+                    backgroundColor: "transparent", color: "#6b7280",
+                    border: "1px solid transparent",
+                    fontFamily: "inherit", fontSize: "14px", cursor: "pointer",
+                    lineHeight: "1.4",
+                  }}
+                >
+                  {theme === "light" ? "\u263C" : theme === "dark" ? "\u263D" : "\u25D0"}
+                </button>
+
+                {/* Language toggle — desktop only */}
+                <button
+                  className="nav-user-desktop"
+                  onClick={() => setLocale(locale === "en" ? "sl" : "en")}
+                  aria-label="Toggle language"
+                  style={{
+                    padding: "3px 8px", borderRadius: "4px",
+                    backgroundColor: "transparent", color: "#6b7280",
+                    border: "1px solid transparent",
+                    fontFamily: "inherit", fontSize: "11px", fontWeight: 600, cursor: "pointer",
+                    lineHeight: "1.4",
+                  }}
+                >
+                  {locale === "en" ? "EN" : "SL"}
+                </button>
+
                 {/* User dropdown — desktop only */}
                 <div ref={userRef} style={{ position: "relative" }} className="nav-user-desktop">
                   <DropdownBtn
@@ -391,9 +434,24 @@ export default function Nav() {
                     <div style={dropdownPanel} role="menu">
                       {/* Email display */}
                       <div style={{ padding: "8px 12px", borderBottom: "1px solid #1e2a3a" }}>
-                        <div style={{ fontSize: "10px", color: "#5a6a7a", marginBottom: "2px" }}>signed in as</div>
+                        <div style={{ fontSize: "10px", color: "#5a6a7a", marginBottom: "2px" }}>{t("signedInAs")}</div>
                         <div style={{ fontSize: "11px", color: "#8b949e", wordBreak: "break-all" }}>{userEmail}</div>
                       </div>
+                      <Link
+                        href="/settings"
+                        className="no-underline"
+                        role="menuitem"
+                        style={{
+                          ...dropdownLink,
+                          color: pathname === "/settings" ? "#00ff88" : "#8b949e",
+                          backgroundColor: pathname === "/settings" ? "rgba(0, 255, 136, 0.08)" : "transparent",
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(0, 255, 136, 0.05)"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = pathname === "/settings" ? "rgba(0, 255, 136, 0.08)" : "transparent"; }}
+                      >
+                        <span style={{ color: pathname === "/settings" ? "#00e5ff" : "#666", marginRight: "6px" }}>&gt;</span>
+                        {t("settings").toLowerCase()}
+                      </Link>
                       <button
                         onClick={() => signOut()}
                         role="menuitem"
@@ -406,7 +464,7 @@ export default function Nav() {
                         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
                       >
                         <span style={{ color: "#666", marginRight: "6px" }}>&gt;</span>
-                        sign_out
+                        {t("signOut")}
                       </button>
                     </div>
                   )}
@@ -450,7 +508,7 @@ export default function Nav() {
           {/* Section: Tools */}
           <div style={{ marginBottom: "8px" }}>
             <div style={{ fontSize: "10px", color: "#5a6a7a", textTransform: "uppercase", letterSpacing: "0.1em", padding: "4px 12px", marginBottom: "2px" }}>
-              // tools
+              // {t("tools")}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
               {[...filteredPrimaryLinks, ...overflowLinks].map((l) => {
@@ -468,7 +526,7 @@ export default function Nav() {
                     }}
                   >
                     <span style={{ color: isActive ? "#00e5ff" : "#444", marginRight: "6px" }}>&gt;</span>
-                    {l.label}
+                    {t(l.i18nKey)}
                   </Link>
                 );
               })}
@@ -508,8 +566,50 @@ export default function Nav() {
           {/* Section: Account */}
           <div style={{ borderTop: "1px solid #1e2a3a", marginTop: "4px", paddingTop: "8px" }}>
             <div style={{ fontSize: "10px", color: "#5a6a7a", textTransform: "uppercase", letterSpacing: "0.1em", padding: "4px 12px", marginBottom: "4px" }}>
-              // account
+              // {t("account")}
             </div>
+            {/* Theme + Language toggles — mobile */}
+            <div style={{ padding: "4px 12px 8px", display: "flex", gap: "8px", alignItems: "center" }}>
+              <button
+                onClick={() => {
+                  const next = theme === "system" ? "dark" : theme === "dark" ? "light" : "system";
+                  setTheme(next);
+                }}
+                style={{
+                  padding: "4px 10px", borderRadius: "4px", border: "1px solid #1e2a3a",
+                  backgroundColor: "transparent", color: "#8b949e",
+                  fontFamily: "inherit", fontSize: "13px", cursor: "pointer",
+                }}
+              >
+                {theme === "light" ? "\u263C" : theme === "dark" ? "\u263D" : "\u25D0"}{" "}
+                {theme === "system" ? "System" : theme === "dark" ? "Dark" : "Light"}
+              </button>
+              <button
+                onClick={() => setLocale(locale === "en" ? "sl" : "en")}
+                style={{
+                  padding: "4px 10px", borderRadius: "4px", border: "1px solid #1e2a3a",
+                  backgroundColor: "transparent", color: "#8b949e",
+                  fontFamily: "inherit", fontSize: "11px", fontWeight: 600, cursor: "pointer",
+                }}
+              >
+                {locale === "en" ? "EN" : "SL"}
+              </button>
+            </div>
+            {/* Settings link — mobile */}
+            <Link
+              href="/settings"
+              className="no-underline"
+              style={{
+                display: "block", padding: "10px 12px", borderRadius: "4px", fontSize: "14px", fontWeight: 500,
+                color: pathname === "/settings" ? "#00ff88" : "#8b949e",
+                backgroundColor: pathname === "/settings" ? "rgba(0, 255, 136, 0.08)" : "transparent",
+                borderLeft: pathname === "/settings" ? "2px solid #00ff88" : "2px solid transparent",
+                marginBottom: "4px",
+              }}
+            >
+              <span style={{ color: pathname === "/settings" ? "#00e5ff" : "#444", marginRight: "6px" }}>&gt;</span>
+              {t("settings")}
+            </Link>
             {/* Workspace switcher in mobile */}
             {workspaces.length > 1 && (
               <div style={{ padding: "4px 12px 8px", display: "flex", flexWrap: "wrap", gap: "4px" }}>
@@ -542,7 +642,7 @@ export default function Nav() {
                   fontSize: "12px", cursor: "pointer", flexShrink: 0, borderRadius: "4px",
                 }}
               >
-                sign_out
+                {t("signOut")}
               </button>
             </div>
           </div>

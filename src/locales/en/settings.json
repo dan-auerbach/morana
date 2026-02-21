@@ -1,0 +1,20 @@
+{
+  "title": "Settings",
+  "subtitle": "user preferences",
+  "theme": {
+    "title": "Theme",
+    "system": "System",
+    "dark": "Dark",
+    "light": "Light"
+  },
+  "language": {
+    "title": "Language",
+    "description": "Interface language"
+  },
+  "defaults": {
+    "title": "Defaults",
+    "llmModel": "Default LLM Model",
+    "comingSoon": "(coming soon)",
+    "none": "None"
+  }
+}

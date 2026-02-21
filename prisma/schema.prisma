@@ -45,6 +45,11 @@ model User {
   allowedModels         Json?  // JSON array of model ID strings, null = all models allowed
   allowedModules        Json?  // string[] e.g. ["llm","stt","tts","image","video","recipes"], null = all
 
+  // User preferences
+  themePreference       String   @default("system")  // "system" | "dark" | "light"
+  locale                String   @default("en")      // "en" | "sl"
+  defaultLlmModelId     String?                      // future: default LLM model
+
   // Active workspace selection (cookie-backed, DB persisted)
   activeWorkspaceId     String?
 

@@ -1,0 +1,18 @@
+{
+  "recipes": "Recipes",
+  "llm": "LLM",
+  "stt": "STT",
+  "tts": "TTS",
+  "image": "Image",
+  "video": "Video",
+  "jobs": "Jobs",
+  "history": "History",
+  "usage": "Usage",
+  "settings": "Settings",
+  "signOut": "sign_out",
+  "signedInAs": "signed in as",
+  "admin": "Admin",
+  "more": "More",
+  "tools": "tools",
+  "account": "account"
+}

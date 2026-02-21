@@ -24,9 +24,27 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* ── Light theme overrides ── */
+.light {
+  --bg: #f0f2f5;
+  --bg-panel: #ffffff;
+  --bg-input: #e8ecf0;
+  --border: #d0d7de;
+  --border-focus: #00cc6a;
+  --green: #008f4a;
+  --green-dim: #006d38;
+  --yellow: #b38600;
+  --cyan: #0085b2;
+  --red: #cc3333;
+  --white: #1a1a2e;
+  --gray: #6b7280;
+  --glow-green: 0 0 10px rgba(0, 143, 74, 0.2);
+  --glow-yellow: 0 0 10px rgba(179, 134, 0, 0.2);
+}
+
 * {
   scrollbar-width: thin;
-  scrollbar-color: #1e2a3a #0a0a0a;
+  scrollbar-color: var(--border) var(--bg);
 }
 
 body {
@@ -55,10 +73,22 @@ body::after {
   );
 }
 
+.light body::after {
+  opacity: 0.3;
+}
+
 ::selection {
   background: rgba(0, 255, 136, 0.3);
   color: #fff;
 }
+
+.light ::selection {
+  background: rgba(0, 143, 74, 0.25);
+  color: #1a1a2e;
+}
+
+.light ::-webkit-scrollbar-track { background: var(--bg); }
+.light ::-webkit-scrollbar-thumb { background: var(--border); }
 
 /* Terminal-style inputs */
 input, textarea, select {

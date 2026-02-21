@@ -1,0 +1,18 @@
+{
+  "recipes": "Recepti",
+  "llm": "LLM",
+  "stt": "STT",
+  "tts": "TTS",
+  "image": "Slika",
+  "video": "Video",
+  "jobs": "Opravila",
+  "history": "Zgodovina",
+  "usage": "Poraba",
+  "settings": "Nastavitve",
+  "signOut": "odjava",
+  "signedInAs": "prijavljeni kot",
+  "admin": "Admin",
+  "more": "Ve\u010d",
+  "tools": "orodja",
+  "account": "ra\u010dun"
+}
