@@ -197,13 +197,13 @@ export default function AdminTemplatesPage() {
     } catch { /* ignore */ }
   }
 
-  if (!session) return <div style={{ color: "#5a6a7a" }}><span style={{ color: "#ff4444" }}>[ERROR]</span> Authentication required.</div>;
-  if (!isAdmin) return <div style={{ color: "#ff4444" }}><span style={{ fontWeight: 700 }}>[ACCESS DENIED]</span> Admin privileges required.</div>;
+  if (!session) return <div style={{ color: "var(--gray)" }}><span style={{ color: "var(--red)" }}>[ERROR]</span> Authentication required.</div>;
+  if (!isAdmin) return <div style={{ color: "var(--red)" }}><span style={{ fontWeight: 700 }}>[ACCESS DENIED]</span> Admin privileges required.</div>;
 
   const s = {
-    label: { fontSize: "11px", fontWeight: 700 as const, color: "#00ff88", textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: "4px", display: "block" },
-    input: { width: "100%", padding: "6px 10px", backgroundColor: "#111820", border: "1px solid #1e2a3a", color: "#e0e0e0", fontFamily: "inherit", fontSize: "12px" },
-    textarea: { width: "100%", padding: "8px 10px", backgroundColor: "#111820", border: "1px solid #1e2a3a", color: "#e0e0e0", fontFamily: "inherit", fontSize: "12px", resize: "vertical" as const, minHeight: "80px" },
+    label: { fontSize: "11px", fontWeight: 700 as const, color: "var(--green)", textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: "4px", display: "block" },
+    input: { width: "100%", padding: "6px 10px", backgroundColor: "var(--bg-input)", border: "1px solid var(--border)", color: "var(--white)", fontFamily: "inherit", fontSize: "12px" },
+    textarea: { width: "100%", padding: "8px 10px", backgroundColor: "var(--bg-input)", border: "1px solid var(--border)", color: "var(--white)", fontFamily: "inherit", fontSize: "12px", resize: "vertical" as const, minHeight: "80px" },
   };
 
   return (
@@ -211,32 +211,32 @@ export default function AdminTemplatesPage() {
       {/* Breadcrumb */}
       <div style={{ marginBottom: "24px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-          <Link href="/admin" className="no-underline" style={{ color: "#ff4444", fontSize: "18px", fontWeight: 700 }}>[ADMIN]</Link>
+          <Link href="/admin" className="no-underline" style={{ color: "var(--red)", fontSize: "18px", fontWeight: 700 }}>[ADMIN]</Link>
           <span style={{ color: "#333" }}>/</span>
-          <span style={{ color: "#ffcc00", fontSize: "18px", fontWeight: 700 }}>TEMPLATES</span>
+          <span style={{ color: "var(--yellow)", fontSize: "18px", fontWeight: 700 }}>TEMPLATES</span>
         </div>
-        <div style={{ color: "#5a6a7a", fontSize: "13px" }}>$ admin --templates --manage</div>
+        <div style={{ color: "var(--gray)", fontSize: "13px" }}>$ admin --templates --manage</div>
       </div>
 
       {/* Actions */}
       <div style={{ marginBottom: "20px", display: "flex", gap: "12px", alignItems: "center" }}>
         <button
           onClick={() => { if (showForm && !editingId) { setShowForm(false); } else { resetForm(); setShowForm(true); } }}
-          style={{ padding: "8px 20px", background: "transparent", border: "1px solid #00ff88", color: "#00ff88", fontFamily: "inherit", fontSize: "12px", fontWeight: 700, cursor: "pointer", textTransform: "uppercase", letterSpacing: "0.1em" }}
+          style={{ padding: "8px 20px", background: "transparent", border: "1px solid var(--green)", color: "var(--green)", fontFamily: "inherit", fontSize: "12px", fontWeight: 700, cursor: "pointer", textTransform: "uppercase", letterSpacing: "0.1em" }}
           onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0, 255, 136, 0.1)"; }}
           onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
         >
           {showForm && !editingId ? "[  CANCEL  ]" : "[  + NEW TEMPLATE  ]"}
         </button>
-        <div style={{ fontSize: "12px", color: "#5a6a7a" }}>
+        <div style={{ fontSize: "12px", color: "var(--gray)" }}>
           {templates.length} template{templates.length !== 1 ? "s" : ""} | {templates.filter(t => t.isActive).length} active
         </div>
       </div>
 
       {/* Form */}
       {showForm && (
-        <div style={{ padding: "16px", border: `1px solid ${editingId ? "#00e5ff" : "#00ff88"}`, backgroundColor: `rgba(${editingId ? "0, 229, 255" : "0, 255, 136"}, 0.03)`, marginBottom: "20px" }}>
-          <div style={{ fontSize: "11px", fontWeight: 700, color: editingId ? "#00e5ff" : "#00ff88", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "12px" }}>
+        <div style={{ padding: "16px", border: `1px solid ${editingId ? "var(--cyan)" : "var(--green)"}`, backgroundColor: `rgba(${editingId ? "0, 229, 255" : "0, 255, 136"}, 0.03)`, marginBottom: "20px" }}>
+          <div style={{ fontSize: "11px", fontWeight: 700, color: editingId ? "var(--cyan)" : "var(--green)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "12px" }}>
             {editingId ? "EDIT TEMPLATE" : "NEW TEMPLATE"}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginBottom: "12px" }}>
@@ -260,34 +260,34 @@ export default function AdminTemplatesPage() {
             <input value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Short description for users" style={s.input} />
           </div>
           <div style={{ marginBottom: "12px" }}>
-            <label style={s.label}>--system-prompt * <span style={{ color: "#5a6a7a", fontWeight: 400, textTransform: "none" }}>(instructions for the AI)</span></label>
+            <label style={s.label}>--system-prompt * <span style={{ color: "var(--gray)", fontWeight: 400, textTransform: "none" }}>(instructions for the AI)</span></label>
             <textarea value={formData.systemPrompt} onChange={(e) => setFormData({ ...formData, systemPrompt: e.target.value })} placeholder="You are a professional journalist..." style={{ ...s.textarea, minHeight: "120px" }} />
           </div>
           <div style={{ marginBottom: "12px" }}>
-            <label style={s.label}>--user-prompt-template <span style={{ color: "#5a6a7a", fontWeight: 400, textTransform: "none" }}>(optional, use {"{{input}}"} as placeholder)</span></label>
+            <label style={s.label}>--user-prompt-template <span style={{ color: "var(--gray)", fontWeight: 400, textTransform: "none" }}>(optional, use {"{{input}}"} as placeholder)</span></label>
             <textarea value={formData.userPromptTemplate} onChange={(e) => setFormData({ ...formData, userPromptTemplate: e.target.value })} placeholder='e.g. Write an article based on: {{input}}' style={s.textarea} />
           </div>
           <div style={{ marginBottom: "12px" }}>
-            <label style={s.label}>--knowledge-text <span style={{ color: "#5a6a7a", fontWeight: 400, textTransform: "none" }}>(inline reference material)</span></label>
+            <label style={s.label}>--knowledge-text <span style={{ color: "var(--gray)", fontWeight: 400, textTransform: "none" }}>(inline reference material)</span></label>
             <textarea value={formData.knowledgeText} onChange={(e) => setFormData({ ...formData, knowledgeText: e.target.value })} placeholder="Paste reference text, style guides, rules..." style={s.textarea} />
           </div>
           <div style={{ display: "flex", gap: "16px", alignItems: "center", marginBottom: "12px" }}>
-            <label style={{ fontSize: "11px", color: "#e0e0e0", display: "flex", alignItems: "center", gap: "6px", cursor: "pointer" }}>
+            <label style={{ fontSize: "11px", color: "var(--white)", display: "flex", alignItems: "center", gap: "6px", cursor: "pointer" }}>
               <input type="checkbox" checked={formData.isActive} onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })} />
-              <span style={{ color: "#00ff88", fontWeight: 700, textTransform: "uppercase", fontSize: "10px" }}>Active</span>
+              <span style={{ color: "var(--green)", fontWeight: 700, textTransform: "uppercase", fontSize: "10px" }}>Active</span>
             </label>
             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <label style={{ fontSize: "10px", color: "#00ff88", fontWeight: 700, textTransform: "uppercase" }}>Sort order:</label>
+              <label style={{ fontSize: "10px", color: "var(--green)", fontWeight: 700, textTransform: "uppercase" }}>Sort order:</label>
               <input type="number" value={formData.sortOrder} onChange={(e) => setFormData({ ...formData, sortOrder: parseInt(e.target.value) || 0 })} style={{ ...s.input, width: "60px" }} />
             </div>
           </div>
-          {formError && <div style={{ color: "#ff4444", fontSize: "12px", marginBottom: "8px" }}>[ERROR] {formError}</div>}
+          {formError && <div style={{ color: "var(--red)", fontSize: "12px", marginBottom: "8px" }}>[ERROR] {formError}</div>}
           <div style={{ display: "flex", gap: "8px" }}>
-            <button onClick={handleSubmit} style={{ padding: "6px 16px", background: "transparent", border: `1px solid ${editingId ? "#00e5ff" : "#00ff88"}`, color: editingId ? "#00e5ff" : "#00ff88", fontFamily: "inherit", fontSize: "12px", fontWeight: 700, cursor: "pointer", textTransform: "uppercase" }}>
+            <button onClick={handleSubmit} style={{ padding: "6px 16px", background: "transparent", border: `1px solid ${editingId ? "var(--cyan)" : "var(--green)"}`, color: editingId ? "var(--cyan)" : "var(--green)", fontFamily: "inherit", fontSize: "12px", fontWeight: 700, cursor: "pointer", textTransform: "uppercase" }}>
               {editingId ? "[  SAVE  ]" : "[  CREATE  ]"}
             </button>
             {editingId && (
-              <button onClick={() => { resetForm(); setShowForm(false); }} style={{ padding: "6px 16px", background: "transparent", border: "1px solid #5a6a7a", color: "#5a6a7a", fontFamily: "inherit", fontSize: "12px", fontWeight: 700, cursor: "pointer", textTransform: "uppercase" }}>
+              <button onClick={() => { resetForm(); setShowForm(false); }} style={{ padding: "6px 16px", background: "transparent", border: "1px solid var(--gray)", color: "var(--gray)", fontFamily: "inherit", fontSize: "12px", fontWeight: 700, cursor: "pointer", textTransform: "uppercase" }}>
                 [  CANCEL  ]
               </button>
             )}
@@ -295,18 +295,18 @@ export default function AdminTemplatesPage() {
         </div>
       )}
 
-      {error && <div style={{ padding: "12px", backgroundColor: "rgba(255, 68, 68, 0.08)", border: "1px solid #ff4444", color: "#ff4444", fontSize: "13px", marginBottom: "16px" }}><span style={{ fontWeight: 700 }}>[ERROR]</span> {error}</div>}
+      {error && <div style={{ padding: "12px", backgroundColor: "rgba(255, 68, 68, 0.08)", border: "1px solid var(--red)", color: "var(--red)", fontSize: "13px", marginBottom: "16px" }}><span style={{ fontWeight: 700 }}>[ERROR]</span> {error}</div>}
 
       {/* Templates table */}
       {loading ? (
-        <div style={{ color: "#00ff88", fontSize: "13px" }}><span style={{ animation: "blink 1s step-end infinite" }}>_</span> Loading templates...</div>
+        <div style={{ color: "var(--green)", fontSize: "13px" }}><span style={{ animation: "blink 1s step-end infinite" }}>_</span> Loading templates...</div>
       ) : (
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", fontSize: "12px", borderCollapse: "collapse", fontFamily: "inherit" }}>
             <thead>
-              <tr style={{ borderBottom: "1px solid #00ff88", textAlign: "left" }}>
+              <tr style={{ borderBottom: "1px solid var(--green)", textAlign: "left" }}>
                 {["NAME", "SLUG", "CATEGORY", "STATUS", "ORDER", "ACTIONS"].map((h) => (
-                  <th key={h} style={{ padding: "8px 12px 8px 0", color: "#00ff88", fontWeight: 700, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.1em", whiteSpace: "nowrap" }}>{h}</th>
+                  <th key={h} style={{ padding: "8px 12px 8px 0", color: "var(--green)", fontWeight: 700, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.1em", whiteSpace: "nowrap" }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -319,53 +319,53 @@ export default function AdminTemplatesPage() {
                       {/* Main row */}
                       <div style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 0.8fr 0.6fr 0.4fr 1.2fr", alignItems: "center", borderBottom: "1px solid rgba(30, 42, 58, 0.5)", padding: "8px 0" }}>
                         <div>
-                          <span onClick={() => setExpandedId(isExpanded ? null : t.id)} style={{ color: "#e0e0e0", cursor: "pointer" }}
-                            onMouseEnter={(e) => { e.currentTarget.style.color = "#00ff88"; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.color = "#e0e0e0"; }}
+                          <span onClick={() => setExpandedId(isExpanded ? null : t.id)} style={{ color: "var(--white)", cursor: "pointer" }}
+                            onMouseEnter={(e) => { e.currentTarget.style.color = "var(--green)"; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.color = "var(--white)"; }}
                           >
-                            <span style={{ color: isExpanded ? "#00ff88" : "#444", marginRight: "4px", fontSize: "10px" }}>{isExpanded ? "▼" : "▶"}</span>
+                            <span style={{ color: isExpanded ? "var(--green)" : "#444", marginRight: "4px", fontSize: "10px" }}>{isExpanded ? "▼" : "▶"}</span>
                             {t.name}
                           </span>
-                          {t.description && <div style={{ color: "#5a6a7a", fontSize: "10px", marginTop: "2px", paddingLeft: "14px" }}>{t.description}</div>}
+                          {t.description && <div style={{ color: "var(--gray)", fontSize: "10px", marginTop: "2px", paddingLeft: "14px" }}>{t.description}</div>}
                         </div>
-                        <div style={{ color: "#5a6a7a", fontSize: "11px" }}>{t.slug}</div>
-                        <div><span style={{ color: "#ffcc00", fontSize: "10px", fontWeight: 700, textTransform: "uppercase", padding: "2px 6px", border: "1px solid rgba(255, 204, 0, 0.3)", borderRadius: "2px" }}>{t.category}</span></div>
-                        <div><span style={{ color: t.isActive ? "#00ff88" : "#ff4444", fontSize: "11px", fontWeight: 700 }}>{t.isActive ? "ON" : "OFF"}</span></div>
-                        <div style={{ color: "#5a6a7a", fontSize: "11px" }}>{t.sortOrder}</div>
+                        <div style={{ color: "var(--gray)", fontSize: "11px" }}>{t.slug}</div>
+                        <div><span style={{ color: "var(--yellow)", fontSize: "10px", fontWeight: 700, textTransform: "uppercase", padding: "2px 6px", border: "1px solid rgba(255, 204, 0, 0.3)", borderRadius: "2px" }}>{t.category}</span></div>
+                        <div><span style={{ color: t.isActive ? "var(--green)" : "var(--red)", fontSize: "11px", fontWeight: 700 }}>{t.isActive ? "ON" : "OFF"}</span></div>
+                        <div style={{ color: "var(--gray)", fontSize: "11px" }}>{t.sortOrder}</div>
                         <div style={{ display: "flex", gap: "4px" }}>
-                          <button onClick={() => startEdit(t)} style={{ padding: "2px 8px", background: "transparent", border: "1px solid #00e5ff", color: "#00e5ff", fontFamily: "inherit", fontSize: "10px", cursor: "pointer" }}>EDIT</button>
-                          <button onClick={() => handleToggleActive(t.id, t.isActive)} style={{ padding: "2px 8px", background: "transparent", border: `1px solid ${t.isActive ? "#ffcc00" : "#00ff88"}`, color: t.isActive ? "#ffcc00" : "#00ff88", fontFamily: "inherit", fontSize: "10px", cursor: "pointer" }}>{t.isActive ? "DISABLE" : "ENABLE"}</button>
-                          <button onClick={() => handleDelete(t.id)} style={{ padding: "2px 8px", background: "transparent", border: "1px solid #ff4444", color: "#ff4444", fontFamily: "inherit", fontSize: "10px", cursor: "pointer" }}>DEL</button>
+                          <button onClick={() => startEdit(t)} style={{ padding: "2px 8px", background: "transparent", border: "1px solid var(--cyan)", color: "var(--cyan)", fontFamily: "inherit", fontSize: "10px", cursor: "pointer" }}>EDIT</button>
+                          <button onClick={() => handleToggleActive(t.id, t.isActive)} style={{ padding: "2px 8px", background: "transparent", border: `1px solid ${t.isActive ? "var(--yellow)" : "var(--green)"}`, color: t.isActive ? "var(--yellow)" : "var(--green)", fontFamily: "inherit", fontSize: "10px", cursor: "pointer" }}>{t.isActive ? "DISABLE" : "ENABLE"}</button>
+                          <button onClick={() => handleDelete(t.id)} style={{ padding: "2px 8px", background: "transparent", border: "1px solid var(--red)", color: "var(--red)", fontFamily: "inherit", fontSize: "10px", cursor: "pointer" }}>DEL</button>
                         </div>
                       </div>
 
                       {/* Expanded detail */}
                       {isExpanded && (
-                        <div style={{ padding: "12px 16px", backgroundColor: "rgba(13, 17, 23, 0.8)", borderBottom: "1px solid rgba(0, 255, 136, 0.15)", borderLeft: "2px solid #00ff88", marginLeft: "8px" }}>
+                        <div style={{ padding: "12px 16px", backgroundColor: "rgba(13, 17, 23, 0.8)", borderBottom: "1px solid rgba(0, 255, 136, 0.15)", borderLeft: "2px solid var(--green)", marginLeft: "8px" }}>
                           <div style={{ marginBottom: "8px" }}>
-                            <div style={{ fontSize: "10px", fontWeight: 700, color: "#00ff88", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "4px" }}>System Prompt</div>
-                            <div style={{ padding: "8px", backgroundColor: "#0a0e14", border: "1px solid #1e2a3a", fontSize: "11px", color: "#e0e0e0", whiteSpace: "pre-wrap", maxHeight: "200px", overflowY: "auto" }}>{t.systemPrompt}</div>
+                            <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--green)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "4px" }}>System Prompt</div>
+                            <div style={{ padding: "8px", backgroundColor: "var(--bg)", border: "1px solid var(--border)", fontSize: "11px", color: "var(--white)", whiteSpace: "pre-wrap", maxHeight: "200px", overflowY: "auto" }}>{t.systemPrompt}</div>
                           </div>
                           {t.userPromptTemplate && (
                             <div style={{ marginBottom: "8px" }}>
-                              <div style={{ fontSize: "10px", fontWeight: 700, color: "#ffcc00", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "4px" }}>User Prompt Template</div>
-                              <div style={{ padding: "8px", backgroundColor: "#0a0e14", border: "1px solid #1e2a3a", fontSize: "11px", color: "#e0e0e0", whiteSpace: "pre-wrap" }}>{t.userPromptTemplate}</div>
+                              <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--yellow)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "4px" }}>User Prompt Template</div>
+                              <div style={{ padding: "8px", backgroundColor: "var(--bg)", border: "1px solid var(--border)", fontSize: "11px", color: "var(--white)", whiteSpace: "pre-wrap" }}>{t.userPromptTemplate}</div>
                             </div>
                           )}
                           {t.knowledgeText && (
                             <div style={{ marginBottom: "8px" }}>
-                              <div style={{ fontSize: "10px", fontWeight: 700, color: "#00e5ff", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "4px" }}>Knowledge Text</div>
-                              <div style={{ padding: "8px", backgroundColor: "#0a0e14", border: "1px solid #1e2a3a", fontSize: "11px", color: "#e0e0e0", whiteSpace: "pre-wrap", maxHeight: "150px", overflowY: "auto" }}>{t.knowledgeText.substring(0, 500)}{t.knowledgeText.length > 500 ? "..." : ""}</div>
+                              <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--cyan)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "4px" }}>Knowledge Text</div>
+                              <div style={{ padding: "8px", backgroundColor: "var(--bg)", border: "1px solid var(--border)", fontSize: "11px", color: "var(--white)", whiteSpace: "pre-wrap", maxHeight: "150px", overflowY: "auto" }}>{t.knowledgeText.substring(0, 500)}{t.knowledgeText.length > 500 ? "..." : ""}</div>
                             </div>
                           )}
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "8px" }}>
-                            <div style={{ fontSize: "10px", color: "#5a6a7a" }}>
-                              Created by <span style={{ color: "#e0e0e0" }}>{t.creator.email}</span> on {new Date(t.createdAt).toLocaleDateString("sl-SI")}
-                              <span style={{ marginLeft: "12px", color: "#ffcc00" }}>v{t.currentVersion}</span>
+                            <div style={{ fontSize: "10px", color: "var(--gray)" }}>
+                              Created by <span style={{ color: "var(--white)" }}>{t.creator.email}</span> on {new Date(t.createdAt).toLocaleDateString("sl-SI")}
+                              <span style={{ marginLeft: "12px", color: "var(--yellow)" }}>v{t.currentVersion}</span>
                             </div>
                             <button
                               onClick={() => { showVersions === t.id ? setShowVersions(null) : loadVersions(t.id); }}
-                              style={{ padding: "3px 10px", background: "transparent", border: "1px solid #ffcc00", color: "#ffcc00", fontFamily: "inherit", fontSize: "10px", fontWeight: 700, cursor: "pointer" }}
+                              style={{ padding: "3px 10px", background: "transparent", border: "1px solid var(--yellow)", color: "var(--yellow)", fontFamily: "inherit", fontSize: "10px", fontWeight: 700, cursor: "pointer" }}
                             >
                               {showVersions === t.id ? "HIDE VERSIONS" : "VERSION HISTORY"}
                             </button>
@@ -373,24 +373,24 @@ export default function AdminTemplatesPage() {
 
                           {/* Version history panel */}
                           {showVersions === t.id && versions.length > 0 && (
-                            <div style={{ marginTop: "12px", padding: "12px", backgroundColor: "#0a0e14", border: "1px solid rgba(255, 204, 0, 0.2)" }}>
-                              <div style={{ fontSize: "10px", fontWeight: 700, color: "#ffcc00", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "8px" }}>
+                            <div style={{ marginTop: "12px", padding: "12px", backgroundColor: "var(--bg)", border: "1px solid rgba(255, 204, 0, 0.2)" }}>
+                              <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--yellow)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "8px" }}>
                                 VERSION HISTORY ({versions.length} versions)
                               </div>
                               <div style={{ display: "flex", flexDirection: "column", gap: "4px", maxHeight: "200px", overflowY: "auto" }}>
                                 {versions.map((v) => (
-                                  <div key={v.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 8px", backgroundColor: v.versionNumber === t.currentVersion ? "rgba(255, 204, 0, 0.08)" : "transparent", border: `1px solid ${v.versionNumber === t.currentVersion ? "rgba(255, 204, 0, 0.3)" : "#1e2a3a"}` }}>
+                                  <div key={v.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 8px", backgroundColor: v.versionNumber === t.currentVersion ? "rgba(255, 204, 0, 0.08)" : "transparent", border: `1px solid ${v.versionNumber === t.currentVersion ? "rgba(255, 204, 0, 0.3)" : "var(--border)"}` }}>
                                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                      <span style={{ color: v.versionNumber === t.currentVersion ? "#ffcc00" : "#5a6a7a", fontSize: "11px", fontWeight: 700, minWidth: "30px" }}>v{v.versionNumber}</span>
-                                      <span style={{ color: "#8b949e", fontSize: "10px" }}>{new Date(v.createdAt).toLocaleString("sl-SI", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
-                                      <span style={{ color: "#5a6a7a", fontSize: "10px" }}>{v.author.email}</span>
-                                      {v.description && <span style={{ color: "#5a6a7a", fontSize: "9px", fontStyle: "italic" }}>{v.description.substring(0, 40)}</span>}
+                                      <span style={{ color: v.versionNumber === t.currentVersion ? "var(--yellow)" : "var(--gray)", fontSize: "11px", fontWeight: 700, minWidth: "30px" }}>v{v.versionNumber}</span>
+                                      <span style={{ color: "var(--text-secondary)", fontSize: "10px" }}>{new Date(v.createdAt).toLocaleString("sl-SI", { day: "2-digit", month: "2-digit", year: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+                                      <span style={{ color: "var(--gray)", fontSize: "10px" }}>{v.author.email}</span>
+                                      {v.description && <span style={{ color: "var(--gray)", fontSize: "9px", fontStyle: "italic" }}>{v.description.substring(0, 40)}</span>}
                                     </div>
                                     <div style={{ display: "flex", gap: "4px" }}>
                                       {versions.length > 1 && v.versionNumber > 1 && (
                                         <button
                                           onClick={() => handleDiff(t.id, v.versionNumber - 1, v.versionNumber)}
-                                          style={{ padding: "1px 6px", background: "transparent", border: "1px solid #00e5ff", color: "#00e5ff", fontFamily: "inherit", fontSize: "9px", cursor: "pointer" }}
+                                          style={{ padding: "1px 6px", background: "transparent", border: "1px solid var(--cyan)", color: "var(--cyan)", fontFamily: "inherit", fontSize: "9px", cursor: "pointer" }}
                                         >
                                           DIFF
                                         </button>
@@ -410,8 +410,8 @@ export default function AdminTemplatesPage() {
 
                               {/* Diff view */}
                               {diffData && diffVersions && (
-                                <div style={{ marginTop: "8px", padding: "8px", backgroundColor: "#111820", border: "1px solid #1e2a3a" }}>
-                                  <div style={{ fontSize: "10px", fontWeight: 700, color: "#00e5ff", marginBottom: "4px" }}>
+                                <div style={{ marginTop: "8px", padding: "8px", backgroundColor: "var(--bg-input)", border: "1px solid var(--border)" }}>
+                                  <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--cyan)", marginBottom: "4px" }}>
                                     DIFF: v{diffVersions[0]} → v{diffVersions[1]}
                                   </div>
                                   <div style={{ fontSize: "11px", fontFamily: "monospace", maxHeight: "200px", overflowY: "auto" }}>
@@ -419,7 +419,7 @@ export default function AdminTemplatesPage() {
                                       <div key={i} style={{
                                         padding: "1px 4px",
                                         backgroundColor: line.type === "add" ? "rgba(0, 255, 136, 0.08)" : line.type === "remove" ? "rgba(255, 68, 68, 0.08)" : "transparent",
-                                        color: line.type === "add" ? "#00ff88" : line.type === "remove" ? "#ff4444" : "#5a6a7a",
+                                        color: line.type === "add" ? "var(--green)" : line.type === "remove" ? "var(--red)" : "var(--gray)",
                                       }}>
                                         <span style={{ marginRight: "4px" }}>{line.type === "add" ? "+" : line.type === "remove" ? "-" : " "}</span>
                                         {line.text}

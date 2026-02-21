@@ -54,43 +54,43 @@ type WsInfo = { id: string; name: string; slug: string; role: string };
 
 const dropdownPanel: React.CSSProperties = {
   position: "absolute", top: "100%", right: 0, marginTop: "4px",
-  backgroundColor: "#0d1117", border: "1px solid #1e2a3a", borderRadius: "4px",
+  backgroundColor: "var(--bg-panel)", border: "1px solid var(--border)", borderRadius: "4px",
   minWidth: "180px", zIndex: 200, boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
   padding: "4px 0",
 };
 
 const dropdownItem: React.CSSProperties = {
   display: "block", width: "100%", padding: "8px 12px", border: "none",
-  backgroundColor: "transparent", color: "#8b949e",
+  backgroundColor: "transparent", color: "var(--text-secondary)",
   fontFamily: "inherit", fontSize: "12px", cursor: "pointer", textAlign: "left",
-  borderBottom: "1px solid #111820",
+  borderBottom: "1px solid var(--bg-input)",
 };
 
 const dropdownLink: React.CSSProperties = {
   display: "block", padding: "8px 12px", fontSize: "12px", fontWeight: 500,
-  color: "#8b949e", borderBottom: "1px solid #111820",
+  color: "var(--text-secondary)", borderBottom: "1px solid var(--bg-input)",
 };
 
 /* ── Helper: nav link renderer ───────────────────────────── */
 function NavLink({ href, label, pathname, className }: { href: string; label: string; pathname: string; className?: string }) {
   const isActive = pathname === href || pathname.startsWith(href + "/");
   const isAdminLink = href.startsWith("/admin");
-  const activeColor = isAdminLink ? "#ff4444" : "#00ff88";
+  const activeColor = isAdminLink ? "var(--red)" : "var(--green)";
   return (
     <Link
       href={href}
       className={`no-underline ${className || ""}`}
       style={{
         padding: "4px 10px", borderRadius: "4px", fontSize: "13px", fontWeight: 500,
-        color: isActive ? activeColor : "#6b7280",
+        color: isActive ? activeColor : "var(--gray)",
         backgroundColor: isActive ? `rgba(${isAdminLink ? "255, 68, 68" : "0, 255, 136"}, 0.08)` : "transparent",
         border: isActive ? `1px solid rgba(${isAdminLink ? "255, 68, 68" : "0, 255, 136"}, 0.2)` : "1px solid transparent",
         transition: "all 0.15s", whiteSpace: "nowrap",
       }}
       onMouseEnter={(e) => { if (!isActive) { e.currentTarget.style.color = activeColor; e.currentTarget.style.backgroundColor = `rgba(${isAdminLink ? "255, 68, 68" : "0, 255, 136"}, 0.05)`; } }}
-      onMouseLeave={(e) => { if (!isActive) { e.currentTarget.style.color = "#6b7280"; e.currentTarget.style.backgroundColor = "transparent"; } }}
+      onMouseLeave={(e) => { if (!isActive) { e.currentTarget.style.color = "var(--gray)"; e.currentTarget.style.backgroundColor = "transparent"; } }}
     >
-      <span style={{ color: isActive ? (isAdminLink ? "#ff4444" : "#00e5ff") : "#444", marginRight: "2px" }}>&gt;</span>
+      <span style={{ color: isActive ? (isAdminLink ? "var(--red)" : "var(--cyan)") : "#444", marginRight: "2px" }}>&gt;</span>
       {label}
     </Link>
   );
@@ -231,8 +231,8 @@ export default function Nav() {
   return (
     <nav
       style={{
-        borderBottom: "1px solid #1a1f2b",
-        backgroundColor: "#0d1117",
+        borderBottom: "1px solid var(--border)",
+        backgroundColor: "var(--bg-panel)",
         fontFamily: "var(--font-geist-mono), ui-monospace, monospace",
         position: "relative",
         zIndex: 100,
@@ -244,15 +244,15 @@ export default function Nav() {
           <Link
             href="/"
             className="no-underline"
-            style={{ color: "#00ff88", letterSpacing: "0.05em", fontSize: "18px", fontWeight: 700, flexShrink: 0 }}
+            style={{ color: "var(--green)", letterSpacing: "0.05em", fontSize: "18px", fontWeight: 700, flexShrink: 0 }}
           >
-            <span style={{ color: "#555" }}>[</span>MORANA<span style={{ color: "#555" }}>]</span>
+            <span style={{ color: "var(--dim)" }}>[</span>MORANA<span style={{ color: "var(--dim)" }}>]</span>
           </Link>
 
           {/* ── Center: primary nav links — desktop only ── */}
           {session && (
             <div className="nav-links-desktop" style={{ display: "flex", gap: "2px", alignItems: "center" }}>
-              <span style={{ color: "#555", fontSize: "12px", marginRight: "4px" }}>//</span>
+              <span style={{ color: "var(--dim)", fontSize: "12px", marginRight: "4px" }}>//</span>
 
               {/* Primary links — filtered by allowed modules */}
               {filteredPrimaryLinks.map((l) => (
@@ -270,7 +270,7 @@ export default function Nav() {
                   label={t("more")}
                   isOpen={moreOpen}
                   onClick={() => { setMoreOpen(!moreOpen); setAdminOpen(false); }}
-                  color="#6b7280"
+                  color="var(--gray)"
                   bgColor="transparent"
                   borderColor="transparent"
                   ariaLabel="More navigation links"
@@ -287,13 +287,13 @@ export default function Nav() {
                           role="menuitem"
                           style={{
                             ...dropdownLink,
-                            color: isActive ? "#00ff88" : "#8b949e",
+                            color: isActive ? "var(--green)" : "var(--text-secondary)",
                             backgroundColor: isActive ? "rgba(0, 255, 136, 0.08)" : "transparent",
                           }}
                           onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(0, 255, 136, 0.05)"; }}
                           onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = isActive ? "rgba(0, 255, 136, 0.08)" : "transparent"; }}
                         >
-                          <span style={{ color: isActive ? "#00e5ff" : "#444", marginRight: "6px" }}>&gt;</span>
+                          <span style={{ color: isActive ? "var(--cyan)" : "#444", marginRight: "6px" }}>&gt;</span>
                           {t(l.i18nKey)}
                         </Link>
                       );
@@ -315,7 +315,7 @@ export default function Nav() {
                       label={t("admin")}
                       isOpen={adminOpen}
                       onClick={() => { setAdminOpen(!adminOpen); setUserOpen(false); setMoreOpen(false); setWsOpen(false); }}
-                      color={isAdminRoute ? "#ff4444" : "#ff4444"}
+                      color={isAdminRoute ? "var(--red)" : "var(--red)"}
                       bgColor={isAdminRoute ? "rgba(255, 68, 68, 0.12)" : "rgba(255, 68, 68, 0.06)"}
                       borderColor="rgba(255, 68, 68, 0.3)"
                       ariaLabel="Admin menu"
@@ -332,13 +332,13 @@ export default function Nav() {
                               role="menuitem"
                               style={{
                                 ...dropdownLink,
-                                color: isActive ? "#ff4444" : "#8b949e",
+                                color: isActive ? "var(--red)" : "var(--text-secondary)",
                                 backgroundColor: isActive ? "rgba(255, 68, 68, 0.08)" : "transparent",
                               }}
-                              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(255, 68, 68, 0.05)"; e.currentTarget.style.color = "#ff4444"; }}
-                              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = isActive ? "rgba(255, 68, 68, 0.08)" : "transparent"; e.currentTarget.style.color = isActive ? "#ff4444" : "#8b949e"; }}
+                              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(255, 68, 68, 0.05)"; e.currentTarget.style.color = "var(--red)"; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = isActive ? "rgba(255, 68, 68, 0.08)" : "transparent"; e.currentTarget.style.color = isActive ? "var(--red)" : "var(--text-secondary)"; }}
                             >
-                              <span style={{ color: isActive ? "#ff4444" : "#555", marginRight: "6px" }}>&gt;</span>
+                              <span style={{ color: isActive ? "var(--red)" : "#555", marginRight: "6px" }}>&gt;</span>
                               {l.label}
                             </Link>
                           );
@@ -370,12 +370,12 @@ export default function Nav() {
                             style={{
                               ...dropdownItem,
                               backgroundColor: ws.id === activeWsId ? "rgba(255, 136, 0, 0.1)" : "transparent",
-                              color: ws.id === activeWsId ? "#ff8800" : "#8b949e",
+                              color: ws.id === activeWsId ? "#ff8800" : "var(--text-secondary)",
                             }}
                           >
                             {ws.id === activeWsId && <span style={{ marginRight: "4px" }}>*</span>}
                             {ws.name}
-                            <span style={{ float: "right", fontSize: "9px", color: "#5a6a7a" }}>{ws.role}</span>
+                            <span style={{ float: "right", fontSize: "9px", color: "var(--gray)" }}>{ws.role}</span>
                           </button>
                         ))}
                       </div>
@@ -394,7 +394,7 @@ export default function Nav() {
                   title={theme === "system" ? "System" : theme === "dark" ? "Dark" : "Light"}
                   style={{
                     padding: "3px 8px", borderRadius: "4px",
-                    backgroundColor: "transparent", color: "#6b7280",
+                    backgroundColor: "transparent", color: "var(--gray)",
                     border: "1px solid transparent",
                     fontFamily: "inherit", fontSize: "14px", cursor: "pointer",
                     lineHeight: "1.4",
@@ -410,7 +410,7 @@ export default function Nav() {
                   aria-label="Toggle language"
                   style={{
                     padding: "3px 8px", borderRadius: "4px",
-                    backgroundColor: "transparent", color: "#6b7280",
+                    backgroundColor: "transparent", color: "var(--gray)",
                     border: "1px solid transparent",
                     fontFamily: "inherit", fontSize: "11px", fontWeight: 600, cursor: "pointer",
                     lineHeight: "1.4",
@@ -425,7 +425,7 @@ export default function Nav() {
                     label={userLabel}
                     isOpen={userOpen}
                     onClick={() => { setUserOpen(!userOpen); setAdminOpen(false); setMoreOpen(false); setWsOpen(false); }}
-                    color="#00ff88"
+                    color="var(--green)"
                     bgColor="rgba(0, 255, 136, 0.06)"
                     borderColor="rgba(0, 255, 136, 0.25)"
                     ariaLabel="User menu"
@@ -433,9 +433,9 @@ export default function Nav() {
                   {userOpen && (
                     <div style={dropdownPanel} role="menu">
                       {/* Email display */}
-                      <div style={{ padding: "8px 12px", borderBottom: "1px solid #1e2a3a" }}>
-                        <div style={{ fontSize: "10px", color: "#5a6a7a", marginBottom: "2px" }}>{t("signedInAs")}</div>
-                        <div style={{ fontSize: "11px", color: "#8b949e", wordBreak: "break-all" }}>{userEmail}</div>
+                      <div style={{ padding: "8px 12px", borderBottom: "1px solid var(--border)" }}>
+                        <div style={{ fontSize: "10px", color: "var(--gray)", marginBottom: "2px" }}>{t("signedInAs")}</div>
+                        <div style={{ fontSize: "11px", color: "var(--text-secondary)", wordBreak: "break-all" }}>{userEmail}</div>
                       </div>
                       <Link
                         href="/settings"
@@ -443,13 +443,13 @@ export default function Nav() {
                         role="menuitem"
                         style={{
                           ...dropdownLink,
-                          color: pathname === "/settings" ? "#00ff88" : "#8b949e",
+                          color: pathname === "/settings" ? "var(--green)" : "var(--text-secondary)",
                           backgroundColor: pathname === "/settings" ? "rgba(0, 255, 136, 0.08)" : "transparent",
                         }}
                         onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(0, 255, 136, 0.05)"; }}
                         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = pathname === "/settings" ? "rgba(0, 255, 136, 0.08)" : "transparent"; }}
                       >
-                        <span style={{ color: pathname === "/settings" ? "#00e5ff" : "#666", marginRight: "6px" }}>&gt;</span>
+                        <span style={{ color: pathname === "/settings" ? "var(--cyan)" : "#666", marginRight: "6px" }}>&gt;</span>
                         {t("settings").toLowerCase()}
                       </Link>
                       <button
@@ -457,13 +457,13 @@ export default function Nav() {
                         role="menuitem"
                         style={{
                           ...dropdownItem,
-                          color: "#ffcc00", borderBottom: "none",
+                          color: "var(--yellow)", borderBottom: "none",
                           marginTop: "2px",
                         }}
                         onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(255, 204, 0, 0.08)"; }}
                         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
                       >
-                        <span style={{ color: "#666", marginRight: "6px" }}>&gt;</span>
+                        <span style={{ color: "var(--dim)", marginRight: "6px" }}>&gt;</span>
                         {t("signOut")}
                       </button>
                     </div>
@@ -477,8 +477,8 @@ export default function Nav() {
                   aria-label="Menu"
                   aria-expanded={menuOpen}
                   style={{
-                    background: "transparent", border: "1px solid #1e2a3a",
-                    color: menuOpen ? "#00ff88" : "#6b7280", padding: "6px 8px",
+                    background: "transparent", border: "1px solid var(--border)",
+                    color: menuOpen ? "var(--green)" : "var(--gray)", padding: "6px 8px",
                     fontFamily: "inherit", fontSize: "18px", cursor: "pointer", lineHeight: 1,
                   }}
                 >
@@ -490,12 +490,12 @@ export default function Nav() {
                 onClick={() => signIn("google")}
                 style={{
                   padding: "6px 14px", borderRadius: "4px",
-                  backgroundColor: "rgba(0, 255, 136, 0.08)", color: "#00ff88",
+                  backgroundColor: "rgba(0, 255, 136, 0.08)", color: "var(--green)",
                   border: "1px solid rgba(0, 255, 136, 0.4)", fontFamily: "inherit",
                   fontSize: "13px", fontWeight: 500, cursor: "pointer",
                 }}
               >
-                <span style={{ color: "#00e5ff" }}>&gt; </span>sign_in --google
+                <span style={{ color: "var(--cyan)" }}>&gt; </span>sign_in --google
               </button>
             )}
           </div>
@@ -504,10 +504,10 @@ export default function Nav() {
 
       {/* ── Mobile dropdown menu ── */}
       {menuOpen && session && (
-        <div style={{ backgroundColor: "#0a0e14", borderTop: "1px solid #1e2a3a", padding: "8px 16px 12px" }}>
+        <div style={{ backgroundColor: "var(--bg)", borderTop: "1px solid var(--border)", padding: "8px 16px 12px" }}>
           {/* Section: Tools */}
           <div style={{ marginBottom: "8px" }}>
-            <div style={{ fontSize: "10px", color: "#5a6a7a", textTransform: "uppercase", letterSpacing: "0.1em", padding: "4px 12px", marginBottom: "2px" }}>
+            <div style={{ fontSize: "10px", color: "var(--gray)", textTransform: "uppercase", letterSpacing: "0.1em", padding: "4px 12px", marginBottom: "2px" }}>
               // {t("tools")}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
@@ -520,12 +520,12 @@ export default function Nav() {
                     className="no-underline"
                     style={{
                       padding: "10px 12px", borderRadius: "4px", fontSize: "14px", fontWeight: 500,
-                      color: isActive ? "#00ff88" : "#8b949e",
+                      color: isActive ? "var(--green)" : "var(--text-secondary)",
                       backgroundColor: isActive ? "rgba(0, 255, 136, 0.08)" : "transparent",
-                      borderLeft: isActive ? "2px solid #00ff88" : "2px solid transparent",
+                      borderLeft: isActive ? "2px solid var(--green)" : "2px solid transparent",
                     }}
                   >
-                    <span style={{ color: isActive ? "#00e5ff" : "#444", marginRight: "6px" }}>&gt;</span>
+                    <span style={{ color: isActive ? "var(--cyan)" : "#444", marginRight: "6px" }}>&gt;</span>
                     {t(l.i18nKey)}
                   </Link>
                 );
@@ -536,7 +536,7 @@ export default function Nav() {
           {/* Section: Admin (only for admins) */}
           {isAdmin && (
             <div style={{ marginBottom: "8px" }}>
-              <div style={{ fontSize: "10px", color: "rgba(255, 68, 68, 0.6)", textTransform: "uppercase", letterSpacing: "0.1em", padding: "4px 12px", marginBottom: "2px", borderTop: "1px solid #1e2a3a", paddingTop: "8px" }}>
+              <div style={{ fontSize: "10px", color: "rgba(255, 68, 68, 0.6)", textTransform: "uppercase", letterSpacing: "0.1em", padding: "4px 12px", marginBottom: "2px", borderTop: "1px solid var(--border)", paddingTop: "8px" }}>
                 // admin
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
@@ -549,12 +549,12 @@ export default function Nav() {
                       className="no-underline"
                       style={{
                         padding: "10px 12px", borderRadius: "4px", fontSize: "14px", fontWeight: 500,
-                        color: isActive ? "#ff4444" : "#8b949e",
+                        color: isActive ? "var(--red)" : "var(--text-secondary)",
                         backgroundColor: isActive ? "rgba(255, 68, 68, 0.08)" : "transparent",
-                        borderLeft: isActive ? "2px solid #ff4444" : "2px solid transparent",
+                        borderLeft: isActive ? "2px solid var(--red)" : "2px solid transparent",
                       }}
                     >
-                      <span style={{ color: isActive ? "#ff4444" : "#555", marginRight: "6px" }}>&gt;</span>
+                      <span style={{ color: isActive ? "var(--red)" : "#555", marginRight: "6px" }}>&gt;</span>
                       {l.label}
                     </Link>
                   );
@@ -564,8 +564,8 @@ export default function Nav() {
           )}
 
           {/* Section: Account */}
-          <div style={{ borderTop: "1px solid #1e2a3a", marginTop: "4px", paddingTop: "8px" }}>
-            <div style={{ fontSize: "10px", color: "#5a6a7a", textTransform: "uppercase", letterSpacing: "0.1em", padding: "4px 12px", marginBottom: "4px" }}>
+          <div style={{ borderTop: "1px solid var(--border)", marginTop: "4px", paddingTop: "8px" }}>
+            <div style={{ fontSize: "10px", color: "var(--gray)", textTransform: "uppercase", letterSpacing: "0.1em", padding: "4px 12px", marginBottom: "4px" }}>
               // {t("account")}
             </div>
             {/* Theme + Language toggles — mobile */}
@@ -576,8 +576,8 @@ export default function Nav() {
                   setTheme(next);
                 }}
                 style={{
-                  padding: "4px 10px", borderRadius: "4px", border: "1px solid #1e2a3a",
-                  backgroundColor: "transparent", color: "#8b949e",
+                  padding: "4px 10px", borderRadius: "4px", border: "1px solid var(--border)",
+                  backgroundColor: "transparent", color: "var(--text-secondary)",
                   fontFamily: "inherit", fontSize: "13px", cursor: "pointer",
                 }}
               >
@@ -587,8 +587,8 @@ export default function Nav() {
               <button
                 onClick={() => setLocale(locale === "en" ? "sl" : "en")}
                 style={{
-                  padding: "4px 10px", borderRadius: "4px", border: "1px solid #1e2a3a",
-                  backgroundColor: "transparent", color: "#8b949e",
+                  padding: "4px 10px", borderRadius: "4px", border: "1px solid var(--border)",
+                  backgroundColor: "transparent", color: "var(--text-secondary)",
                   fontFamily: "inherit", fontSize: "11px", fontWeight: 600, cursor: "pointer",
                 }}
               >
@@ -601,13 +601,13 @@ export default function Nav() {
               className="no-underline"
               style={{
                 display: "block", padding: "10px 12px", borderRadius: "4px", fontSize: "14px", fontWeight: 500,
-                color: pathname === "/settings" ? "#00ff88" : "#8b949e",
+                color: pathname === "/settings" ? "var(--green)" : "var(--text-secondary)",
                 backgroundColor: pathname === "/settings" ? "rgba(0, 255, 136, 0.08)" : "transparent",
-                borderLeft: pathname === "/settings" ? "2px solid #00ff88" : "2px solid transparent",
+                borderLeft: pathname === "/settings" ? "2px solid var(--green)" : "2px solid transparent",
                 marginBottom: "4px",
               }}
             >
-              <span style={{ color: pathname === "/settings" ? "#00e5ff" : "#444", marginRight: "6px" }}>&gt;</span>
+              <span style={{ color: pathname === "/settings" ? "var(--cyan)" : "#444", marginRight: "6px" }}>&gt;</span>
               {t("settings")}
             </Link>
             {/* Workspace switcher in mobile */}
@@ -619,9 +619,9 @@ export default function Nav() {
                     onClick={() => switchWs(ws.id)}
                     style={{
                       padding: "4px 10px", borderRadius: "4px", border: "1px solid",
-                      borderColor: ws.id === activeWsId ? "rgba(255, 136, 0, 0.4)" : "#1e2a3a",
+                      borderColor: ws.id === activeWsId ? "rgba(255, 136, 0, 0.4)" : "var(--border)",
                       backgroundColor: ws.id === activeWsId ? "rgba(255, 136, 0, 0.1)" : "transparent",
-                      color: ws.id === activeWsId ? "#ff8800" : "#5a6a7a",
+                      color: ws.id === activeWsId ? "#ff8800" : "var(--gray)",
                       fontFamily: "inherit", fontSize: "11px", cursor: "pointer",
                     }}
                   >
@@ -631,13 +631,13 @@ export default function Nav() {
               </div>
             )}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0 12px" }}>
-              <span style={{ fontSize: "11px", color: "#5a6a7a", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+              <span style={{ fontSize: "11px", color: "var(--gray)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
                 {userEmail}
               </span>
               <button
                 onClick={() => signOut()}
                 style={{
-                  padding: "6px 12px", backgroundColor: "transparent", color: "#ffcc00",
+                  padding: "6px 12px", backgroundColor: "transparent", color: "var(--yellow)",
                   border: "1px solid rgba(255, 204, 0, 0.3)", fontFamily: "inherit",
                   fontSize: "12px", cursor: "pointer", flexShrink: 0, borderRadius: "4px",
                 }}

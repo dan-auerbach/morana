@@ -74,8 +74,8 @@ export default function VideoPage() {
 
   if (!session) {
     return (
-      <div style={{ color: "#5a6a7a" }}>
-        <span style={{ color: "#ff4444" }}>[ERROR]</span> Authentication required.
+      <div style={{ color: "var(--gray)" }}>
+        <span style={{ color: "var(--red)" }}>[ERROR]</span> Authentication required.
       </div>
     );
   }
@@ -280,7 +280,7 @@ export default function VideoPage() {
   // ─── Derived ─────────────────────────────────────────────
 
   const charPercent = Math.min((prompt.length / 4096) * 100, 100);
-  const charColor = charPercent > 90 ? "#ff4444" : charPercent > 70 ? "#ffcc00" : "#5a6a7a";
+  const charColor = charPercent > 90 ? "var(--red)" : charPercent > 70 ? "var(--yellow)" : "var(--gray)";
 
   // ─── Render ──────────────────────────────────────────────
 
@@ -292,23 +292,23 @@ export default function VideoPage() {
         style={{
           width: sidebarOpen ? "240px" : "0px",
           minWidth: sidebarOpen ? "240px" : "0px",
-          borderRight: sidebarOpen ? "1px solid #1e2a3a" : "none",
-          backgroundColor: "#0a0e14",
+          borderRight: sidebarOpen ? "1px solid var(--border)" : "none",
+          backgroundColor: "var(--bg)",
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
           transition: "all 0.2s",
         }}
       >
-        <div style={{ padding: "8px", borderBottom: "1px solid #1e2a3a" }}>
+        <div style={{ padding: "8px", borderBottom: "1px solid var(--border)" }}>
           <button
             onClick={resetForm}
             style={{
               width: "100%",
               padding: "7px 12px",
               background: "transparent",
-              border: "1px solid #00ff88",
-              color: "#00ff88",
+              border: "1px solid var(--green)",
+              color: "var(--green)",
               fontFamily: "inherit",
               fontSize: "11px",
               fontWeight: 700,
@@ -323,7 +323,7 @@ export default function VideoPage() {
             + New Video
           </button>
         </div>
-        <div style={{ padding: "8px 12px 4px", fontSize: "11px", fontWeight: 700, color: "#ffcc00", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+        <div style={{ padding: "8px 12px 4px", fontSize: "11px", fontWeight: 700, color: "var(--yellow)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
           History
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: "4px 8px" }}>
@@ -343,11 +343,11 @@ export default function VideoPage() {
               onMouseEnter={(e) => { if (r.id !== runId) e.currentTarget.style.backgroundColor = "rgba(0, 255, 136, 0.04)"; }}
               onMouseLeave={(e) => { if (r.id !== runId) e.currentTarget.style.backgroundColor = "transparent"; }}
             >
-              <div style={{ color: r.id === runId ? "#e0e0e0" : "#8b949e", fontSize: "11px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: "3px" }}>
+              <div style={{ color: r.id === runId ? "var(--white)" : "var(--text-secondary)", fontSize: "11px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: "3px" }}>
                 {r.preview || r.id.slice(0, 16) + "..."}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <span style={{ color: "#444", fontSize: "9px" }}>
+                <span style={{ color: "var(--dim)", fontSize: "9px" }}>
                   {new Date(r.createdAt).toLocaleString("sl-SI", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
                 </span>
                 <span style={{ color: r.model?.includes("720p") ? "#ff6b9d" : "#ff9d6b", fontSize: "9px" }}>
@@ -365,15 +365,15 @@ export default function VideoPage() {
       {/* Main area */}
       <div className="page-main" style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, overflowY: "auto" }}>
         {/* Header */}
-        <div style={{ padding: "10px 16px", borderBottom: "1px solid #1e2a3a", backgroundColor: "#0d1117", display: "flex", alignItems: "center", gap: "12px", flexShrink: 0, flexWrap: "wrap" }}>
+        <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--border)", backgroundColor: "var(--bg-panel)", display: "flex", alignItems: "center", gap: "12px", flexShrink: 0, flexWrap: "wrap" }}>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            style={{ background: "transparent", border: "1px solid #1e2a3a", color: "#5a6a7a", cursor: "pointer", padding: "4px 8px", fontFamily: "inherit", fontSize: "12px" }}
+            style={{ background: "transparent", border: "1px solid var(--border)", color: "var(--gray)", cursor: "pointer", padding: "4px 8px", fontFamily: "inherit", fontSize: "12px" }}
           >
             {sidebarOpen ? "<<" : ">>"}
           </button>
           <span style={{ color: "#ff6b9d", fontSize: "14px", fontWeight: 700 }}>[VIDEO]</span>
-          <span style={{ color: "#5a6a7a", fontSize: "12px" }}>$ video --{operation} --{resolution}</span>
+          <span style={{ color: "var(--gray)", fontSize: "12px" }}>$ video --{operation} --{resolution}</span>
         </div>
 
         {/* Content */}
@@ -382,7 +382,7 @@ export default function VideoPage() {
           {/* Operation toggle */}
           <div>
             <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#ff6b9d", textTransform: "uppercase", letterSpacing: "0.1em" }}>--mode</label>
-            <div style={{ display: "flex", border: "1px solid #1e2a3a", overflow: "hidden", width: "fit-content" }}>
+            <div style={{ display: "flex", border: "1px solid var(--border)", overflow: "hidden", width: "fit-content" }}>
               {OPERATIONS.map((op, idx) => (
                 <button
                   key={op.id}
@@ -394,8 +394,8 @@ export default function VideoPage() {
                     padding: "6px 14px",
                     background: operation === op.id ? "rgba(255, 107, 157, 0.15)" : "transparent",
                     border: "none",
-                    borderRight: idx < OPERATIONS.length - 1 ? "1px solid #1e2a3a" : "none",
-                    color: operation === op.id ? "#ff6b9d" : "#5a6a7a",
+                    borderRight: idx < OPERATIONS.length - 1 ? "1px solid var(--border)" : "none",
+                    color: operation === op.id ? "#ff6b9d" : "var(--gray)",
                     fontFamily: "inherit",
                     fontSize: "12px",
                     fontWeight: operation === op.id ? 700 : 400,
@@ -410,7 +410,7 @@ export default function VideoPage() {
 
           {/* Prompt */}
           <div>
-            <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#00ff88", textTransform: "uppercase", letterSpacing: "0.1em" }}>--prompt</label>
+            <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "var(--green)", textTransform: "uppercase", letterSpacing: "0.1em" }}>--prompt</label>
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
@@ -422,7 +422,7 @@ export default function VideoPage() {
                     ? "Describe the motion and changes to apply..."
                     : "Describe the edit to apply to the video..."
               }
-              style={{ width: "100%", padding: "8px 12px", backgroundColor: "#111820", border: "1px solid #1e2a3a", color: "#e0e0e0", fontFamily: "inherit", fontSize: "13px", resize: "vertical" }}
+              style={{ width: "100%", padding: "8px 12px", backgroundColor: "var(--bg-input)", border: "1px solid var(--border)", color: "var(--white)", fontFamily: "inherit", fontSize: "13px", resize: "vertical" }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
@@ -432,10 +432,10 @@ export default function VideoPage() {
             />
             <div style={{ marginTop: "4px", fontSize: "11px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span style={{ color: charColor }}>
-                <span style={{ color: "#ffcc00" }}>CHARS:</span> {prompt.length.toLocaleString()} / 4,096
+                <span style={{ color: "var(--yellow)" }}>CHARS:</span> {prompt.length.toLocaleString()} / 4,096
               </span>
-              <div style={{ width: "120px", height: "4px", backgroundColor: "#1e2a3a", overflow: "hidden" }}>
-                <div style={{ width: `${charPercent}%`, height: "100%", backgroundColor: charColor === "#ff4444" ? "#ff4444" : charColor === "#ffcc00" ? "#ffcc00" : "#00ff88", transition: "width 0.2s" }} />
+              <div style={{ width: "120px", height: "4px", backgroundColor: "var(--border)", overflow: "hidden" }}>
+                <div style={{ width: `${charPercent}%`, height: "100%", backgroundColor: charColor === "var(--red)" ? "var(--red)" : charColor === "var(--yellow)" ? "var(--yellow)" : "var(--green)", transition: "width 0.2s" }} />
               </div>
             </div>
           </div>
@@ -459,8 +459,8 @@ export default function VideoPage() {
                   style={{
                     padding: "10px 20px",
                     background: "transparent",
-                    border: "1px dashed #1e2a3a",
-                    color: "#5a6a7a",
+                    border: "1px dashed var(--border)",
+                    color: "var(--gray)",
                     fontFamily: "inherit",
                     fontSize: "12px",
                     cursor: "pointer",
@@ -469,31 +469,31 @@ export default function VideoPage() {
                     transition: "all 0.2s",
                   }}
                   onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(255, 107, 157, 0.4)"; e.currentTarget.style.color = "#ff6b9d"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#1e2a3a"; e.currentTarget.style.color = "#5a6a7a"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.color = "var(--gray)"; }}
                 >
                   {currentOp.requiresFile === "image"
                     ? "[  UPLOAD IMAGE  ] \u2014 PNG, JPEG, WebP (max 50MB)"
                     : "[  UPLOAD VIDEO  ] \u2014 MP4, WebM (max 50MB)"}
                 </button>
               ) : (
-                <div style={{ border: "1px solid #1e2a3a", backgroundColor: "#111820", padding: "12px", display: "flex", alignItems: "center", gap: "12px" }}>
+                <div style={{ border: "1px solid var(--border)", backgroundColor: "var(--bg-input)", padding: "12px", display: "flex", alignItems: "center", gap: "12px" }}>
                   {currentOp.requiresFile === "image" && uploadedFile ? (
-                    <img src={uploadedFile} alt="Input" style={{ width: "80px", height: "80px", objectFit: "cover", border: "1px solid #1e2a3a" }} />
+                    <img src={uploadedFile} alt="Input" style={{ width: "80px", height: "80px", objectFit: "cover", border: "1px solid var(--border)" }} />
                   ) : (
-                    <div style={{ width: "80px", height: "80px", backgroundColor: "#0a0e14", border: "1px solid #1e2a3a", display: "flex", alignItems: "center", justifyContent: "center", color: "#ff6b9d", fontSize: "20px" }}>
+                    <div style={{ width: "80px", height: "80px", backgroundColor: "var(--bg)", border: "1px solid var(--border)", display: "flex", alignItems: "center", justifyContent: "center", color: "#ff6b9d", fontSize: "20px" }}>
                       &#9654;
                     </div>
                   )}
                   <div style={{ flex: 1 }}>
-                    <div style={{ color: "#e0e0e0", fontSize: "12px" }}>{uploadedFileName}</div>
-                    <div style={{ color: "#5a6a7a", fontSize: "11px", marginTop: "2px" }}>{uploadedFileMime}</div>
+                    <div style={{ color: "var(--white)", fontSize: "12px" }}>{uploadedFileName}</div>
+                    <div style={{ color: "var(--gray)", fontSize: "11px", marginTop: "2px" }}>{uploadedFileMime}</div>
                   </div>
                   <button
                     onClick={removeFile}
                     style={{
                       background: "transparent",
                       border: "1px solid rgba(255, 68, 68, 0.3)",
-                      color: "#ff4444",
+                      color: "var(--red)",
                       padding: "4px 10px",
                       fontFamily: "inherit",
                       fontSize: "11px",
@@ -511,7 +511,7 @@ export default function VideoPage() {
           {/* Duration slider */}
           <div>
             <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#ff6b9d", textTransform: "uppercase", letterSpacing: "0.1em" }}>
-              --duration <span style={{ color: "#e0e0e0", fontWeight: 400 }}>{duration}s</span>
+              --duration <span style={{ color: "var(--white)", fontWeight: 400 }}>{duration}s</span>
             </label>
             <input
               type="range"
@@ -522,7 +522,7 @@ export default function VideoPage() {
               onChange={(e) => setDuration(parseInt(e.target.value, 10))}
               style={{ width: "100%", maxWidth: "400px", accentColor: "#ff6b9d" }}
             />
-            <div style={{ fontSize: "10px", color: "#5a6a7a", display: "flex", justifyContent: "space-between", maxWidth: "400px" }}>
+            <div style={{ fontSize: "10px", color: "var(--gray)", display: "flex", justifyContent: "space-between", maxWidth: "400px" }}>
               <span>1s</span>
               <span>15s</span>
             </div>
@@ -540,8 +540,8 @@ export default function VideoPage() {
                     style={{
                       padding: "5px 12px",
                       background: aspectRatio === ar ? "rgba(255, 107, 157, 0.15)" : "transparent",
-                      border: `1px solid ${aspectRatio === ar ? "#ff6b9d" : "#1e2a3a"}`,
-                      color: aspectRatio === ar ? "#ff6b9d" : "#5a6a7a",
+                      border: `1px solid ${aspectRatio === ar ? "#ff6b9d" : "var(--border)"}`,
+                      color: aspectRatio === ar ? "#ff6b9d" : "var(--gray)",
                       fontFamily: "inherit",
                       fontSize: "12px",
                       cursor: "pointer",
@@ -566,8 +566,8 @@ export default function VideoPage() {
                   style={{
                     padding: "5px 16px",
                     background: resolution === res ? "rgba(255, 107, 157, 0.15)" : "transparent",
-                    border: `1px solid ${resolution === res ? "#ff6b9d" : "#1e2a3a"}`,
-                    color: resolution === res ? "#ff6b9d" : "#5a6a7a",
+                    border: `1px solid ${resolution === res ? "#ff6b9d" : "var(--border)"}`,
+                    color: resolution === res ? "#ff6b9d" : "var(--gray)",
                     fontFamily: "inherit",
                     fontSize: "12px",
                     cursor: "pointer",
@@ -586,7 +586,7 @@ export default function VideoPage() {
               style={{
                 fontSize: "10px",
                 fontFamily: "inherit",
-                color: "#ffcc00",
+                color: "var(--yellow)",
                 padding: "4px 8px",
                 backgroundColor: "rgba(255, 204, 0, 0.06)",
                 border: "1px solid rgba(255, 204, 0, 0.15)",
@@ -597,7 +597,7 @@ export default function VideoPage() {
                 alignSelf: "flex-start",
               }}
             >
-              <span style={{ color: "#00ff88", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              <span style={{ color: "var(--green)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                 COST
               </span>
               <span>~${estimatedCost.toFixed(2)} | {duration}s @ {resolution}</span>
@@ -612,8 +612,8 @@ export default function VideoPage() {
               style={{
                 padding: "8px 24px",
                 background: "transparent",
-                border: `1px solid ${loading ? "#5a6a7a" : "#00ff88"}`,
-                color: loading ? "#5a6a7a" : "#00ff88",
+                border: `1px solid ${loading ? "var(--gray)" : "var(--green)"}`,
+                color: loading ? "var(--gray)" : "var(--green)",
                 fontFamily: "inherit",
                 fontSize: "13px",
                 fontWeight: 700,
@@ -635,8 +635,8 @@ export default function VideoPage() {
                 style={{
                   padding: "8px 16px",
                   background: "transparent",
-                  border: "1px solid #ff4444",
-                  color: "#ff4444",
+                  border: "1px solid var(--red)",
+                  color: "var(--red)",
                   fontFamily: "inherit",
                   fontSize: "12px",
                   cursor: "pointer",
@@ -650,15 +650,15 @@ export default function VideoPage() {
 
           {/* Error */}
           {error && (
-            <div style={{ padding: "12px", backgroundColor: "rgba(255, 68, 68, 0.08)", border: "1px solid #ff4444", color: "#ff4444", fontSize: "13px" }}>
+            <div style={{ padding: "12px", backgroundColor: "rgba(255, 68, 68, 0.08)", border: "1px solid var(--red)", color: "var(--red)", fontSize: "13px" }}>
               <span style={{ fontWeight: 700 }}>[ERROR]</span> {error}
             </div>
           )}
 
           {/* Run status */}
           {runId && (
-            <div style={{ fontSize: "12px", color: "#5a6a7a", display: "flex", alignItems: "center", gap: "10px", padding: "8px 0", borderTop: "1px solid #1e2a3a", flexWrap: "wrap" }}>
-              <span><span style={{ color: "#ffcc00" }}>RUN:</span> <span style={{ color: "#e0e0e0" }}>{runId.slice(0, 8)}...</span></span>
+            <div style={{ fontSize: "12px", color: "var(--gray)", display: "flex", alignItems: "center", gap: "10px", padding: "8px 0", borderTop: "1px solid var(--border)", flexWrap: "wrap" }}>
+              <span><span style={{ color: "var(--yellow)" }}>RUN:</span> <span style={{ color: "var(--white)" }}>{runId.slice(0, 8)}...</span></span>
               <StatusBadge status={status} />
               {loading && (
                 <span style={{ color: "#ff6b9d", fontSize: "11px" }}>Generating video on fal.ai... (this may take a few minutes)</span>
@@ -668,18 +668,18 @@ export default function VideoPage() {
 
           {/* Stats */}
           {stats && (
-            <div style={{ display: "flex", gap: "20px", fontSize: "12px", padding: "8px 0", borderTop: "1px solid #1e2a3a", flexWrap: "wrap" }}>
-              {stats.latencyMs && <span><span style={{ color: "#ffcc00" }}>LATENCY:</span> <span style={{ color: "#ff6b9d" }}>{(stats.latencyMs / 1000).toFixed(1)}s</span></span>}
-              {stats.width && stats.height && <span><span style={{ color: "#ffcc00" }}>SIZE:</span> <span style={{ color: "#ff6b9d" }}>{stats.width}x{stats.height}</span></span>}
-              {stats.fps && <span><span style={{ color: "#ffcc00" }}>FPS:</span> <span style={{ color: "#ff6b9d" }}>{stats.fps}</span></span>}
-              {stats.duration && <span><span style={{ color: "#ffcc00" }}>DURATION:</span> <span style={{ color: "#ff6b9d" }}>{stats.duration.toFixed(1)}s</span></span>}
+            <div style={{ display: "flex", gap: "20px", fontSize: "12px", padding: "8px 0", borderTop: "1px solid var(--border)", flexWrap: "wrap" }}>
+              {stats.latencyMs && <span><span style={{ color: "var(--yellow)" }}>LATENCY:</span> <span style={{ color: "#ff6b9d" }}>{(stats.latencyMs / 1000).toFixed(1)}s</span></span>}
+              {stats.width && stats.height && <span><span style={{ color: "var(--yellow)" }}>SIZE:</span> <span style={{ color: "#ff6b9d" }}>{stats.width}x{stats.height}</span></span>}
+              {stats.fps && <span><span style={{ color: "var(--yellow)" }}>FPS:</span> <span style={{ color: "#ff6b9d" }}>{stats.fps}</span></span>}
+              {stats.duration && <span><span style={{ color: "var(--yellow)" }}>DURATION:</span> <span style={{ color: "#ff6b9d" }}>{stats.duration.toFixed(1)}s</span></span>}
             </div>
           )}
 
           {/* Video output */}
           {videoUrl && (
-            <div style={{ border: "1px solid #ff6b9d", backgroundColor: "#0d1117" }}>
-              <div style={{ padding: "8px 12px", borderBottom: "1px solid #1e2a3a", fontSize: "11px", fontWeight: 700, color: "#ff6b9d", textTransform: "uppercase", letterSpacing: "0.1em", backgroundColor: "rgba(255, 107, 157, 0.05)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ border: "1px solid #ff6b9d", backgroundColor: "var(--bg-panel)" }}>
+              <div style={{ padding: "8px 12px", borderBottom: "1px solid var(--border)", fontSize: "11px", fontWeight: 700, color: "#ff6b9d", textTransform: "uppercase", letterSpacing: "0.1em", backgroundColor: "rgba(255, 107, 157, 0.05)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span>GENERATED VIDEO:</span>
               </div>
               <div style={{ padding: "16px", display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
@@ -688,7 +688,7 @@ export default function VideoPage() {
                   controls
                   autoPlay
                   loop
-                  style={{ maxWidth: "100%", maxHeight: "600px", border: "1px solid #1e2a3a" }}
+                  style={{ maxWidth: "100%", maxHeight: "600px", border: "1px solid var(--border)" }}
                 />
                 <div style={{ display: "flex", gap: "6px" }}>
                   <a
@@ -702,7 +702,7 @@ export default function VideoPage() {
                   </a>
                   <button
                     onClick={useAsInput}
-                    style={{ color: "#ffcc00", fontSize: "10px", background: "transparent", border: "1px solid rgba(255, 204, 0, 0.3)", padding: "3px 10px", fontFamily: "inherit", cursor: "pointer", textTransform: "uppercase" }}
+                    style={{ color: "var(--yellow)", fontSize: "10px", background: "transparent", border: "1px solid rgba(255, 204, 0, 0.3)", padding: "3px 10px", fontFamily: "inherit", cursor: "pointer", textTransform: "uppercase" }}
                     onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(255, 204, 0, 0.1)"; }}
                     onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
                   >

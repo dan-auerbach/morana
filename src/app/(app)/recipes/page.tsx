@@ -230,13 +230,13 @@ export default function RecipesPage() {
     } finally { setExecuting(null); setUploadStatus(null); }
   }
 
-  if (!session) return <div style={{ color: "#5a6a7a" }}><span style={{ color: "#ff4444" }}>[ERROR]</span> Authentication required.</div>;
+  if (!session) return <div style={{ color: "var(--gray)" }}><span style={{ color: "var(--red)" }}>[ERROR]</span> Authentication required.</div>;
 
   const statusColor = (s: string) => {
-    if (s === "done") return "#00ff88";
-    if (s === "running" || s === "pending") return "#ffcc00";
-    if (s === "error") return "#ff4444";
-    return "#5a6a7a";
+    if (s === "done") return "var(--green)";
+    if (s === "running" || s === "pending") return "var(--yellow)";
+    if (s === "error") return "var(--red)";
+    return "var(--gray)";
   };
 
   const selectedRecipe = recipes.find(r => r.id === selectedRecipeId);
@@ -246,10 +246,10 @@ export default function RecipesPage() {
     <div>
       <div style={{ marginBottom: "24px" }}>
         <div style={{ color: "#ff8800", fontSize: "18px", fontWeight: 700, marginBottom: "4px" }}>[RECIPES]</div>
-        <div style={{ color: "#5a6a7a", fontSize: "13px" }}>$ recipes --list --execute</div>
+        <div style={{ color: "var(--gray)", fontSize: "13px" }}>$ recipes --list --execute</div>
       </div>
 
-      {loading && <div style={{ color: "#00ff88", fontSize: "13px", marginBottom: "12px" }}>Loading...</div>}
+      {loading && <div style={{ color: "var(--green)", fontSize: "13px", marginBottom: "12px" }}>Loading...</div>}
 
       {error && (
         <div style={{ padding: "8px 12px", backgroundColor: "rgba(255, 68, 68, 0.1)", border: "1px solid rgba(255, 68, 68, 0.3)", color: "#ff6666", fontSize: "12px", fontFamily: "inherit", marginBottom: "12px", cursor: "pointer" }} onClick={() => setError(null)}>
@@ -292,20 +292,20 @@ export default function RecipesPage() {
                 }}
                 style={{
                   padding: "8px 16px", background: "transparent",
-                  border: `1px solid ${p.alreadyCreated ? "#00e5ff" : "#ff8800"}`,
-                  color: p.alreadyCreated ? "#00e5ff" : "#ff8800",
+                  border: `1px solid ${p.alreadyCreated ? "var(--cyan)" : "#ff8800"}`,
+                  color: p.alreadyCreated ? "var(--cyan)" : "#ff8800",
                   fontFamily: "inherit", fontSize: "11px", fontWeight: 700,
                   cursor: creatingPreset ? "wait" : "pointer", textTransform: "uppercase",
                 }}
               >
                 {p.alreadyCreated ? "SYNC" : "+"} {p.name}
-                <span style={{ fontSize: "9px", color: "#5a6a7a", marginLeft: "6px" }}>
+                <span style={{ fontSize: "9px", color: "var(--gray)", marginLeft: "6px" }}>
                   ({p.stepTypes.join(" \u2192 ")})
                 </span>
               </button>
             ))}
           </div>
-          <div style={{ fontSize: "10px", color: "#5a6a7a", marginTop: "6px" }}>
+          <div style={{ fontSize: "10px", color: "var(--gray)", marginTop: "6px" }}>
             {presets.some(p => !p.alreadyCreated) ? "Click + to create from preset." : ""}{" "}
             {presets.some(p => p.alreadyCreated) ? "Click SYNC to update steps from code." : ""}
           </div>
@@ -321,11 +321,11 @@ export default function RecipesPage() {
                 TELEGRAM
               </span>
               {telegramLinked ? (
-                <span style={{ marginLeft: "8px", fontSize: "11px", color: "#00ff88" }}>
+                <span style={{ marginLeft: "8px", fontSize: "11px", color: "var(--green)" }}>
                   {"\u2713"} Povezano{telegramUsername ? ` (@${telegramUsername})` : ""}
                 </span>
               ) : (
-                <span style={{ marginLeft: "8px", fontSize: "11px", color: "#5a6a7a" }}>
+                <span style={{ marginLeft: "8px", fontSize: "11px", color: "var(--gray)" }}>
                   Ni povezano
                 </span>
               )}
@@ -354,10 +354,10 @@ export default function RecipesPage() {
           </div>
           {linkCode && (
             <div style={{ marginTop: "8px", padding: "8px 12px", backgroundColor: "rgba(0, 136, 255, 0.06)", border: "1px solid rgba(0, 136, 255, 0.2)" }}>
-              <div style={{ fontSize: "12px", color: "#e0e0e0" }}>
+              <div style={{ fontSize: "12px", color: "var(--white)" }}>
                 {"Pošlji botu: "}<code style={{ color: "#0088ff", fontWeight: 700, fontSize: "14px" }}>/link {linkCode}</code>
               </div>
-              <div style={{ fontSize: "10px", color: "#5a6a7a", marginTop: "2px" }}>
+              <div style={{ fontSize: "10px", color: "var(--gray)", marginTop: "2px" }}>
                 {"Koda poteče: "}{linkCodeExpires ? new Date(linkCodeExpires).toLocaleTimeString("sl-SI") : "5 min"}
               </div>
             </div>
@@ -370,19 +370,19 @@ export default function RecipesPage() {
         <div style={{ fontSize: "11px", fontWeight: 700, color: "#ff8800", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "12px" }}>AVAILABLE RECIPES</div>
         <div style={{ display: "grid", gap: "8px" }}>
           {recipes.filter(r => r.steps.length > 0).map((r) => (
-            <div key={r.id} style={{ border: "1px solid #1e2a3a", padding: "12px 16px" }}>
+            <div key={r.id} style={{ border: "1px solid var(--border)", padding: "12px 16px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
                 <div>
-                  <span style={{ color: "#e0e0e0", fontWeight: 700, fontSize: "14px" }}>{r.name}</span>
+                  <span style={{ color: "var(--white)", fontWeight: 700, fontSize: "14px" }}>{r.name}</span>
                   {r.inputKind === "audio" && (
-                    <span style={{ marginLeft: "8px", padding: "1px 6px", backgroundColor: "rgba(0, 229, 255, 0.1)", border: "1px solid rgba(0, 229, 255, 0.3)", color: "#00e5ff", fontSize: "9px", fontWeight: 700, textTransform: "uppercase" }}>AUDIO</span>
+                    <span style={{ marginLeft: "8px", padding: "1px 6px", backgroundColor: "rgba(0, 229, 255, 0.1)", border: "1px solid rgba(0, 229, 255, 0.3)", color: "var(--cyan)", fontSize: "9px", fontWeight: 700, textTransform: "uppercase" }}>AUDIO</span>
                   )}
                   {r.inputKind === "image_text" && (
                     <span style={{ marginLeft: "8px", padding: "1px 6px", backgroundColor: "rgba(255, 107, 157, 0.1)", border: "1px solid rgba(255, 107, 157, 0.3)", color: "#ff6b9d", fontSize: "9px", fontWeight: 700, textTransform: "uppercase" }}>IMAGE+TEXT</span>
                   )}
-                  {r.description && <span style={{ color: "#5a6a7a", fontSize: "12px", marginLeft: "8px" }}>{r.description}</span>}
+                  {r.description && <span style={{ color: "var(--gray)", fontSize: "12px", marginLeft: "8px" }}>{r.description}</span>}
                 </div>
-                <span style={{ color: "#5a6a7a", fontSize: "10px" }}>{r.steps.length} steps</span>
+                <span style={{ color: "var(--gray)", fontSize: "10px" }}>{r.steps.length} steps</span>
               </div>
               <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "8px" }}>
                 {r.steps.map((s) => (
@@ -402,8 +402,8 @@ export default function RecipesPage() {
                           onClick={() => setInputMode(mode)}
                           style={{
                             padding: "4px 12px", background: inputMode === mode ? "rgba(0, 229, 255, 0.1)" : "transparent",
-                            border: `1px solid ${inputMode === mode ? "#00e5ff" : "#1e2a3a"}`,
-                            color: inputMode === mode ? "#00e5ff" : "#5a6a7a",
+                            border: `1px solid ${inputMode === mode ? "var(--cyan)" : "var(--border)"}`,
+                            color: inputMode === mode ? "var(--cyan)" : "var(--gray)",
                             fontFamily: "inherit", fontSize: "10px", fontWeight: 700, cursor: "pointer", textTransform: "uppercase",
                           }}
                         >
@@ -416,15 +416,15 @@ export default function RecipesPage() {
                   {/* Language selector for audio recipes */}
                   {r.inputKind === "audio" && (
                     <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px" }}>
-                      <span style={{ fontSize: "10px", fontWeight: 700, color: "#5a6a7a", textTransform: "uppercase" }}>Lang:</span>
+                      <span style={{ fontSize: "10px", fontWeight: 700, color: "var(--gray)", textTransform: "uppercase" }}>Lang:</span>
                       {["sl", "en"].map((lang) => (
                         <button
                           key={lang}
                           onClick={() => setLanguage(lang)}
                           style={{
                             padding: "2px 10px", background: language === lang ? "rgba(255, 204, 0, 0.1)" : "transparent",
-                            border: `1px solid ${language === lang ? "#ffcc00" : "#1e2a3a"}`,
-                            color: language === lang ? "#ffcc00" : "#5a6a7a",
+                            border: `1px solid ${language === lang ? "var(--yellow)" : "var(--border)"}`,
+                            color: language === lang ? "var(--yellow)" : "var(--gray)",
                             fontFamily: "inherit", fontSize: "10px", fontWeight: 700, cursor: "pointer",
                           }}
                         >
@@ -451,8 +451,8 @@ export default function RecipesPage() {
                             onClick={() => imageInputRef.current?.click()}
                             style={{
                               width: "100%", height: "120px", backgroundColor: "rgba(255, 107, 157, 0.03)",
-                              border: `2px dashed ${imageFile ? "#00ff88" : "rgba(255, 107, 157, 0.3)"}`,
-                              color: imageFile ? "#00ff88" : "#5a6a7a",
+                              border: `2px dashed ${imageFile ? "var(--green)" : "rgba(255, 107, 157, 0.3)"}`,
+                              color: imageFile ? "var(--green)" : "var(--gray)",
                               fontFamily: "inherit", fontSize: "11px", cursor: "pointer", textAlign: "center",
                               display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "4px",
                             }}
@@ -461,7 +461,7 @@ export default function RecipesPage() {
                               <>
                                 <span style={{ fontSize: "16px" }}>{"\u2713"}</span>
                                 <span>{imageFile.name}</span>
-                                <span style={{ fontSize: "10px", color: "#5a6a7a" }}>({(imageFile.size / 1024 / 1024).toFixed(1)} MB)</span>
+                                <span style={{ fontSize: "10px", color: "var(--gray)" }}>({(imageFile.size / 1024 / 1024).toFixed(1)} MB)</span>
                               </>
                             ) : (
                               <>
@@ -478,15 +478,15 @@ export default function RecipesPage() {
                           onChange={(e) => setInputText(e.target.value)}
                           placeholder={(r.uiHints?.textPlaceholder as string) || "Write your story here..."}
                           style={{
-                            flex: 1, padding: "10px", backgroundColor: "#111820", border: "1px solid #1e2a3a",
-                            color: "#e0e0e0", fontFamily: "inherit", fontSize: "12px", resize: "vertical", minHeight: "120px",
+                            flex: 1, padding: "10px", backgroundColor: "var(--bg-input)", border: "1px solid var(--border)",
+                            color: "var(--white)", fontFamily: "inherit", fontSize: "12px", resize: "vertical", minHeight: "120px",
                           }}
                         />
                       </div>
                       <div style={{ display: "flex", justifyContent: "flex-end", gap: "4px" }}>
                         <button
                           onClick={resetInput}
-                          style={{ padding: "4px 16px", background: "transparent", border: "1px solid #5a6a7a", color: "#5a6a7a", fontFamily: "inherit", fontSize: "10px", cursor: "pointer" }}
+                          style={{ padding: "4px 16px", background: "transparent", border: "1px solid var(--gray)", color: "var(--gray)", fontFamily: "inherit", fontSize: "10px", cursor: "pointer" }}
                         >
                           CANCEL
                         </button>
@@ -495,8 +495,8 @@ export default function RecipesPage() {
                           disabled={executing === r.id}
                           style={{
                             padding: "8px 20px", background: executing === r.id ? "rgba(255, 204, 0, 0.08)" : "transparent",
-                            border: `1px solid ${executing === r.id ? "#ffcc00" : "#ff6b9d"}`,
-                            color: executing === r.id ? "#ffcc00" : "#ff6b9d",
+                            border: `1px solid ${executing === r.id ? "var(--yellow)" : "#ff6b9d"}`,
+                            color: executing === r.id ? "var(--yellow)" : "#ff6b9d",
                             fontFamily: "inherit", fontSize: "11px", fontWeight: 700,
                             cursor: executing === r.id ? "wait" : "pointer", textTransform: "uppercase",
                             animation: executing === r.id ? "blink 1.2s step-end infinite" : "none",
@@ -522,8 +522,8 @@ export default function RecipesPage() {
                           onClick={() => fileInputRef.current?.click()}
                           style={{
                             width: "100%", padding: "16px", backgroundColor: "rgba(0, 229, 255, 0.03)",
-                            border: `2px dashed ${audioFile ? "#00ff88" : "rgba(0, 229, 255, 0.3)"}`,
-                            color: audioFile ? "#00ff88" : "#5a6a7a",
+                            border: `2px dashed ${audioFile ? "var(--green)" : "rgba(0, 229, 255, 0.3)"}`,
+                            color: audioFile ? "var(--green)" : "var(--gray)",
                             fontFamily: "inherit", fontSize: "12px", cursor: "pointer", textAlign: "center",
                           }}
                         >
@@ -537,7 +537,7 @@ export default function RecipesPage() {
                         value={audioUrl}
                         onChange={(e) => setAudioUrl(e.target.value)}
                         placeholder="https://example.com/audio.mp3"
-                        style={{ flex: 1, padding: "8px", backgroundColor: "#111820", border: "1px solid #1e2a3a", color: "#e0e0e0", fontFamily: "inherit", fontSize: "12px" }}
+                        style={{ flex: 1, padding: "8px", backgroundColor: "var(--bg-input)", border: "1px solid var(--border)", color: "var(--white)", fontFamily: "inherit", fontSize: "12px" }}
                       />
                     ) : (
                       <textarea
@@ -546,7 +546,7 @@ export default function RecipesPage() {
                         placeholder={r.inputKind === "audio" && inputMode === "text"
                           ? "Paste transcript text here (STT step will be skipped)..."
                           : (r.uiHints?.placeholder as string) || "Paste input text (optional \u2014 e.g. transcript, article text)..."}
-                        style={{ flex: 1, padding: "8px", backgroundColor: "#111820", border: "1px solid #1e2a3a", color: "#e0e0e0", fontFamily: "inherit", fontSize: "12px", resize: "vertical", minHeight: "60px" }}
+                        style={{ flex: 1, padding: "8px", backgroundColor: "var(--bg-input)", border: "1px solid var(--border)", color: "var(--white)", fontFamily: "inherit", fontSize: "12px", resize: "vertical", minHeight: "60px" }}
                       />
                     )}
                     <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
@@ -555,8 +555,8 @@ export default function RecipesPage() {
                         disabled={executing === r.id}
                         style={{
                           padding: "8px 16px", background: executing === r.id ? "rgba(255, 204, 0, 0.08)" : "transparent",
-                          border: `1px solid ${executing === r.id ? "#ffcc00" : "#00ff88"}`,
-                          color: executing === r.id ? "#ffcc00" : "#00ff88",
+                          border: `1px solid ${executing === r.id ? "var(--yellow)" : "var(--green)"}`,
+                          color: executing === r.id ? "var(--yellow)" : "var(--green)",
                           fontFamily: "inherit", fontSize: "11px", fontWeight: 700,
                           cursor: executing === r.id ? "wait" : "pointer", textTransform: "uppercase",
                           animation: executing === r.id ? "blink 1.2s step-end infinite" : "none",
@@ -566,7 +566,7 @@ export default function RecipesPage() {
                       </button>
                       <button
                         onClick={resetInput}
-                        style={{ padding: "4px 16px", background: "transparent", border: "1px solid #5a6a7a", color: "#5a6a7a", fontFamily: "inherit", fontSize: "10px", cursor: "pointer" }}
+                        style={{ padding: "4px 16px", background: "transparent", border: "1px solid var(--gray)", color: "var(--gray)", fontFamily: "inherit", fontSize: "10px", cursor: "pointer" }}
                       >
                         CANCEL
                       </button>
@@ -577,7 +577,7 @@ export default function RecipesPage() {
               ) : (
                 <button
                   onClick={() => selectRecipe(r)}
-                  style={{ padding: "6px 16px", background: "transparent", border: "1px solid #00ff88", color: "#00ff88", fontFamily: "inherit", fontSize: "11px", fontWeight: 700, cursor: "pointer", textTransform: "uppercase" }}
+                  style={{ padding: "6px 16px", background: "transparent", border: "1px solid var(--green)", color: "var(--green)", fontFamily: "inherit", fontSize: "11px", fontWeight: 700, cursor: "pointer", textTransform: "uppercase" }}
                 >
                   [  EXECUTE  ]
                 </button>
@@ -593,19 +593,19 @@ export default function RecipesPage() {
       {/* Recent executions */}
       {executions.length > 0 && (
         <div>
-          <div style={{ fontSize: "11px", fontWeight: 700, color: "#ffcc00", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "12px" }}>RECENT EXECUTIONS</div>
+          <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--yellow)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "12px" }}>RECENT EXECUTIONS</div>
           <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
             {executions.map((e) => (
-              <Link key={e.id} href={`/recipes/${e.id}`} className="no-underline" style={{ display: "flex", alignItems: "center", gap: "12px", padding: "8px 12px", backgroundColor: "rgba(13, 17, 23, 0.5)", border: "1px solid #1e2a3a", borderLeft: `3px solid ${statusColor(e.status)}` }}>
+              <Link key={e.id} href={`/recipes/${e.id}`} className="no-underline" style={{ display: "flex", alignItems: "center", gap: "12px", padding: "8px 12px", backgroundColor: "rgba(13, 17, 23, 0.5)", border: "1px solid var(--border)", borderLeft: `3px solid ${statusColor(e.status)}` }}>
                 <span style={{ color: statusColor(e.status), fontSize: "10px", fontWeight: 700, textTransform: "uppercase", width: "70px" }}>{e.status}</span>
-                <span style={{ color: "#e0e0e0", fontSize: "12px", flex: 1 }}>{e.recipe.name}</span>
+                <span style={{ color: "var(--white)", fontSize: "12px", flex: 1 }}>{e.recipe.name}</span>
                 {(e.status === "running" || e.status === "pending") && (
-                  <span style={{ color: "#ffcc00", fontSize: "10px" }}>{e.progress}% &mdash; step {e.currentStep + 1}/{e.totalSteps}</span>
+                  <span style={{ color: "var(--yellow)", fontSize: "10px" }}>{e.progress}% &mdash; step {e.currentStep + 1}/{e.totalSteps}</span>
                 )}
                 {e.status === "done" && e.totalCostCents > 0 && (
-                  <span style={{ color: "#ffcc00", fontSize: "10px", fontWeight: 700 }}>${(e.totalCostCents / 100).toFixed(4)}</span>
+                  <span style={{ color: "var(--yellow)", fontSize: "10px", fontWeight: 700 }}>${(e.totalCostCents / 100).toFixed(4)}</span>
                 )}
-                <span style={{ color: "#5a6a7a", fontSize: "10px" }}>{new Date(e.startedAt).toLocaleString("sl-SI", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
+                <span style={{ color: "var(--gray)", fontSize: "10px" }}>{new Date(e.startedAt).toLocaleString("sl-SI", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}</span>
               </Link>
             ))}
           </div>

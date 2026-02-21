@@ -128,8 +128,8 @@ export default function STTPage() {
 
   if (!session) {
     return (
-      <div style={{ color: "#5a6a7a" }}>
-        <span style={{ color: "#ff4444" }}>[ERROR]</span> Authentication required.
+      <div style={{ color: "var(--gray)" }}>
+        <span style={{ color: "var(--red)" }}>[ERROR]</span> Authentication required.
       </div>
     );
   }
@@ -296,15 +296,15 @@ export default function STTPage() {
         style={{
           width: sidebarOpen ? "240px" : "0px",
           minWidth: sidebarOpen ? "240px" : "0px",
-          borderRight: sidebarOpen ? "1px solid #1e2a3a" : "none",
-          backgroundColor: "#0a0e14",
+          borderRight: sidebarOpen ? "1px solid var(--border)" : "none",
+          backgroundColor: "var(--bg)",
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
           transition: "all 0.2s",
         }}
       >
-        <div style={{ padding: "12px", fontSize: "11px", fontWeight: 700, color: "#ffcc00", textTransform: "uppercase", letterSpacing: "0.1em", borderBottom: "1px solid #1e2a3a" }}>
+        <div style={{ padding: "12px", fontSize: "11px", fontWeight: 700, color: "var(--yellow)", textTransform: "uppercase", letterSpacing: "0.1em", borderBottom: "1px solid var(--border)" }}>
           STT History
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: "4px 8px" }}>
@@ -324,11 +324,11 @@ export default function STTPage() {
               onMouseEnter={(e) => { if (r.id !== runId) e.currentTarget.style.backgroundColor = "rgba(0, 255, 136, 0.04)"; }}
               onMouseLeave={(e) => { if (r.id !== runId) e.currentTarget.style.backgroundColor = "transparent"; }}
             >
-              <div style={{ color: r.id === runId ? "#e0e0e0" : "#8b949e", fontSize: "11px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: "3px" }}>
+              <div style={{ color: r.id === runId ? "var(--white)" : "var(--text-secondary)", fontSize: "11px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: "3px" }}>
                 {r.preview || r.id.slice(0, 16) + "..."}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <span style={{ color: "#444", fontSize: "9px" }}>
+                <span style={{ color: "var(--dim)", fontSize: "9px" }}>
                   {new Date(r.createdAt).toLocaleString("sl-SI", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
                 </span>
               </div>
@@ -343,15 +343,15 @@ export default function STTPage() {
       {/* Main area */}
       <div className="page-main" style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, overflowY: "auto" }}>
         {/* Header */}
-        <div style={{ padding: "10px 16px", borderBottom: "1px solid #1e2a3a", backgroundColor: "#0d1117", display: "flex", alignItems: "center", gap: "12px", flexShrink: 0 }}>
+        <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--border)", backgroundColor: "var(--bg-panel)", display: "flex", alignItems: "center", gap: "12px", flexShrink: 0 }}>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            style={{ background: "transparent", border: "1px solid #1e2a3a", color: "#5a6a7a", cursor: "pointer", padding: "4px 8px", fontFamily: "inherit", fontSize: "12px" }}
+            style={{ background: "transparent", border: "1px solid var(--border)", color: "var(--gray)", cursor: "pointer", padding: "4px 8px", fontFamily: "inherit", fontSize: "12px" }}
           >
             {sidebarOpen ? "<<" : ">>"}
           </button>
-          <span style={{ color: "#00ff88", fontSize: "14px", fontWeight: 700 }}>[STT]</span>
-          <span style={{ color: "#5a6a7a", fontSize: "12px" }}>$ stt --input {mode} --lang {language}</span>
+          <span style={{ color: "var(--green)", fontSize: "14px", fontWeight: 700 }}>[STT]</span>
+          <span style={{ color: "var(--gray)", fontSize: "12px" }}>$ stt --input {mode} --lang {language}</span>
         </div>
 
         {/* Content */}
@@ -366,9 +366,9 @@ export default function STTPage() {
                   padding: "8px 20px", fontSize: "12px", fontWeight: 700, fontFamily: "inherit",
                   textTransform: "uppercase", letterSpacing: "0.1em", cursor: "pointer",
                   border: "1px solid", borderRight: m === "file" ? "none" : undefined,
-                  backgroundColor: mode === m ? "#0d1117" : "transparent",
-                  color: mode === m ? "#00ff88" : "#5a6a7a",
-                  borderColor: mode === m ? "#00ff88" : "#1e2a3a",
+                  backgroundColor: mode === m ? "var(--bg-panel)" : "transparent",
+                  color: mode === m ? "var(--green)" : "var(--gray)",
+                  borderColor: mode === m ? "var(--green)" : "var(--border)",
                 }}
               >
                 [{m.toUpperCase()}]
@@ -379,22 +379,22 @@ export default function STTPage() {
           {/* File upload or URL input */}
           {mode === "file" ? (
             <div>
-              <label style={{ display: "block", marginBottom: "6px", fontSize: "11px", fontWeight: 700, color: "#00ff88", textTransform: "uppercase", letterSpacing: "0.1em" }}>--input-file</label>
+              <label style={{ display: "block", marginBottom: "6px", fontSize: "11px", fontWeight: 700, color: "var(--green)", textTransform: "uppercase", letterSpacing: "0.1em" }}>--input-file</label>
               <div
-                style={{ border: "2px dashed #00ff88", backgroundColor: "#0d1117", padding: "24px", textAlign: "center", cursor: "pointer", transition: "all 0.2s" }}
+                style={{ border: "2px dashed var(--green)", backgroundColor: "var(--bg-panel)", padding: "24px", textAlign: "center", cursor: "pointer", transition: "all 0.2s" }}
                 onClick={() => fileRef.current?.click()}
                 onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(0, 255, 136, 0.05)"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "#0d1117"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "var(--bg-panel)"; }}
               >
                 {fileName ? (
                   <>
-                    <div style={{ color: "#00ff88", fontSize: "13px", marginBottom: "4px" }}>✓ {fileName}</div>
-                    <div style={{ color: "#5a6a7a", fontSize: "11px" }}>Click to change file</div>
+                    <div style={{ color: "var(--green)", fontSize: "13px", marginBottom: "4px" }}>✓ {fileName}</div>
+                    <div style={{ color: "var(--gray)", fontSize: "11px" }}>Click to change file</div>
                   </>
                 ) : (
                   <>
-                    <div style={{ color: "#00ff88", fontSize: "13px", marginBottom: "4px" }}>[ DROP AUDIO/VIDEO FILE OR CLICK ]</div>
-                    <div style={{ color: "#5a6a7a", fontSize: "11px" }}>Supported: .mp3, .wav, .m4a, .ogg, .flac, .aac, .webm, .mp4 — max 500MB</div>
+                    <div style={{ color: "var(--green)", fontSize: "13px", marginBottom: "4px" }}>[ DROP AUDIO/VIDEO FILE OR CLICK ]</div>
+                    <div style={{ color: "var(--gray)", fontSize: "11px" }}>Supported: .mp3, .wav, .m4a, .ogg, .flac, .aac, .webm, .mp4 — max 500MB</div>
                   </>
                 )}
               </div>
@@ -402,19 +402,19 @@ export default function STTPage() {
             </div>
           ) : (
             <div>
-              <label style={{ display: "block", marginBottom: "6px", fontSize: "11px", fontWeight: 700, color: "#00ff88", textTransform: "uppercase", letterSpacing: "0.1em" }}>--input-url</label>
-              <input value={url} onChange={(e) => setUrl(e.target.value)} type="url" placeholder="https://example.com/audio.mp3" style={{ width: "100%", padding: "8px 12px", backgroundColor: "#111820", border: "1px solid #1e2a3a", color: "#e0e0e0", fontFamily: "inherit", fontSize: "13px" }} />
+              <label style={{ display: "block", marginBottom: "6px", fontSize: "11px", fontWeight: 700, color: "var(--green)", textTransform: "uppercase", letterSpacing: "0.1em" }}>--input-url</label>
+              <input value={url} onChange={(e) => setUrl(e.target.value)} type="url" placeholder="https://example.com/audio.mp3" style={{ width: "100%", padding: "8px 12px", backgroundColor: "var(--bg-input)", border: "1px solid var(--border)", color: "var(--white)", fontFamily: "inherit", fontSize: "13px" }} />
             </div>
           )}
 
           {/* Language + Options row */}
           <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", alignItems: "flex-end" }}>
             <div>
-              <label style={{ display: "block", marginBottom: "6px", fontSize: "11px", fontWeight: 700, color: "#00ff88", textTransform: "uppercase", letterSpacing: "0.1em" }}>--lang</label>
+              <label style={{ display: "block", marginBottom: "6px", fontSize: "11px", fontWeight: 700, color: "var(--green)", textTransform: "uppercase", letterSpacing: "0.1em" }}>--lang</label>
               <select
                 value={language}
                 onChange={(e) => setLanguage(e.target.value)}
-                style={{ padding: "8px 12px", backgroundColor: "#111820", border: "1px solid #1e2a3a", color: "#e0e0e0", fontFamily: "inherit", fontSize: "13px" }}
+                style={{ padding: "8px 12px", backgroundColor: "var(--bg-input)", border: "1px solid var(--border)", color: "var(--white)", fontFamily: "inherit", fontSize: "13px" }}
               >
                 {LANGUAGES.map((l) => (
                   <option key={l.code} value={l.code}>{l.code} ({l.label})</option>
@@ -423,11 +423,11 @@ export default function STTPage() {
             </div>
 
             <div>
-              <label style={{ display: "block", marginBottom: "6px", fontSize: "11px", fontWeight: 700, color: "#00ff88", textTransform: "uppercase", letterSpacing: "0.1em" }}>--translate-to</label>
+              <label style={{ display: "block", marginBottom: "6px", fontSize: "11px", fontWeight: 700, color: "var(--green)", textTransform: "uppercase", letterSpacing: "0.1em" }}>--translate-to</label>
               <select
                 value={translateTo}
                 onChange={(e) => setTranslateTo(e.target.value)}
-                style={{ padding: "8px 12px", backgroundColor: "#111820", border: "1px solid #1e2a3a", color: "#e0e0e0", fontFamily: "inherit", fontSize: "13px" }}
+                style={{ padding: "8px 12px", backgroundColor: "var(--bg-input)", border: "1px solid var(--border)", color: "var(--white)", fontFamily: "inherit", fontSize: "13px" }}
               >
                 <option value="">None</option>
                 {LANGUAGES.filter((l) => l.code !== "auto" && l.code !== language).map((l) => (
@@ -440,8 +440,8 @@ export default function STTPage() {
               onClick={() => setDiarize(!diarize)}
               style={{
                 padding: "8px 14px", background: diarize ? "rgba(0, 255, 136, 0.1)" : "transparent",
-                border: `1px solid ${diarize ? "#00ff88" : "#1e2a3a"}`,
-                color: diarize ? "#00ff88" : "#5a6a7a", fontFamily: "inherit", fontSize: "12px",
+                border: `1px solid ${diarize ? "var(--green)" : "var(--border)"}`,
+                color: diarize ? "var(--green)" : "var(--gray)", fontFamily: "inherit", fontSize: "12px",
                 cursor: "pointer", transition: "all 0.2s",
               }}
             >
@@ -462,8 +462,8 @@ export default function STTPage() {
             disabled={loading}
             style={{
               alignSelf: "flex-start", padding: "8px 24px", background: "transparent",
-              border: `1px solid ${loading ? "#5a6a7a" : "#00ff88"}`,
-              color: loading ? "#5a6a7a" : "#00ff88", fontFamily: "inherit", fontSize: "13px",
+              border: `1px solid ${loading ? "var(--gray)" : "var(--green)"}`,
+              color: loading ? "var(--gray)" : "var(--green)", fontFamily: "inherit", fontSize: "13px",
               fontWeight: 700, cursor: loading ? "not-allowed" : "pointer",
               textTransform: "uppercase", letterSpacing: "0.1em", opacity: loading ? 0.5 : 1,
               transition: "all 0.2s",
@@ -476,29 +476,29 @@ export default function STTPage() {
 
           {/* Error */}
           {error && (
-            <div style={{ padding: "12px", backgroundColor: "rgba(255, 68, 68, 0.08)", border: "1px solid #ff4444", color: "#ff4444", fontSize: "13px" }}>
+            <div style={{ padding: "12px", backgroundColor: "rgba(255, 68, 68, 0.08)", border: "1px solid var(--red)", color: "var(--red)", fontSize: "13px" }}>
               <span style={{ fontWeight: 700 }}>[ERROR]</span> {error}
             </div>
           )}
 
           {/* Run status + stats */}
           {runId && (
-            <div style={{ fontSize: "12px", color: "#5a6a7a", display: "flex", alignItems: "center", gap: "10px", padding: "8px 0", borderTop: "1px solid #1e2a3a" }}>
-              <span><span style={{ color: "#ffcc00" }}>RUN:</span> <span style={{ color: "#e0e0e0" }}>{runId.slice(0, 8)}...</span></span>
+            <div style={{ fontSize: "12px", color: "var(--gray)", display: "flex", alignItems: "center", gap: "10px", padding: "8px 0", borderTop: "1px solid var(--border)" }}>
+              <span><span style={{ color: "var(--yellow)" }}>RUN:</span> <span style={{ color: "var(--white)" }}>{runId.slice(0, 8)}...</span></span>
               <StatusBadge status={status} />
             </div>
           )}
           {stats && (
-            <div style={{ display: "flex", gap: "20px", fontSize: "12px", padding: "8px 0", borderTop: "1px solid #1e2a3a" }}>
-              <span><span style={{ color: "#ffcc00" }}>DURATION:</span> <span style={{ color: "#00e5ff" }}>{stats.durationSeconds.toFixed(1)}s</span></span>
-              <span><span style={{ color: "#ffcc00" }}>LATENCY:</span> <span style={{ color: "#00e5ff" }}>{(stats.latencyMs / 1000).toFixed(1)}s</span></span>
+            <div style={{ display: "flex", gap: "20px", fontSize: "12px", padding: "8px 0", borderTop: "1px solid var(--border)" }}>
+              <span><span style={{ color: "var(--yellow)" }}>DURATION:</span> <span style={{ color: "var(--cyan)" }}>{stats.durationSeconds.toFixed(1)}s</span></span>
+              <span><span style={{ color: "var(--yellow)" }}>LATENCY:</span> <span style={{ color: "var(--cyan)" }}>{(stats.latencyMs / 1000).toFixed(1)}s</span></span>
             </div>
           )}
 
           {/* Transcript output */}
           {transcript && (
-            <div style={{ border: "1px solid #00ff88", backgroundColor: "#0d1117" }}>
-              <div style={{ padding: "8px 12px", borderBottom: "1px solid #1e2a3a", fontSize: "11px", fontWeight: 700, color: "#00ff88", textTransform: "uppercase", letterSpacing: "0.1em", backgroundColor: "rgba(0, 255, 136, 0.05)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ border: "1px solid var(--green)", backgroundColor: "var(--bg-panel)" }}>
+              <div style={{ padding: "8px 12px", borderBottom: "1px solid var(--border)", fontSize: "11px", fontWeight: 700, color: "var(--green)", textTransform: "uppercase", letterSpacing: "0.1em", backgroundColor: "rgba(0, 255, 136, 0.05)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <span>TRANSCRIPT:</span>
                 {tokens && tokens.length > 0 && (
                   <button
@@ -512,20 +512,20 @@ export default function STTPage() {
                       a.click();
                       URL.revokeObjectURL(url);
                     }}
-                    style={{ padding: "3px 10px", background: "transparent", border: "1px solid #00ff88", color: "#00ff88", fontFamily: "inherit", fontSize: "10px", cursor: "pointer", textTransform: "uppercase", letterSpacing: "0.05em" }}
+                    style={{ padding: "3px 10px", background: "transparent", border: "1px solid var(--green)", color: "var(--green)", fontFamily: "inherit", fontSize: "10px", cursor: "pointer", textTransform: "uppercase", letterSpacing: "0.05em" }}
                   >
                     Download SRT
                   </button>
                 )}
               </div>
-              <div style={{ padding: "16px", whiteSpace: "pre-wrap", fontSize: "13px", color: "#e0e0e0", lineHeight: "1.6" }}>
+              <div style={{ padding: "16px", whiteSpace: "pre-wrap", fontSize: "13px", color: "var(--white)", lineHeight: "1.6" }}>
                 {diarize && transcript.includes("[Speaker")
                   ? transcript.split("\n\n").map((block, i) => {
                       const match = block.match(/^\[(.+?)\]\s*/);
                       if (!match) return <div key={i}>{block}</div>;
                       const speaker = match[1];
                       const text = block.slice(match[0].length);
-                      const colors = ["#00ff88", "#00e5ff", "#ffcc00", "#ff6b9d", "#b388ff", "#ff9800"];
+                      const colors = ["var(--green)", "var(--cyan)", "var(--yellow)", "#ff6b9d", "#b388ff", "#ff9800"];
                       const speakerNum = parseInt(speaker.replace(/\D/g, "") || "0");
                       const color = colors[speakerNum % colors.length];
                       return (
@@ -544,11 +544,11 @@ export default function STTPage() {
 
           {/* Translation output */}
           {translatedText && (
-            <div style={{ border: "1px solid #00e5ff", backgroundColor: "#0d1117" }}>
-              <div style={{ padding: "8px 12px", borderBottom: "1px solid #1e2a3a", fontSize: "11px", fontWeight: 700, color: "#00e5ff", textTransform: "uppercase", letterSpacing: "0.1em", backgroundColor: "rgba(0, 229, 255, 0.05)" }}>
+            <div style={{ border: "1px solid var(--cyan)", backgroundColor: "var(--bg-panel)" }}>
+              <div style={{ padding: "8px 12px", borderBottom: "1px solid var(--border)", fontSize: "11px", fontWeight: 700, color: "var(--cyan)", textTransform: "uppercase", letterSpacing: "0.1em", backgroundColor: "rgba(0, 229, 255, 0.05)" }}>
                 TRANSLATION:
               </div>
-              <div style={{ padding: "16px", whiteSpace: "pre-wrap", fontSize: "13px", color: "#e0e0e0", lineHeight: "1.6" }}>
+              <div style={{ padding: "16px", whiteSpace: "pre-wrap", fontSize: "13px", color: "var(--white)", lineHeight: "1.6" }}>
                 {translatedText}
               </div>
             </div>
@@ -557,7 +557,7 @@ export default function STTPage() {
           {/* LLM Action Buttons */}
           {transcript && (
             <div>
-              <div style={{ fontSize: "11px", fontWeight: 700, color: "#ffcc00", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "8px" }}>
+              <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--yellow)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "8px" }}>
                 ACTIONS → LLM:
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
@@ -568,8 +568,8 @@ export default function STTPage() {
                     disabled={!!actionLoading}
                     style={{
                       padding: "6px 14px", background: "transparent",
-                      border: `1px solid ${actionLoading === btn.label ? "#00e5ff" : "#00e5ff"}`,
-                      color: actionLoading === btn.label ? "#00e5ff" : "#00e5ff",
+                      border: `1px solid ${actionLoading === btn.label ? "var(--cyan)" : "var(--cyan)"}`,
+                      color: actionLoading === btn.label ? "var(--cyan)" : "var(--cyan)",
                       fontFamily: "inherit", fontSize: "11px", cursor: actionLoading ? "not-allowed" : "pointer",
                       opacity: actionLoading && actionLoading !== btn.label ? 0.4 : 1,
                       transition: "all 0.2s",
@@ -586,11 +586,11 @@ export default function STTPage() {
 
           {/* LLM Action Result */}
           {actionResult && (
-            <div style={{ border: "1px solid #00e5ff", backgroundColor: "#0d1117" }}>
-              <div style={{ padding: "8px 12px", borderBottom: "1px solid #1e2a3a", fontSize: "11px", fontWeight: 700, color: "#00e5ff", textTransform: "uppercase", letterSpacing: "0.1em", backgroundColor: "rgba(0, 229, 255, 0.05)" }}>
+            <div style={{ border: "1px solid var(--cyan)", backgroundColor: "var(--bg-panel)" }}>
+              <div style={{ padding: "8px 12px", borderBottom: "1px solid var(--border)", fontSize: "11px", fontWeight: 700, color: "var(--cyan)", textTransform: "uppercase", letterSpacing: "0.1em", backgroundColor: "rgba(0, 229, 255, 0.05)" }}>
                 {actionLabel || "LLM RESULT"}:
               </div>
-              <div style={{ padding: "16px", whiteSpace: "pre-wrap", fontSize: "13px", color: "#e0e0e0", lineHeight: "1.6" }}>
+              <div style={{ padding: "16px", whiteSpace: "pre-wrap", fontSize: "13px", color: "var(--white)", lineHeight: "1.6" }}>
                 {actionResult}
               </div>
             </div>

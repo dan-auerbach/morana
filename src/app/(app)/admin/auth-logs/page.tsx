@@ -50,13 +50,13 @@ export default function AuthLogsPage() {
     if (session) load();
   }, [session, load]);
 
-  if (!session) return <div style={{ color: "#ff4444" }}>[ERROR] Authentication required.</div>;
+  if (!session) return <div style={{ color: "var(--red)" }}>[ERROR] Authentication required.</div>;
 
   const eventColor = (e: string) => {
-    if (e === "sign_in_ok") return "#00ff88";
-    if (e === "sign_in_bootstrap") return "#00e5ff";
-    if (e.includes("denied")) return "#ff4444";
-    return "#ffcc00";
+    if (e === "sign_in_ok") return "var(--green)";
+    if (e === "sign_in_bootstrap") return "var(--cyan)";
+    if (e.includes("denied")) return "var(--red)";
+    return "var(--yellow)";
   };
 
   const eventIcon = (e: string) => {
@@ -81,32 +81,32 @@ export default function AuthLogsPage() {
     <div>
       {/* Header */}
       <div style={{ marginBottom: "24px" }}>
-        <div style={{ color: "#ff4444", fontSize: "18px", fontWeight: 700, marginBottom: "4px" }}>
+        <div style={{ color: "var(--red)", fontSize: "18px", fontWeight: 700, marginBottom: "4px" }}>
           [AUTH LOGS]
         </div>
-        <div style={{ color: "#5a6a7a", fontSize: "13px" }}>
+        <div style={{ color: "var(--gray)", fontSize: "13px" }}>
           $ auth --logs --verbose --monitor
         </div>
       </div>
 
       {/* Stats */}
       {stats && (
-        <div style={{ display: "flex", gap: "16px", marginBottom: "20px", padding: "12px 16px", border: "1px solid #1e2a3a", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: "16px", marginBottom: "20px", padding: "12px 16px", border: "1px solid var(--border)", flexWrap: "wrap" }}>
           <div>
-            <div style={{ fontSize: "9px", color: "#5a6a7a", textTransform: "uppercase", letterSpacing: "0.05em" }}>Total Logs</div>
-            <div style={{ fontSize: "16px", fontWeight: 700, color: "#e0e0e0" }}>{stats.totalLogs}</div>
+            <div style={{ fontSize: "9px", color: "var(--gray)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Total Logs</div>
+            <div style={{ fontSize: "16px", fontWeight: 700, color: "var(--white)" }}>{stats.totalLogs}</div>
           </div>
           <div>
-            <div style={{ fontSize: "9px", color: "#5a6a7a", textTransform: "uppercase", letterSpacing: "0.05em" }}>Denied 24h</div>
-            <div style={{ fontSize: "16px", fontWeight: 700, color: stats.denied24h > 0 ? "#ff4444" : "#00ff88" }}>{stats.denied24h}</div>
+            <div style={{ fontSize: "9px", color: "var(--gray)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Denied 24h</div>
+            <div style={{ fontSize: "16px", fontWeight: 700, color: stats.denied24h > 0 ? "var(--red)" : "var(--green)" }}>{stats.denied24h}</div>
           </div>
           <div>
-            <div style={{ fontSize: "9px", color: "#5a6a7a", textTransform: "uppercase", letterSpacing: "0.05em" }}>Denied 7d</div>
-            <div style={{ fontSize: "16px", fontWeight: 700, color: stats.denied7d > 0 ? "#ff4444" : "#00ff88" }}>{stats.denied7d}</div>
+            <div style={{ fontSize: "9px", color: "var(--gray)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Denied 7d</div>
+            <div style={{ fontSize: "16px", fontWeight: 700, color: stats.denied7d > 0 ? "var(--red)" : "var(--green)" }}>{stats.denied7d}</div>
           </div>
           <div>
-            <div style={{ fontSize: "9px", color: "#5a6a7a", textTransform: "uppercase", letterSpacing: "0.05em" }}>Unique IPs 7d</div>
-            <div style={{ fontSize: "16px", fontWeight: 700, color: "#00e5ff" }}>{stats.uniqueIPs7d}</div>
+            <div style={{ fontSize: "9px", color: "var(--gray)", textTransform: "uppercase", letterSpacing: "0.05em" }}>Unique IPs 7d</div>
+            <div style={{ fontSize: "16px", fontWeight: 700, color: "var(--cyan)" }}>{stats.uniqueIPs7d}</div>
           </div>
         </div>
       )}
@@ -120,16 +120,16 @@ export default function AuthLogsPage() {
           onChange={(e) => setFilterEmail(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && load()}
           style={{
-            padding: "6px 10px", backgroundColor: "#111820", border: "1px solid #1e2a3a",
-            color: "#e0e0e0", fontFamily: "inherit", fontSize: "12px", width: "200px",
+            padding: "6px 10px", backgroundColor: "var(--bg-input)", border: "1px solid var(--border)",
+            color: "var(--white)", fontFamily: "inherit", fontSize: "12px", width: "200px",
           }}
         />
         <select
           value={filterEvent}
           onChange={(e) => { setFilterEvent(e.target.value); }}
           style={{
-            padding: "6px 10px", backgroundColor: "#111820", border: "1px solid #1e2a3a",
-            color: "#e0e0e0", fontFamily: "inherit", fontSize: "12px",
+            padding: "6px 10px", backgroundColor: "var(--bg-input)", border: "1px solid var(--border)",
+            color: "var(--white)", fontFamily: "inherit", fontSize: "12px",
           }}
         >
           <option value="">All events</option>
@@ -141,8 +141,8 @@ export default function AuthLogsPage() {
         <button
           onClick={load}
           style={{
-            padding: "6px 14px", background: "transparent", border: "1px solid #00ff88",
-            color: "#00ff88", fontFamily: "inherit", fontSize: "11px", cursor: "pointer",
+            padding: "6px 14px", background: "transparent", border: "1px solid var(--green)",
+            color: "var(--green)", fontFamily: "inherit", fontSize: "11px", cursor: "pointer",
             textTransform: "uppercase",
           }}
         >
@@ -150,15 +150,15 @@ export default function AuthLogsPage() {
         </button>
       </div>
 
-      {loading && <div style={{ color: "#00ff88", fontSize: "13px" }}>Loading...</div>}
+      {loading && <div style={{ color: "var(--green)", fontSize: "13px" }}>Loading...</div>}
 
       {/* Logs table */}
       <div style={{ overflowX: "auto" }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px" }}>
           <thead>
-            <tr style={{ borderBottom: "1px solid #1e2a3a" }}>
+            <tr style={{ borderBottom: "1px solid var(--border)" }}>
               {["", "Event", "Email", "IP", "Location", "Browser", "Time"].map((h) => (
-                <th key={h} style={{ padding: "8px 6px", textAlign: "left", color: "#5a6a7a", fontWeight: 600, fontSize: "9px", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                <th key={h} style={{ padding: "8px 6px", textAlign: "left", color: "var(--gray)", fontWeight: 600, fontSize: "9px", textTransform: "uppercase", letterSpacing: "0.05em" }}>
                   {h}
                 </th>
               ))}
@@ -181,13 +181,13 @@ export default function AuthLogsPage() {
                   <td style={{ padding: "6px", color: eventColor(log.event), fontWeight: 600, fontSize: "10px" }}>
                     {log.event.replace("sign_in_", "")}
                   </td>
-                  <td style={{ padding: "6px", color: "#e0e0e0" }}>{log.email}</td>
-                  <td style={{ padding: "6px", color: "#8b949e", fontFamily: "monospace", fontSize: "10px" }}>{log.ip || "—"}</td>
-                  <td style={{ padding: "6px", color: "#8b949e" }}>
+                  <td style={{ padding: "6px", color: "var(--white)" }}>{log.email}</td>
+                  <td style={{ padding: "6px", color: "var(--text-secondary)", fontFamily: "monospace", fontSize: "10px" }}>{log.ip || "—"}</td>
+                  <td style={{ padding: "6px", color: "var(--text-secondary)" }}>
                     {[log.city, log.country].filter(Boolean).join(", ") || "—"}
                   </td>
-                  <td style={{ padding: "6px", color: "#5a6a7a" }}>{shortUA(log.userAgent)}</td>
-                  <td style={{ padding: "6px", color: "#5a6a7a", whiteSpace: "nowrap" }}>
+                  <td style={{ padding: "6px", color: "var(--gray)" }}>{shortUA(log.userAgent)}</td>
+                  <td style={{ padding: "6px", color: "var(--gray)", whiteSpace: "nowrap" }}>
                     {new Date(log.createdAt).toLocaleString("sl-SI", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" })}
                   </td>
                 </tr>
@@ -195,14 +195,14 @@ export default function AuthLogsPage() {
                   <tr key={`${log.id}-detail`}>
                     <td colSpan={7} style={{ padding: "8px 6px 12px 30px", backgroundColor: "rgba(0,0,0,0.2)" }}>
                       <div style={{ display: "flex", flexDirection: "column", gap: "4px", fontSize: "10px" }}>
-                        <div><span style={{ color: "#5a6a7a" }}>ID:</span> <span style={{ color: "#8b949e" }}>{log.id}</span></div>
-                        <div><span style={{ color: "#5a6a7a" }}>Provider:</span> <span style={{ color: "#8b949e" }}>{log.provider}</span></div>
-                        <div><span style={{ color: "#5a6a7a" }}>IP:</span> <span style={{ color: "#8b949e", fontFamily: "monospace" }}>{log.ip || "unknown"}</span></div>
+                        <div><span style={{ color: "var(--gray)" }}>ID:</span> <span style={{ color: "var(--text-secondary)" }}>{log.id}</span></div>
+                        <div><span style={{ color: "var(--gray)" }}>Provider:</span> <span style={{ color: "var(--text-secondary)" }}>{log.provider}</span></div>
+                        <div><span style={{ color: "var(--gray)" }}>IP:</span> <span style={{ color: "var(--text-secondary)", fontFamily: "monospace" }}>{log.ip || "unknown"}</span></div>
                         {log.reason && (
-                          <div><span style={{ color: "#5a6a7a" }}>Reason:</span> <span style={{ color: "#ff4444" }}>{log.reason}</span></div>
+                          <div><span style={{ color: "var(--gray)" }}>Reason:</span> <span style={{ color: "var(--red)" }}>{log.reason}</span></div>
                         )}
-                        <div><span style={{ color: "#5a6a7a" }}>User-Agent:</span> <span style={{ color: "#5a6a7a", wordBreak: "break-all" }}>{log.userAgent || "—"}</span></div>
-                        <div><span style={{ color: "#5a6a7a" }}>Full time:</span> <span style={{ color: "#8b949e" }}>{new Date(log.createdAt).toLocaleString("sl-SI")}</span></div>
+                        <div><span style={{ color: "var(--gray)" }}>User-Agent:</span> <span style={{ color: "var(--gray)", wordBreak: "break-all" }}>{log.userAgent || "—"}</span></div>
+                        <div><span style={{ color: "var(--gray)" }}>Full time:</span> <span style={{ color: "var(--text-secondary)" }}>{new Date(log.createdAt).toLocaleString("sl-SI")}</span></div>
                       </div>
                     </td>
                   </tr>

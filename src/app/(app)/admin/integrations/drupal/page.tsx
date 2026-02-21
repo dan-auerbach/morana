@@ -27,8 +27,8 @@ type TestResult = {
 };
 
 const cardStyle: React.CSSProperties = {
-  backgroundColor: "#0d1117",
-  border: "1px solid #1e2a3a",
+  backgroundColor: "var(--bg-panel)",
+  border: "1px solid var(--border)",
   borderRadius: "6px",
   padding: "20px",
   marginBottom: "16px",
@@ -37,7 +37,7 @@ const cardStyle: React.CSSProperties = {
 const labelStyle: React.CSSProperties = {
   display: "block",
   fontSize: "11px",
-  color: "#5a6a7a",
+  color: "var(--gray)",
   textTransform: "uppercase" as const,
   letterSpacing: "0.05em",
   marginBottom: "4px",
@@ -46,10 +46,10 @@ const labelStyle: React.CSSProperties = {
 const inputStyle: React.CSSProperties = {
   width: "100%",
   padding: "8px 12px",
-  backgroundColor: "#0a0e14",
-  border: "1px solid #1e2a3a",
+  backgroundColor: "var(--bg)",
+  border: "1px solid var(--border)",
   borderRadius: "4px",
-  color: "#c9d1d9",
+  color: "var(--white)",
   fontFamily: "inherit",
   fontSize: "13px",
   marginBottom: "12px",
@@ -133,14 +133,14 @@ export default function DrupalIntegrationPage() {
 
   if (!session) {
     return (
-      <div style={{ padding: "40px 20px", color: "#5a6a7a", fontFamily: "var(--font-geist-mono), monospace" }}>
+      <div style={{ padding: "40px 20px", color: "var(--gray)", fontFamily: "var(--font-geist-mono), monospace" }}>
         [ERROR] Authentication required.
       </div>
     );
   }
   if (!isAdmin) {
     return (
-      <div style={{ padding: "40px 20px", color: "#ff4444", fontFamily: "var(--font-geist-mono), monospace" }}>
+      <div style={{ padding: "40px 20px", color: "var(--red)", fontFamily: "var(--font-geist-mono), monospace" }}>
         [ACCESS DENIED] Admin privileges required.
       </div>
     );
@@ -271,7 +271,7 @@ export default function DrupalIntegrationPage() {
 
   if (loading) {
     return (
-      <div style={{ padding: "40px 20px", color: "#5a6a7a", fontFamily: "var(--font-geist-mono), monospace" }}>
+      <div style={{ padding: "40px 20px", color: "var(--gray)", fontFamily: "var(--font-geist-mono), monospace" }}>
         Loading...
       </div>
     );
@@ -281,25 +281,25 @@ export default function DrupalIntegrationPage() {
     <div style={{ maxWidth: "700px", margin: "0 auto", padding: "24px 16px", fontFamily: "var(--font-geist-mono), monospace" }}>
       {/* Header */}
       <div style={{ marginBottom: "24px" }}>
-        <div style={{ fontSize: "10px", color: "#ff4444", letterSpacing: "0.1em", marginBottom: "4px" }}>
+        <div style={{ fontSize: "10px", color: "var(--red)", letterSpacing: "0.1em", marginBottom: "4px" }}>
           [ADMIN] / INTEGRATIONS / DRUPAL
         </div>
-        <h1 style={{ fontSize: "18px", color: "#c9d1d9", margin: 0, fontWeight: 700 }}>
+        <h1 style={{ fontSize: "18px", color: "var(--white)", margin: 0, fontWeight: 700 }}>
           Drupal Integration
         </h1>
-        <p style={{ fontSize: "12px", color: "#5a6a7a", marginTop: "4px" }}>
+        <p style={{ fontSize: "12px", color: "var(--gray)", marginTop: "4px" }}>
           Connect to a Drupal instance to automatically publish articles from recipe pipelines.
         </p>
       </div>
 
       {/* Status messages */}
       {error && (
-        <div style={{ ...cardStyle, borderColor: "#ff4444", color: "#ff4444", padding: "12px 16px", fontSize: "12px" }}>
+        <div style={{ ...cardStyle, borderColor: "var(--red)", color: "var(--red)", padding: "12px 16px", fontSize: "12px" }}>
           [ERROR] {error}
         </div>
       )}
       {success && (
-        <div style={{ ...cardStyle, borderColor: "#00ff88", color: "#00ff88", padding: "12px 16px", fontSize: "12px" }}>
+        <div style={{ ...cardStyle, borderColor: "var(--green)", color: "var(--green)", padding: "12px 16px", fontSize: "12px" }}>
           [OK] {success}
         </div>
       )}
@@ -323,9 +323,9 @@ export default function DrupalIntegrationPage() {
       {integration && (
         <div style={cardStyle}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-            <span style={{ fontSize: "12px", color: "#c9d1d9" }}>
-              <span style={{ color: "#5a6a7a" }}>status:</span>{" "}
-              <span style={{ color: integration.isEnabled ? "#00ff88" : "#ff4444" }}>
+            <span style={{ fontSize: "12px", color: "var(--white)" }}>
+              <span style={{ color: "var(--gray)" }}>status:</span>{" "}
+              <span style={{ color: integration.isEnabled ? "var(--green)" : "var(--red)" }}>
                 {integration.isEnabled ? "ENABLED" : "DISABLED"}
               </span>
             </span>
@@ -335,36 +335,36 @@ export default function DrupalIntegrationPage() {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", fontSize: "12px" }}>
             <div>
-              <span style={{ color: "#5a6a7a" }}>url:</span>{" "}
-              <span style={{ color: "#c9d1d9" }}>{integration.baseUrl}</span>
+              <span style={{ color: "var(--gray)" }}>url:</span>{" "}
+              <span style={{ color: "var(--white)" }}>{integration.baseUrl}</span>
             </div>
             <div>
-              <span style={{ color: "#5a6a7a" }}>adapter:</span>{" "}
-              <span style={{ color: "#c9d1d9" }}>{integration.adapterType}</span>
+              <span style={{ color: "var(--gray)" }}>adapter:</span>{" "}
+              <span style={{ color: "var(--white)" }}>{integration.adapterType}</span>
             </div>
             <div>
-              <span style={{ color: "#5a6a7a" }}>auth:</span>{" "}
-              <span style={{ color: "#c9d1d9" }}>{integration.authType}</span>
+              <span style={{ color: "var(--gray)" }}>auth:</span>{" "}
+              <span style={{ color: "var(--white)" }}>{integration.authType}</span>
             </div>
             <div>
-              <span style={{ color: "#5a6a7a" }}>content_type:</span>{" "}
-              <span style={{ color: "#c9d1d9" }}>{integration.defaultContentType}</span>
+              <span style={{ color: "var(--gray)" }}>content_type:</span>{" "}
+              <span style={{ color: "var(--white)" }}>{integration.defaultContentType}</span>
             </div>
             <div>
-              <span style={{ color: "#5a6a7a" }}>credentials:</span>{" "}
-              <span style={{ color: integration.hasCredentials ? "#00ff88" : "#ff4444" }}>
+              <span style={{ color: "var(--gray)" }}>credentials:</span>{" "}
+              <span style={{ color: integration.hasCredentials ? "var(--green)" : "var(--red)" }}>
                 {integration.hasCredentials ? "configured" : "missing"}
               </span>
             </div>
           </div>
 
           {/* Test Connection */}
-          <div style={{ marginTop: "16px", borderTop: "1px solid #1e2a3a", paddingTop: "12px" }}>
+          <div style={{ marginTop: "16px", borderTop: "1px solid var(--border)", paddingTop: "12px" }}>
             <button onClick={handleTest} disabled={testing} style={btnStyle("0, 229, 255")}>
               {testing ? "Testing..." : "Test Connection"}
             </button>
             {testResult && (
-              <span style={{ fontSize: "12px", marginLeft: "8px", color: testResult.ok ? "#00ff88" : "#ff4444" }}>
+              <span style={{ fontSize: "12px", marginLeft: "8px", color: testResult.ok ? "var(--green)" : "var(--red)" }}>
                 {testResult.ok
                   ? `OK (${testResult.latencyMs}ms)${testResult.drupalVersion ? ` — ${testResult.drupalVersion}` : ""}`
                   : `FAILED: ${testResult.error}`}
@@ -376,7 +376,7 @@ export default function DrupalIntegrationPage() {
 
       {/* Form */}
       <div style={cardStyle}>
-        <div style={{ fontSize: "13px", color: "#c9d1d9", fontWeight: 600, marginBottom: "16px" }}>
+        <div style={{ fontSize: "13px", color: "var(--white)", fontWeight: 600, marginBottom: "16px" }}>
           {integration ? "Update Configuration" : "Create Integration"}
         </div>
 
@@ -425,8 +425,8 @@ export default function DrupalIntegrationPage() {
         </div>
 
         {/* Credentials */}
-        <div style={{ borderTop: "1px solid #1e2a3a", marginTop: "8px", paddingTop: "12px" }}>
-          <div style={{ fontSize: "11px", color: "#5a6a7a", marginBottom: "8px" }}>
+        <div style={{ borderTop: "1px solid var(--border)", marginTop: "8px", paddingTop: "12px" }}>
+          <div style={{ fontSize: "11px", color: "var(--gray)", marginBottom: "8px" }}>
             CREDENTIALS{integration?.hasCredentials ? " (leave empty to keep existing)" : ""}
           </div>
 
@@ -497,7 +497,7 @@ export default function DrupalIntegrationPage() {
             <>
               {showDelete ? (
                 <>
-                  <span style={{ fontSize: "12px", color: "#ff4444", marginRight: "8px" }}>
+                  <span style={{ fontSize: "12px", color: "var(--red)", marginRight: "8px" }}>
                     Delete integration? This cannot be undone.
                   </span>
                   <button onClick={handleDelete} style={btnStyle("255, 68, 68")}>

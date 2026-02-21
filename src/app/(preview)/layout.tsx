@@ -9,9 +9,9 @@ export default function PreviewRootLayout({
         style={{
           margin: 0,
           padding: 0,
-          backgroundColor: "#0a0a0a",
+          backgroundColor: "var(--bg)",
           fontFamily: "'Georgia', 'Times New Roman', serif",
-          color: "#e0e0e0",
+          color: "var(--white)",
         }}
       >
         {children}

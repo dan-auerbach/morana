@@ -2,29 +2,29 @@
 
 const statusConfig: Record<string, { color: string; bg: string; className: string }> = {
   queued: {
-    color: "#ffcc00",
+    color: "var(--yellow)",
     bg: "rgba(255, 204, 0, 0.1)",
     className: "status-queued",
   },
   running: {
-    color: "#00e5ff",
+    color: "var(--cyan)",
     bg: "rgba(0, 229, 255, 0.1)",
     className: "status-running",
   },
   done: {
-    color: "#00ff88",
+    color: "var(--green)",
     bg: "rgba(0, 255, 136, 0.1)",
     className: "status-done",
   },
   error: {
-    color: "#ff4444",
+    color: "var(--red)",
     bg: "rgba(255, 68, 68, 0.1)",
     className: "status-error",
   },
 };
 
 const fallback = {
-  color: "#5a6a7a",
+  color: "var(--gray)",
   bg: "rgba(90, 106, 122, 0.1)",
   className: "",
 };

@@ -5,15 +5,15 @@ import { useEffect, useState, useCallback } from "react";
 
 /* ─── MORANA color tokens ─── */
 const C = {
-  success: "#00ff88",
-  error: "#ff4444",
-  warning: "#ffcc00",
+  success: "var(--green)",
+  error: "var(--red)",
+  warning: "var(--yellow)",
   accent: "#ff8800",
-  info: "#00e5ff",
-  muted: "#5a6a7a",
-  text: "#e0e0e0",
-  border: "#1e2a3a",
-  bg: "#0d1117",
+  info: "var(--cyan)",
+  muted: "var(--gray)",
+  text: "var(--white)",
+  border: "var(--border)",
+  bg: "var(--bg-panel)",
 } as const;
 
 const MONO = "'JetBrains Mono', 'Fira Code', monospace";

@@ -118,8 +118,8 @@ export default function HistoryPage() {
 
   if (!session) {
     return (
-      <div style={{ color: "#5a6a7a" }}>
-        <span style={{ color: "#ff4444" }}>[ERROR]</span> Authentication required. Please sign in.
+      <div style={{ color: "var(--gray)" }}>
+        <span style={{ color: "var(--red)" }}>[ERROR]</span> Authentication required. Please sign in.
       </div>
     );
   }
@@ -137,7 +137,7 @@ export default function HistoryPage() {
               style={{
                 fontSize: "11px",
                 fontWeight: 700,
-                color: "#ffcc00",
+                color: "var(--yellow)",
                 textTransform: "uppercase",
                 letterSpacing: "0.1em",
                 marginBottom: "6px",
@@ -149,15 +149,15 @@ export default function HistoryPage() {
               <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                 {input.prompt && (
                   <div>
-                    <span style={{ color: "#00ff88", fontSize: "11px" }}>--prompt </span>
+                    <span style={{ color: "var(--green)", fontSize: "11px" }}>--prompt </span>
                     <div
                       style={{
                         marginTop: "4px",
                         padding: "8px 12px",
-                        backgroundColor: "#111820",
-                        border: "1px solid #1e2a3a",
+                        backgroundColor: "var(--bg-input)",
+                        border: "1px solid var(--border)",
                         fontSize: "12px",
-                        color: "#e0e0e0",
+                        color: "var(--white)",
                         whiteSpace: "pre-wrap",
                         maxHeight: "200px",
                         overflow: "auto",
@@ -169,15 +169,15 @@ export default function HistoryPage() {
                 )}
                 {input.sourceText && (
                   <div>
-                    <span style={{ color: "#00ff88", fontSize: "11px" }}>--source </span>
+                    <span style={{ color: "var(--green)", fontSize: "11px" }}>--source </span>
                     <div
                       style={{
                         marginTop: "4px",
                         padding: "8px 12px",
-                        backgroundColor: "#111820",
-                        border: "1px solid #1e2a3a",
+                        backgroundColor: "var(--bg-input)",
+                        border: "1px solid var(--border)",
                         fontSize: "12px",
-                        color: "#5a6a7a",
+                        color: "var(--gray)",
                         whiteSpace: "pre-wrap",
                         maxHeight: "150px",
                         overflow: "auto",
@@ -194,15 +194,15 @@ export default function HistoryPage() {
               <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                 {input.text && (
                   <div>
-                    <span style={{ color: "#00ff88", fontSize: "11px" }}>--text </span>
+                    <span style={{ color: "var(--green)", fontSize: "11px" }}>--text </span>
                     <div
                       style={{
                         marginTop: "4px",
                         padding: "8px 12px",
-                        backgroundColor: "#111820",
-                        border: "1px solid #1e2a3a",
+                        backgroundColor: "var(--bg-input)",
+                        border: "1px solid var(--border)",
                         fontSize: "12px",
-                        color: "#e0e0e0",
+                        color: "var(--white)",
                         whiteSpace: "pre-wrap",
                         maxHeight: "150px",
                         overflow: "auto",
@@ -213,22 +213,22 @@ export default function HistoryPage() {
                   </div>
                 )}
                 {input.voiceId && (
-                  <div style={{ fontSize: "11px", color: "#5a6a7a", marginTop: "4px" }}>
-                    <span style={{ color: "#00ff88" }}>--voice</span> {String(input.voiceId)}
+                  <div style={{ fontSize: "11px", color: "var(--gray)", marginTop: "4px" }}>
+                    <span style={{ color: "var(--green)" }}>--voice</span> {String(input.voiceId)}
                   </div>
                 )}
               </div>
             )}
             {detail.type === "stt" && (
-              <div style={{ fontSize: "12px", color: "#5a6a7a" }}>
+              <div style={{ fontSize: "12px", color: "var(--gray)" }}>
                 {input.language && (
                   <span>
-                    <span style={{ color: "#00ff88" }}>--lang</span> {String(input.language)}{" "}
+                    <span style={{ color: "var(--green)" }}>--lang</span> {String(input.language)}{" "}
                   </span>
                 )}
                 {input.mimeType && (
                   <span>
-                    <span style={{ color: "#00ff88" }}>--mime</span> {String(input.mimeType)}
+                    <span style={{ color: "var(--green)" }}>--mime</span> {String(input.mimeType)}
                   </span>
                 )}
               </div>
@@ -243,7 +243,7 @@ export default function HistoryPage() {
               style={{
                 fontSize: "11px",
                 fontWeight: 700,
-                color: "#00ff88",
+                color: "var(--green)",
                 textTransform: "uppercase",
                 letterSpacing: "0.1em",
                 marginBottom: "6px",
@@ -255,10 +255,10 @@ export default function HistoryPage() {
               <div
                 style={{
                   padding: "8px 12px",
-                  backgroundColor: "#0d1117",
+                  backgroundColor: "var(--bg-panel)",
                   border: "1px solid rgba(0, 255, 136, 0.2)",
                   fontSize: "12px",
-                  color: "#e0e0e0",
+                  color: "var(--white)",
                   whiteSpace: "pre-wrap",
                   lineHeight: "1.5",
                   maxHeight: "300px",
@@ -272,10 +272,10 @@ export default function HistoryPage() {
               <div
                 style={{
                   padding: "8px 12px",
-                  backgroundColor: "#0d1117",
+                  backgroundColor: "var(--bg-panel)",
                   border: "1px solid rgba(0, 255, 136, 0.2)",
                   fontSize: "12px",
-                  color: "#e0e0e0",
+                  color: "var(--white)",
                   whiteSpace: "pre-wrap",
                   lineHeight: "1.5",
                   maxHeight: "300px",
@@ -296,36 +296,36 @@ export default function HistoryPage() {
             >
               {output.inputTokens != null && (
                 <span>
-                  <span style={{ color: "#ffcc00" }}>IN:</span>{" "}
-                  <span style={{ color: "#00e5ff" }}>{String(output.inputTokens)}</span>{" "}
-                  <span style={{ color: "#5a6a7a" }}>tokens</span>
+                  <span style={{ color: "var(--yellow)" }}>IN:</span>{" "}
+                  <span style={{ color: "var(--cyan)" }}>{String(output.inputTokens)}</span>{" "}
+                  <span style={{ color: "var(--gray)" }}>tokens</span>
                 </span>
               )}
               {output.outputTokens != null && (
                 <span>
-                  <span style={{ color: "#ffcc00" }}>OUT:</span>{" "}
-                  <span style={{ color: "#00e5ff" }}>{String(output.outputTokens)}</span>{" "}
-                  <span style={{ color: "#5a6a7a" }}>tokens</span>
+                  <span style={{ color: "var(--yellow)" }}>OUT:</span>{" "}
+                  <span style={{ color: "var(--cyan)" }}>{String(output.outputTokens)}</span>{" "}
+                  <span style={{ color: "var(--gray)" }}>tokens</span>
                 </span>
               )}
               {output.latencyMs != null && (
                 <span>
-                  <span style={{ color: "#ffcc00" }}>LATENCY:</span>{" "}
-                  <span style={{ color: "#00e5ff" }}>
+                  <span style={{ color: "var(--yellow)" }}>LATENCY:</span>{" "}
+                  <span style={{ color: "var(--cyan)" }}>
                     {(Number(output.latencyMs) / 1000).toFixed(1)}s
                   </span>
                 </span>
               )}
               {output.chars != null && (
                 <span>
-                  <span style={{ color: "#ffcc00" }}>CHARS:</span>{" "}
-                  <span style={{ color: "#00e5ff" }}>{String(output.chars)}</span>
+                  <span style={{ color: "var(--yellow)" }}>CHARS:</span>{" "}
+                  <span style={{ color: "var(--cyan)" }}>{String(output.chars)}</span>
                 </span>
               )}
               {output.durationSeconds != null && (
                 <span>
-                  <span style={{ color: "#ffcc00" }}>DURATION:</span>{" "}
-                  <span style={{ color: "#00e5ff" }}>
+                  <span style={{ color: "var(--yellow)" }}>DURATION:</span>{" "}
+                  <span style={{ color: "var(--cyan)" }}>
                     {Number(output.durationSeconds).toFixed(1)}s
                   </span>
                 </span>
@@ -342,7 +342,7 @@ export default function HistoryPage() {
               backgroundColor: "rgba(255, 68, 68, 0.08)",
               border: "1px solid rgba(255, 68, 68, 0.3)",
               fontSize: "12px",
-              color: "#ff4444",
+              color: "var(--red)",
             }}
           >
             <span style={{ fontWeight: 700 }}>[ERROR]</span> {detail.errorMessage}
@@ -351,8 +351,8 @@ export default function HistoryPage() {
 
         {/* Timing */}
         {detail.finishedAt && (
-          <div style={{ fontSize: "11px", color: "#5a6a7a" }}>
-            <span style={{ color: "#00ff88" }}>FINISHED:</span>{" "}
+          <div style={{ fontSize: "11px", color: "var(--gray)" }}>
+            <span style={{ color: "var(--green)" }}>FINISHED:</span>{" "}
             {new Date(detail.finishedAt).toLocaleString()}
           </div>
         )}
@@ -366,7 +366,7 @@ export default function HistoryPage() {
       <div style={{ marginBottom: "24px" }}>
         <div
           style={{
-            color: "#00ff88",
+            color: "var(--green)",
             fontSize: "18px",
             fontWeight: 700,
             marginBottom: "4px",
@@ -374,9 +374,9 @@ export default function HistoryPage() {
         >
           [HISTORY]
         </div>
-        <div style={{ color: "#5a6a7a", fontSize: "13px" }}>
+        <div style={{ color: "var(--gray)", fontSize: "13px" }}>
           $ query runs --page {page} {typeFilter ? `--type ${typeFilter}` : "--all"}{" "}
-          <span style={{ color: "#5a6a7a", opacity: 0.5 }}>// click row to expand</span>
+          <span style={{ color: "var(--gray)", opacity: 0.5 }}>// click row to expand</span>
         </div>
       </div>
 
@@ -388,14 +388,14 @@ export default function HistoryPage() {
           gap: "12px",
           marginBottom: "20px",
           paddingBottom: "12px",
-          borderBottom: "1px solid #1e2a3a",
+          borderBottom: "1px solid var(--border)",
         }}
       >
         <label
           style={{
             fontSize: "11px",
             fontWeight: 700,
-            color: "#00ff88",
+            color: "var(--green)",
             textTransform: "uppercase",
             letterSpacing: "0.1em",
           }}
@@ -410,9 +410,9 @@ export default function HistoryPage() {
           }}
           style={{
             padding: "6px 12px",
-            backgroundColor: "#111820",
-            border: "1px solid #1e2a3a",
-            color: "#e0e0e0",
+            backgroundColor: "var(--bg-input)",
+            border: "1px solid var(--border)",
+            color: "var(--white)",
             fontFamily: "inherit",
             fontSize: "12px",
           }}
@@ -424,18 +424,18 @@ export default function HistoryPage() {
           <option value="image">image</option>
         </select>
         {isAdmin && (
-          <span style={{ fontSize: "11px", color: "#ffcc00" }}>
+          <span style={{ fontSize: "11px", color: "var(--yellow)" }}>
             [ADMIN] viewing all users
           </span>
         )}
       </div>
 
       {loading ? (
-        <div style={{ color: "#00ff88", fontSize: "13px" }}>
+        <div style={{ color: "var(--green)", fontSize: "13px" }}>
           <span style={{ animation: "blink 1s step-end infinite" }}>_</span> Querying database...
         </div>
       ) : runs.length === 0 ? (
-        <div style={{ color: "#5a6a7a", fontSize: "13px" }}>
+        <div style={{ color: "var(--gray)", fontSize: "13px" }}>
           [INFO] No runs found matching query.
         </div>
       ) : (
@@ -447,7 +447,7 @@ export default function HistoryPage() {
               gridTemplateColumns: isAdmin
                 ? "60px 80px 90px 140px 1fr 160px"
                 : "60px 80px 90px 1fr 160px",
-              borderBottom: "1px solid #00ff88",
+              borderBottom: "1px solid var(--green)",
               padding: "8px 0",
               gap: "8px",
             }}
@@ -459,7 +459,7 @@ export default function HistoryPage() {
                   style={{
                     fontSize: "11px",
                     fontWeight: 700,
-                    color: "#00ff88",
+                    color: "var(--green)",
                     textTransform: "uppercase",
                     letterSpacing: "0.1em",
                   }}
@@ -512,10 +512,10 @@ export default function HistoryPage() {
                       textTransform: "uppercase",
                       fontSize: "11px",
                       fontWeight: 700,
-                      color: "#ffcc00",
+                      color: "var(--yellow)",
                     }}
                   >
-                    <span style={{ color: isExpanded ? "#00ff88" : "#444", marginRight: "4px" }}>
+                    <span style={{ color: isExpanded ? "var(--green)" : "#444", marginRight: "4px" }}>
                       {isExpanded ? "▼" : "▶"}
                     </span>
                     {r.type}
@@ -523,12 +523,12 @@ export default function HistoryPage() {
                   <div>
                     <StatusBadge status={r.status} />
                   </div>
-                  <div style={{ fontSize: "12px", color: "#e0e0e0" }}>{r.provider}</div>
+                  <div style={{ fontSize: "12px", color: "var(--white)" }}>{r.provider}</div>
                   {isAdmin ? (
                     <div
                       style={{
                         fontSize: "12px",
-                        color: "#5a6a7a",
+                        color: "var(--gray)",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                         whiteSpace: "nowrap",
@@ -540,7 +540,7 @@ export default function HistoryPage() {
                     <div
                       style={{
                         fontSize: "12px",
-                        color: "#8b949e",
+                        color: "var(--text-secondary)",
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                         whiteSpace: "nowrap",
@@ -549,7 +549,7 @@ export default function HistoryPage() {
                       {r.preview || r.model}
                     </div>
                   )}
-                  <div style={{ fontSize: "12px", color: "#5a6a7a" }}>
+                  <div style={{ fontSize: "12px", color: "var(--gray)" }}>
                     {new Date(r.createdAt).toLocaleString()}
                   </div>
                 </div>
@@ -561,19 +561,19 @@ export default function HistoryPage() {
                       padding: "16px",
                       backgroundColor: "rgba(13, 17, 23, 0.8)",
                       borderBottom: "1px solid rgba(0, 255, 136, 0.15)",
-                      borderLeft: "2px solid #00ff88",
+                      borderLeft: "2px solid var(--green)",
                       marginLeft: "8px",
                     }}
                   >
                     {isLoadingThis ? (
-                      <div style={{ color: "#00ff88", fontSize: "12px" }}>
+                      <div style={{ color: "var(--green)", fontSize: "12px" }}>
                         <span style={{ animation: "blink 1s step-end infinite" }}>_</span> Loading
                         run details...
                       </div>
                     ) : detail ? (
                       renderInputOutput(detail)
                     ) : (
-                      <div style={{ color: "#5a6a7a", fontSize: "12px" }}>
+                      <div style={{ color: "var(--gray)", fontSize: "12px" }}>
                         [INFO] No details available.
                       </div>
                     )}
@@ -594,7 +594,7 @@ export default function HistoryPage() {
             alignItems: "center",
             gap: "8px",
             paddingTop: "12px",
-            borderTop: "1px solid #1e2a3a",
+            borderTop: "1px solid var(--border)",
           }}
         >
           <button
@@ -603,8 +603,8 @@ export default function HistoryPage() {
             style={{
               padding: "4px 12px",
               background: "transparent",
-              border: "1px solid #1e2a3a",
-              color: page === 1 ? "#5a6a7a" : "#00ff88",
+              border: "1px solid var(--border)",
+              color: page === 1 ? "var(--gray)" : "var(--green)",
               fontFamily: "inherit",
               fontSize: "12px",
               cursor: page === 1 ? "not-allowed" : "pointer",
@@ -613,9 +613,9 @@ export default function HistoryPage() {
           >
             [PREV]
           </button>
-          <span style={{ fontSize: "12px", color: "#5a6a7a" }}>
-            <span style={{ color: "#ffcc00" }}>PAGE:</span>{" "}
-            <span style={{ color: "#e0e0e0" }}>{page}</span> / {pages}
+          <span style={{ fontSize: "12px", color: "var(--gray)" }}>
+            <span style={{ color: "var(--yellow)" }}>PAGE:</span>{" "}
+            <span style={{ color: "var(--white)" }}>{page}</span> / {pages}
           </span>
           <button
             onClick={() => setPage((p) => Math.min(pages, p + 1))}
@@ -623,8 +623,8 @@ export default function HistoryPage() {
             style={{
               padding: "4px 12px",
               background: "transparent",
-              border: "1px solid #1e2a3a",
-              color: page === pages ? "#5a6a7a" : "#00ff88",
+              border: "1px solid var(--border)",
+              color: page === pages ? "var(--gray)" : "var(--green)",
               fontFamily: "inherit",
               fontSize: "12px",
               cursor: page === pages ? "not-allowed" : "pointer",

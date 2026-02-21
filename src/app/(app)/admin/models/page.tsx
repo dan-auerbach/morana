@@ -258,14 +258,14 @@ export default function AdminModelsPage() {
 
   if (!session) {
     return (
-      <div style={{ color: "#5a6a7a" }}>
-        <span style={{ color: "#ff4444" }}>[ERROR]</span> Authentication required.
+      <div style={{ color: "var(--gray)" }}>
+        <span style={{ color: "var(--red)" }}>[ERROR]</span> Authentication required.
       </div>
     );
   }
   if (!isAdmin) {
     return (
-      <div style={{ color: "#ff4444" }}>
+      <div style={{ color: "var(--red)" }}>
         <span style={{ fontWeight: 700 }}>[ACCESS DENIED]</span> Admin privileges required.
       </div>
     );
@@ -275,7 +275,7 @@ export default function AdminModelsPage() {
     label: {
       fontSize: "11px",
       fontWeight: 700 as const,
-      color: "#00ff88",
+      color: "var(--green)",
       textTransform: "uppercase" as const,
       letterSpacing: "0.1em",
       marginBottom: "4px",
@@ -284,9 +284,9 @@ export default function AdminModelsPage() {
     input: {
       width: "100%",
       padding: "6px 10px",
-      backgroundColor: "#111820",
-      border: "1px solid #1e2a3a",
-      color: "#e0e0e0",
+      backgroundColor: "var(--bg-input)",
+      border: "1px solid var(--border)",
+      color: "var(--white)",
       fontFamily: "inherit",
       fontSize: "12px",
     },
@@ -297,13 +297,13 @@ export default function AdminModelsPage() {
       {/* Header / Breadcrumb */}
       <div style={{ marginBottom: "24px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-          <Link href="/admin" className="no-underline" style={{ color: "#ff4444", fontSize: "18px", fontWeight: 700 }}>
+          <Link href="/admin" className="no-underline" style={{ color: "var(--red)", fontSize: "18px", fontWeight: 700 }}>
             [ADMIN]
           </Link>
           <span style={{ color: "#333" }}>/</span>
           <span style={{ color: "#ff8800", fontSize: "18px", fontWeight: 700 }}>[MODELS]</span>
         </div>
-        <div style={{ color: "#5a6a7a", fontSize: "13px" }}>$ models --config --admin</div>
+        <div style={{ color: "var(--gray)", fontSize: "13px" }}>$ models --config --admin</div>
       </div>
 
       {/* Actions bar */}
@@ -320,8 +320,8 @@ export default function AdminModelsPage() {
           style={{
             padding: "8px 20px",
             background: "transparent",
-            border: "1px solid #00ff88",
-            color: "#00ff88",
+            border: "1px solid var(--green)",
+            color: "var(--green)",
             fontFamily: "inherit",
             fontSize: "12px",
             fontWeight: 700,
@@ -334,7 +334,7 @@ export default function AdminModelsPage() {
         >
           {showForm ? "[  CANCEL  ]" : "[  + NEW MODEL  ]"}
         </button>
-        <div style={{ fontSize: "12px", color: "#5a6a7a" }}>
+        <div style={{ fontSize: "12px", color: "var(--gray)" }}>
           {models.length} model{models.length !== 1 ? "s" : ""} | {models.filter((m) => m.isEnabled).length} enabled
         </div>
       </div>
@@ -343,14 +343,14 @@ export default function AdminModelsPage() {
       {showForm && (
         <div style={{
           padding: "16px",
-          border: "1px solid #00ff88",
+          border: "1px solid var(--green)",
           backgroundColor: "rgba(0, 255, 136, 0.03)",
           marginBottom: "20px",
         }}>
           <div style={{
             fontSize: "11px",
             fontWeight: 700,
-            color: "#00ff88",
+            color: "var(--green)",
             textTransform: "uppercase",
             letterSpacing: "0.1em",
             marginBottom: "12px",
@@ -436,7 +436,7 @@ export default function AdminModelsPage() {
             </div>
           </div>
           {formError && (
-            <div style={{ color: "#ff4444", fontSize: "12px", marginBottom: "8px" }}>
+            <div style={{ color: "var(--red)", fontSize: "12px", marginBottom: "8px" }}>
               [ERROR] {formError}
             </div>
           )}
@@ -445,8 +445,8 @@ export default function AdminModelsPage() {
             style={{
               padding: "6px 16px",
               background: "transparent",
-              border: "1px solid #00ff88",
-              color: "#00ff88",
+              border: "1px solid var(--green)",
+              color: "var(--green)",
               fontFamily: "inherit",
               fontSize: "12px",
               fontWeight: 700,
@@ -466,8 +466,8 @@ export default function AdminModelsPage() {
         <div style={{
           padding: "12px",
           backgroundColor: "rgba(255, 68, 68, 0.08)",
-          border: "1px solid #ff4444",
-          color: "#ff4444",
+          border: "1px solid var(--red)",
+          color: "var(--red)",
           fontSize: "13px",
           marginBottom: "16px",
         }}>
@@ -477,20 +477,20 @@ export default function AdminModelsPage() {
 
       {/* Models table */}
       {loading ? (
-        <div style={{ color: "#00ff88", fontSize: "13px" }}>
+        <div style={{ color: "var(--green)", fontSize: "13px" }}>
           <span style={{ animation: "blink 1s step-end infinite" }}>_</span> Loading models...
         </div>
       ) : (
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", fontSize: "12px", borderCollapse: "collapse", fontFamily: "inherit" }}>
             <thead>
-              <tr style={{ borderBottom: "1px solid #00ff88", textAlign: "left" }}>
+              <tr style={{ borderBottom: "1px solid var(--green)", textAlign: "left" }}>
                 {["MODEL ID", "LABEL", "PROVIDER", "ENABLED", "DEFAULT", "PRICING", "SORT", "ACTIONS"].map((h) => (
                   <th
                     key={h}
                     style={{
                       padding: "8px 12px 8px 0",
-                      color: "#00ff88",
+                      color: "var(--green)",
                       fontWeight: 700,
                       fontSize: "10px",
                       textTransform: "uppercase",
@@ -518,15 +518,15 @@ export default function AdminModelsPage() {
                         padding: "8px 0",
                       }}>
                         {/* Model ID */}
-                        <div style={{ color: "#e0e0e0", fontSize: "12px", fontWeight: 600 }}>{m.modelId}</div>
+                        <div style={{ color: "var(--white)", fontSize: "12px", fontWeight: 600 }}>{m.modelId}</div>
 
                         {/* Label */}
-                        <div style={{ color: "#5a6a7a", fontSize: "11px" }}>{m.label}</div>
+                        <div style={{ color: "var(--gray)", fontSize: "11px" }}>{m.label}</div>
 
                         {/* Provider badge */}
                         <div>
                           <span style={{
-                            color: m.provider === "anthropic" ? "#ff8800" : m.provider === "openai" ? "#00e5ff" : "#ffcc00",
+                            color: m.provider === "anthropic" ? "#ff8800" : m.provider === "openai" ? "var(--cyan)" : "var(--yellow)",
                             fontSize: "10px",
                             fontWeight: 700,
                             textTransform: "uppercase",
@@ -545,7 +545,7 @@ export default function AdminModelsPage() {
                               cursor: "pointer",
                               fontSize: "11px",
                               fontWeight: 700,
-                              color: m.isEnabled ? "#00ff88" : "#ff4444",
+                              color: m.isEnabled ? "var(--green)" : "var(--red)",
                             }}
                             title={m.isEnabled ? "Click to disable" : "Click to enable"}
                           >
@@ -560,7 +560,7 @@ export default function AdminModelsPage() {
                             style={{
                               cursor: "pointer",
                               fontSize: "13px",
-                              color: m.isDefault ? "#ffcc00" : "#333",
+                              color: m.isDefault ? "var(--yellow)" : "#333",
                             }}
                             title={m.isDefault ? "Default model (click to unset)" : "Click to set as default"}
                           >
@@ -569,7 +569,7 @@ export default function AdminModelsPage() {
                         </div>
 
                         {/* Pricing (inline editable) */}
-                        <div style={{ fontSize: "10px", color: "#5a6a7a" }}>
+                        <div style={{ fontSize: "10px", color: "var(--gray)" }}>
                           {editingId === m.id && editField === "pricingInput" ? (
                             <input
                               type="number"
@@ -585,9 +585,9 @@ export default function AdminModelsPage() {
                               style={{
                                 width: "60px",
                                 padding: "2px 4px",
-                                backgroundColor: "#111820",
-                                border: "1px solid #00e5ff",
-                                color: "#00e5ff",
+                                backgroundColor: "var(--bg-input)",
+                                border: "1px solid var(--cyan)",
+                                color: "var(--cyan)",
                                 fontFamily: "inherit",
                                 fontSize: "10px",
                               }}
@@ -595,13 +595,13 @@ export default function AdminModelsPage() {
                           ) : (
                             <span
                               onClick={() => startInlineEdit(m.id, "pricingInput", m.pricingInput)}
-                              style={{ cursor: "pointer", color: "#00e5ff" }}
+                              style={{ cursor: "pointer", color: "var(--cyan)" }}
                               title="Click to edit input pricing"
                             >
                               in: ${m.pricingInput.toFixed(2)}
                             </span>
                           )}
-                          <span style={{ color: "#5a6a7a" }}> / </span>
+                          <span style={{ color: "var(--gray)" }}> / </span>
                           {editingId === m.id && editField === "pricingOutput" ? (
                             <input
                               type="number"
@@ -617,7 +617,7 @@ export default function AdminModelsPage() {
                               style={{
                                 width: "60px",
                                 padding: "2px 4px",
-                                backgroundColor: "#111820",
+                                backgroundColor: "var(--bg-input)",
                                 border: "1px solid #ff8800",
                                 color: "#ff8800",
                                 fontFamily: "inherit",
@@ -633,11 +633,11 @@ export default function AdminModelsPage() {
                               out: ${m.pricingOutput.toFixed(2)}
                             </span>
                           )}
-                          <span style={{ color: "#5a6a7a" }}> / {formatPricingUnit(m.pricingUnit)}</span>
+                          <span style={{ color: "var(--gray)" }}> / {formatPricingUnit(m.pricingUnit)}</span>
                         </div>
 
                         {/* Sort order */}
-                        <div style={{ color: "#5a6a7a", fontSize: "11px" }}>{m.sortOrder}</div>
+                        <div style={{ color: "var(--gray)", fontSize: "11px" }}>{m.sortOrder}</div>
 
                         {/* Actions */}
                         <div style={{ display: "flex", gap: "4px" }}>
@@ -646,8 +646,8 @@ export default function AdminModelsPage() {
                             style={{
                               padding: "2px 8px",
                               background: "transparent",
-                              border: `1px solid ${isRowEditing ? "#ffcc00" : "#00e5ff"}`,
-                              color: isRowEditing ? "#ffcc00" : "#00e5ff",
+                              border: `1px solid ${isRowEditing ? "var(--yellow)" : "var(--cyan)"}`,
+                              color: isRowEditing ? "var(--yellow)" : "var(--cyan)",
                               fontFamily: "inherit",
                               fontSize: "10px",
                               cursor: "pointer",
@@ -660,8 +660,8 @@ export default function AdminModelsPage() {
                             style={{
                               padding: "2px 8px",
                               background: "transparent",
-                              border: "1px solid #ff4444",
-                              color: "#ff4444",
+                              border: "1px solid var(--red)",
+                              color: "var(--red)",
                               fontFamily: "inherit",
                               fontSize: "10px",
                               cursor: "pointer",
@@ -678,13 +678,13 @@ export default function AdminModelsPage() {
                           padding: "12px 16px",
                           backgroundColor: "rgba(0, 229, 255, 0.03)",
                           borderBottom: "1px solid rgba(0, 229, 255, 0.2)",
-                          borderLeft: "2px solid #00e5ff",
+                          borderLeft: "2px solid var(--cyan)",
                           marginLeft: "8px",
                         }}>
                           <div style={{
                             fontSize: "10px",
                             fontWeight: 700,
-                            color: "#00e5ff",
+                            color: "var(--cyan)",
                             textTransform: "uppercase",
                             letterSpacing: "0.1em",
                             marginBottom: "8px",
@@ -693,7 +693,7 @@ export default function AdminModelsPage() {
                           </div>
                           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px", marginBottom: "10px" }}>
                             <div>
-                              <label style={{ ...s.label, color: "#00e5ff" }}>--model-id</label>
+                              <label style={{ ...s.label, color: "var(--cyan)" }}>--model-id</label>
                               <input
                                 value={rowEditData.modelId}
                                 onChange={(e) => setRowEditData({ ...rowEditData, modelId: e.target.value })}
@@ -701,7 +701,7 @@ export default function AdminModelsPage() {
                               />
                             </div>
                             <div>
-                              <label style={{ ...s.label, color: "#00e5ff" }}>--label</label>
+                              <label style={{ ...s.label, color: "var(--cyan)" }}>--label</label>
                               <input
                                 value={rowEditData.label}
                                 onChange={(e) => setRowEditData({ ...rowEditData, label: e.target.value })}
@@ -709,7 +709,7 @@ export default function AdminModelsPage() {
                               />
                             </div>
                             <div>
-                              <label style={{ ...s.label, color: "#00e5ff" }}>--provider</label>
+                              <label style={{ ...s.label, color: "var(--cyan)" }}>--provider</label>
                               <select
                                 value={rowEditData.provider}
                                 onChange={(e) => setRowEditData({ ...rowEditData, provider: e.target.value })}
@@ -723,7 +723,7 @@ export default function AdminModelsPage() {
                           </div>
                           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 0.6fr", gap: "10px", marginBottom: "10px" }}>
                             <div>
-                              <label style={{ ...s.label, color: "#00e5ff" }}>--pricing-input</label>
+                              <label style={{ ...s.label, color: "var(--cyan)" }}>--pricing-input</label>
                               <input
                                 type="number"
                                 step="0.01"
@@ -733,7 +733,7 @@ export default function AdminModelsPage() {
                               />
                             </div>
                             <div>
-                              <label style={{ ...s.label, color: "#00e5ff" }}>--pricing-output</label>
+                              <label style={{ ...s.label, color: "var(--cyan)" }}>--pricing-output</label>
                               <input
                                 type="number"
                                 step="0.01"
@@ -743,7 +743,7 @@ export default function AdminModelsPage() {
                               />
                             </div>
                             <div>
-                              <label style={{ ...s.label, color: "#00e5ff" }}>--pricing-unit</label>
+                              <label style={{ ...s.label, color: "var(--cyan)" }}>--pricing-unit</label>
                               <select
                                 value={rowEditData.pricingUnit}
                                 onChange={(e) => setRowEditData({ ...rowEditData, pricingUnit: e.target.value })}
@@ -755,7 +755,7 @@ export default function AdminModelsPage() {
                               </select>
                             </div>
                             <div>
-                              <label style={{ ...s.label, color: "#00e5ff" }}>--sort</label>
+                              <label style={{ ...s.label, color: "var(--cyan)" }}>--sort</label>
                               <input
                                 type="number"
                                 value={rowEditData.sortOrder}
@@ -765,7 +765,7 @@ export default function AdminModelsPage() {
                             </div>
                           </div>
                           {rowEditError && (
-                            <div style={{ color: "#ff4444", fontSize: "12px", marginBottom: "8px" }}>
+                            <div style={{ color: "var(--red)", fontSize: "12px", marginBottom: "8px" }}>
                               [ERROR] {rowEditError}
                             </div>
                           )}
@@ -775,8 +775,8 @@ export default function AdminModelsPage() {
                               style={{
                                 padding: "4px 12px",
                                 background: "transparent",
-                                border: "1px solid #00e5ff",
-                                color: "#00e5ff",
+                                border: "1px solid var(--cyan)",
+                                color: "var(--cyan)",
                                 fontFamily: "inherit",
                                 fontSize: "10px",
                                 fontWeight: 700,
@@ -793,8 +793,8 @@ export default function AdminModelsPage() {
                               style={{
                                 padding: "4px 12px",
                                 background: "transparent",
-                                border: "1px solid #5a6a7a",
-                                color: "#5a6a7a",
+                                border: "1px solid var(--gray)",
+                                color: "var(--gray)",
                                 fontFamily: "inherit",
                                 fontSize: "10px",
                                 fontWeight: 700,

@@ -30,13 +30,13 @@ const OUTPUT_FORMATS = [
 
 const LABEL_STYLE: React.CSSProperties = {
   display: "block", marginBottom: "6px", fontSize: "11px",
-  fontWeight: 700, color: "#00ff88", textTransform: "uppercase",
+  fontWeight: 700, color: "var(--green)", textTransform: "uppercase",
   letterSpacing: "0.1em",
 };
 
 const INPUT_STYLE: React.CSSProperties = {
-  width: "100%", padding: "8px 12px", backgroundColor: "#111820",
-  border: "1px solid #1e2a3a", color: "#e0e0e0",
+  width: "100%", padding: "8px 12px", backgroundColor: "var(--bg-input)",
+  border: "1px solid var(--border)", color: "var(--white)",
   fontFamily: "inherit", fontSize: "13px",
 };
 
@@ -93,8 +93,8 @@ export default function TTSPage() {
 
   if (!session) {
     return (
-      <div style={{ color: "#5a6a7a" }}>
-        <span style={{ color: "#ff4444" }}>[ERROR]</span> Authentication required.
+      <div style={{ color: "var(--gray)" }}>
+        <span style={{ color: "var(--red)" }}>[ERROR]</span> Authentication required.
       </div>
     );
   }
@@ -102,7 +102,7 @@ export default function TTSPage() {
   const currentModel = TTS_MODELS.find((m) => m.id === modelId) || TTS_MODELS[0];
   const charLimit = currentModel.charLimit;
   const charPercent = Math.min((text.length / charLimit) * 100, 100);
-  const charColor = charPercent > 90 ? "#ff4444" : charPercent > 70 ? "#ffcc00" : "#5a6a7a";
+  const charColor = charPercent > 90 ? "var(--red)" : charPercent > 70 ? "var(--yellow)" : "var(--gray)";
 
   async function handleTTSSubmit() {
     setLoading(true);
@@ -221,15 +221,15 @@ export default function TTSPage() {
         style={{
           width: sidebarOpen ? "240px" : "0px",
           minWidth: sidebarOpen ? "240px" : "0px",
-          borderRight: sidebarOpen ? "1px solid #1e2a3a" : "none",
-          backgroundColor: "#0a0e14",
+          borderRight: sidebarOpen ? "1px solid var(--border)" : "none",
+          backgroundColor: "var(--bg)",
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
           transition: "all 0.2s",
         }}
       >
-        <div style={{ padding: "12px", fontSize: "11px", fontWeight: 700, color: "#ffcc00", textTransform: "uppercase", letterSpacing: "0.1em", borderBottom: "1px solid #1e2a3a" }}>
+        <div style={{ padding: "12px", fontSize: "11px", fontWeight: 700, color: "var(--yellow)", textTransform: "uppercase", letterSpacing: "0.1em", borderBottom: "1px solid var(--border)" }}>
           TTS History
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: "4px 8px" }}>
@@ -249,11 +249,11 @@ export default function TTSPage() {
               onMouseEnter={(e) => { if (r.id !== runId) e.currentTarget.style.backgroundColor = "rgba(0, 255, 136, 0.04)"; }}
               onMouseLeave={(e) => { if (r.id !== runId) e.currentTarget.style.backgroundColor = "transparent"; }}
             >
-              <div style={{ color: r.id === runId ? "#e0e0e0" : "#8b949e", fontSize: "11px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: "3px" }}>
+              <div style={{ color: r.id === runId ? "var(--white)" : "var(--text-secondary)", fontSize: "11px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: "3px" }}>
                 {r.preview || r.id.slice(0, 16) + "..."}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <span style={{ color: "#444", fontSize: "9px" }}>
+                <span style={{ color: "var(--dim)", fontSize: "9px" }}>
                   {new Date(r.createdAt).toLocaleString("sl-SI", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
                 </span>
               </div>
@@ -268,14 +268,14 @@ export default function TTSPage() {
       {/* Main area */}
       <div className="page-main" style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, overflowY: "auto" }}>
         {/* Header */}
-        <div style={{ padding: "10px 16px", borderBottom: "1px solid #1e2a3a", backgroundColor: "#0d1117", display: "flex", alignItems: "center", gap: "12px", flexShrink: 0 }}>
+        <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--border)", backgroundColor: "var(--bg-panel)", display: "flex", alignItems: "center", gap: "12px", flexShrink: 0 }}>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            style={{ background: "transparent", border: "1px solid #1e2a3a", color: "#5a6a7a", cursor: "pointer", padding: "4px 8px", fontFamily: "inherit", fontSize: "12px" }}
+            style={{ background: "transparent", border: "1px solid var(--border)", color: "var(--gray)", cursor: "pointer", padding: "4px 8px", fontFamily: "inherit", fontSize: "12px" }}
           >
             {sidebarOpen ? "<<" : ">>"}
           </button>
-          <span style={{ color: "#00ff88", fontSize: "14px", fontWeight: 700 }}>[TTS]</span>
+          <span style={{ color: "var(--green)", fontSize: "14px", fontWeight: 700 }}>[TTS]</span>
 
           {/* Mode toggle */}
           <div style={{ display: "flex", gap: "0" }}>
@@ -286,9 +286,9 @@ export default function TTSPage() {
                 style={{
                   padding: "4px 12px", fontFamily: "inherit", fontSize: "11px",
                   fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em",
-                  border: `1px solid ${mode === m ? (m === "sfx" ? "#ff8800" : "#00ff88") : "#1e2a3a"}`,
+                  border: `1px solid ${mode === m ? (m === "sfx" ? "#ff8800" : "var(--green)") : "var(--border)"}`,
                   background: mode === m ? (m === "sfx" ? "rgba(255, 136, 0, 0.1)" : "rgba(0, 255, 136, 0.1)") : "transparent",
-                  color: mode === m ? (m === "sfx" ? "#ff8800" : "#00ff88") : "#5a6a7a",
+                  color: mode === m ? (m === "sfx" ? "#ff8800" : "var(--green)") : "var(--gray)",
                   cursor: "pointer",
                   borderRadius: m === "tts" ? "3px 0 0 3px" : "0 3px 3px 0",
                   marginLeft: m === "sfx" ? "-1px" : "0",
@@ -299,7 +299,7 @@ export default function TTSPage() {
             ))}
           </div>
 
-          <span style={{ color: "#5a6a7a", fontSize: "12px" }}>{cmdLine}</span>
+          <span style={{ color: "var(--gray)", fontSize: "12px" }}>{cmdLine}</span>
         </div>
 
         {/* Content */}
@@ -319,10 +319,10 @@ export default function TTSPage() {
                 />
                 <div style={{ marginTop: "6px", fontSize: "11px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span style={{ color: charColor }}>
-                    <span style={{ color: "#ffcc00" }}>CHARS:</span> {text.length.toLocaleString()} / {charLimit.toLocaleString()}
+                    <span style={{ color: "var(--yellow)" }}>CHARS:</span> {text.length.toLocaleString()} / {charLimit.toLocaleString()}
                   </span>
-                  <div style={{ width: "120px", height: "4px", backgroundColor: "#1e2a3a", overflow: "hidden" }}>
-                    <div style={{ width: `${charPercent}%`, height: "100%", backgroundColor: charColor === "#ff4444" ? "#ff4444" : charColor === "#ffcc00" ? "#ffcc00" : "#00ff88", transition: "width 0.2s" }} />
+                  <div style={{ width: "120px", height: "4px", backgroundColor: "var(--border)", overflow: "hidden" }}>
+                    <div style={{ width: `${charPercent}%`, height: "100%", backgroundColor: charColor === "var(--red)" ? "var(--red)" : charColor === "var(--yellow)" ? "var(--yellow)" : "var(--green)", transition: "width 0.2s" }} />
                   </div>
                 </div>
               </div>
@@ -358,7 +358,7 @@ export default function TTSPage() {
                   </select>
                 </div>
                 <div style={{ flex: "1 1 200px" }}>
-                  <label style={LABEL_STYLE}>--lang <span style={{ color: "#5a6a7a", fontWeight: 400 }}>(optional)</span></label>
+                  <label style={LABEL_STYLE}>--lang <span style={{ color: "var(--gray)", fontWeight: 400 }}>(optional)</span></label>
                   <input
                     value={languageCode}
                     onChange={(e) => setLanguageCode(e.target.value)}
@@ -370,24 +370,24 @@ export default function TTSPage() {
               </div>
 
               {/* Voice Settings (collapsible) */}
-              <div style={{ border: "1px solid #1e2a3a", backgroundColor: "#0a0e14" }}>
+              <div style={{ border: "1px solid var(--border)", backgroundColor: "var(--bg)" }}>
                 <button
                   onClick={() => setShowSettings(!showSettings)}
                   style={{
                     width: "100%", padding: "8px 12px",
                     background: "transparent", border: "none",
-                    color: "#5a6a7a", fontFamily: "inherit", fontSize: "11px",
+                    color: "var(--gray)", fontFamily: "inherit", fontSize: "11px",
                     fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em",
                     cursor: "pointer", textAlign: "left",
                     display: "flex", justifyContent: "space-between", alignItems: "center",
                   }}
                 >
                   <span>Voice Settings</span>
-                  <span style={{ color: "#00ff88" }}>{showSettings ? "[-]" : "[+]"}</span>
+                  <span style={{ color: "var(--green)" }}>{showSettings ? "[-]" : "[+]"}</span>
                 </button>
 
                 {showSettings && (
-                  <div style={{ padding: "12px", borderTop: "1px solid #1e2a3a", display: "flex", flexDirection: "column", gap: "14px" }}>
+                  <div style={{ padding: "12px", borderTop: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: "14px" }}>
                     {/* Stability */}
                     <SliderControl
                       label="--stability"
@@ -428,8 +428,8 @@ export default function TTSPage() {
                       onClick={() => { setStability(0.5); setSimilarityBoost(0.75); setStyle(0); setSpeed(1.0); }}
                       style={{
                         alignSelf: "flex-start", padding: "4px 12px",
-                        background: "transparent", border: "1px solid #1e2a3a",
-                        color: "#5a6a7a", fontFamily: "inherit", fontSize: "10px",
+                        background: "transparent", border: "1px solid var(--border)",
+                        color: "var(--gray)", fontFamily: "inherit", fontSize: "10px",
                         cursor: "pointer", textTransform: "uppercase",
                       }}
                     >
@@ -452,8 +452,8 @@ export default function TTSPage() {
                 disabled={loading || !text || !voiceId}
                 style={{
                   alignSelf: "flex-start", padding: "8px 24px", background: "transparent",
-                  border: `1px solid ${loading ? "#5a6a7a" : "#00ff88"}`,
-                  color: loading ? "#5a6a7a" : "#00ff88", fontFamily: "inherit", fontSize: "13px",
+                  border: `1px solid ${loading ? "var(--gray)" : "var(--green)"}`,
+                  color: loading ? "var(--gray)" : "var(--green)", fontFamily: "inherit", fontSize: "13px",
                   fontWeight: 700, cursor: loading || !text || !voiceId ? "not-allowed" : "pointer",
                   textTransform: "uppercase", letterSpacing: "0.1em",
                   opacity: loading || !text || !voiceId ? 0.5 : 1, transition: "all 0.2s",
@@ -477,7 +477,7 @@ export default function TTSPage() {
                   placeholder="Describe the sound effect... e.g. 'thunderstorm with heavy rain and distant thunder'"
                   style={{ ...INPUT_STYLE, resize: "vertical" }}
                 />
-                <div style={{ marginTop: "4px", fontSize: "10px", color: "#5a6a7a" }}>
+                <div style={{ marginTop: "4px", fontSize: "10px", color: "var(--gray)" }}>
                   {sfxPrompt.length} / 1,000 chars
                 </div>
               </div>
@@ -511,8 +511,8 @@ export default function TTSPage() {
                 disabled={loading || !sfxPrompt}
                 style={{
                   alignSelf: "flex-start", padding: "8px 24px", background: "transparent",
-                  border: `1px solid ${loading ? "#5a6a7a" : "#ff8800"}`,
-                  color: loading ? "#5a6a7a" : "#ff8800", fontFamily: "inherit", fontSize: "13px",
+                  border: `1px solid ${loading ? "var(--gray)" : "#ff8800"}`,
+                  color: loading ? "var(--gray)" : "#ff8800", fontFamily: "inherit", fontSize: "13px",
                   fontWeight: 700, cursor: loading || !sfxPrompt ? "not-allowed" : "pointer",
                   textTransform: "uppercase", letterSpacing: "0.1em",
                   opacity: loading || !sfxPrompt ? 0.5 : 1, transition: "all 0.2s",
@@ -527,34 +527,34 @@ export default function TTSPage() {
 
           {/* Error */}
           {error && (
-            <div style={{ padding: "12px", backgroundColor: "rgba(255, 68, 68, 0.08)", border: "1px solid #ff4444", color: "#ff4444", fontSize: "13px" }}>
+            <div style={{ padding: "12px", backgroundColor: "rgba(255, 68, 68, 0.08)", border: "1px solid var(--red)", color: "var(--red)", fontSize: "13px" }}>
               <span style={{ fontWeight: 700 }}>[ERROR]</span> {error}
             </div>
           )}
 
           {/* Run status */}
           {runId && (
-            <div style={{ fontSize: "12px", color: "#5a6a7a", display: "flex", alignItems: "center", gap: "10px", padding: "8px 0", borderTop: "1px solid #1e2a3a" }}>
-              <span><span style={{ color: "#ffcc00" }}>RUN:</span> <span style={{ color: "#e0e0e0" }}>{runId.slice(0, 8)}...</span></span>
+            <div style={{ fontSize: "12px", color: "var(--gray)", display: "flex", alignItems: "center", gap: "10px", padding: "8px 0", borderTop: "1px solid var(--border)" }}>
+              <span><span style={{ color: "var(--yellow)" }}>RUN:</span> <span style={{ color: "var(--white)" }}>{runId.slice(0, 8)}...</span></span>
               <StatusBadge status={status} />
             </div>
           )}
 
           {/* Stats */}
           {stats && (
-            <div style={{ display: "flex", gap: "20px", fontSize: "12px", padding: "8px 0", borderTop: "1px solid #1e2a3a" }}>
-              <span><span style={{ color: "#ffcc00" }}>CHARS:</span> <span style={{ color: "#00e5ff" }}>{stats.chars}</span></span>
-              <span><span style={{ color: "#ffcc00" }}>LATENCY:</span> <span style={{ color: "#00e5ff" }}>{(stats.latencyMs / 1000).toFixed(1)}s</span></span>
+            <div style={{ display: "flex", gap: "20px", fontSize: "12px", padding: "8px 0", borderTop: "1px solid var(--border)" }}>
+              <span><span style={{ color: "var(--yellow)" }}>CHARS:</span> <span style={{ color: "var(--cyan)" }}>{stats.chars}</span></span>
+              <span><span style={{ color: "var(--yellow)" }}>LATENCY:</span> <span style={{ color: "var(--cyan)" }}>{(stats.latencyMs / 1000).toFixed(1)}s</span></span>
             </div>
           )}
 
           {/* Audio output */}
           {audioUrl && (
-            <div style={{ border: `1px solid ${mode === "sfx" ? "#ff8800" : "#00ff88"}`, backgroundColor: "#0d1117" }}>
+            <div style={{ border: `1px solid ${mode === "sfx" ? "#ff8800" : "var(--green)"}`, backgroundColor: "var(--bg-panel)" }}>
               <div style={{
-                padding: "8px 12px", borderBottom: "1px solid #1e2a3a",
+                padding: "8px 12px", borderBottom: "1px solid var(--border)",
                 fontSize: "11px", fontWeight: 700,
-                color: mode === "sfx" ? "#ff8800" : "#00ff88",
+                color: mode === "sfx" ? "#ff8800" : "var(--green)",
                 textTransform: "uppercase", letterSpacing: "0.1em",
                 backgroundColor: mode === "sfx" ? "rgba(255, 136, 0, 0.05)" : "rgba(0, 255, 136, 0.05)",
               }}>
@@ -568,9 +568,9 @@ export default function TTSPage() {
                   <a
                     href={audioUrl}
                     download={mode === "sfx" ? "sound-effect.mp3" : "speech.mp3"}
-                    style={{ color: "#5a6a7a", fontSize: "10px", textDecoration: "none" }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = "#00ff88"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = "#5a6a7a"; }}
+                    style={{ color: "var(--gray)", fontSize: "10px", textDecoration: "none" }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = "var(--green)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = "var(--gray)"; }}
                   >
                     [DOWNLOAD]
                   </a>
@@ -603,10 +603,10 @@ function SliderControl({
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "4px" }}>
-        <label style={{ fontSize: "11px", fontWeight: 700, color: "#00ff88", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+        <label style={{ fontSize: "11px", fontWeight: 700, color: "var(--green)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
           {label}
         </label>
-        <span style={{ fontSize: "12px", color: "#00e5ff", fontFamily: "inherit" }}>
+        <span style={{ fontSize: "12px", color: "var(--cyan)", fontFamily: "inherit" }}>
           {value.toFixed(step < 1 ? 2 : 1)}{suffix || ""}
         </span>
       </div>
@@ -620,12 +620,12 @@ function SliderControl({
         style={{
           width: "100%", height: "4px",
           WebkitAppearance: "none", appearance: "none",
-          background: `linear-gradient(to right, #00ff88 0%, #00ff88 ${((value - min) / (max - min)) * 100}%, #1e2a3a ${((value - min) / (max - min)) * 100}%, #1e2a3a 100%)`,
+          background: `linear-gradient(to right, var(--green) 0%, var(--green) ${((value - min) / (max - min)) * 100}%, var(--border) ${((value - min) / (max - min)) * 100}%, var(--border) 100%)`,
           outline: "none", cursor: "pointer",
           borderRadius: "2px",
         }}
       />
-      <div style={{ fontSize: "9px", color: "#444", marginTop: "2px" }}>{description}</div>
+      <div style={{ fontSize: "9px", color: "var(--dim)", marginTop: "2px" }}>{description}</div>
     </div>
   );
 }

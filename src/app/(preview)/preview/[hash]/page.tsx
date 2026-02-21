@@ -111,12 +111,12 @@ export default async function PreviewPage({ params }: Props) {
     .article-body { font-size: 16px; line-height: 1.8; color: #d0d0d0; }
     .article-body h1 { font-size: 28px; font-weight: 700; color: #fff; margin: 32px 0 12px; line-height: 1.3; }
     .article-body h2 { font-size: 22px; font-weight: 700; color: #f0f0f0; margin: 28px 0 10px; line-height: 1.35; }
-    .article-body h3 { font-size: 18px; font-weight: 700; color: #e0e0e0; margin: 24px 0 8px; line-height: 1.4; }
+    .article-body h3 { font-size: 18px; font-weight: 700; color: var(--white); margin: 24px 0 8px; line-height: 1.4; }
     .article-body p { font-size: 16px; line-height: 1.8; margin: 0 0 16px; }
     .article-body ul { font-size: 16px; line-height: 1.8; margin: 0 0 16px; padding-left: 24px; }
     .article-body li { font-size: 16px; line-height: 1.7; margin-bottom: 6px; }
     .article-body strong { color: #fff; font-size: inherit; }
-    .article-body blockquote { font-size: 17px; line-height: 1.7; font-style: italic; color: #e0e0e0; margin: 20px 0; padding: 12px 20px; border-left: 3px solid #f97316; background: rgba(249, 115, 22, 0.05); }
+    .article-body blockquote { font-size: 17px; line-height: 1.7; font-style: italic; color: var(--white); margin: 20px 0; padding: 12px 20px; border-left: 3px solid #f97316; background: rgba(249, 115, 22, 0.05); }
   `;
 
   return (
@@ -185,7 +185,7 @@ export default async function PreviewPage({ params }: Props) {
             {/* Sources */}
             {sources.length > 0 && (
               <div style={{ marginTop: "32px", paddingTop: "16px", borderTop: "1px solid #333" }}>
-                <h3 style={{ fontSize: "14px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#666", fontFamily: "system-ui, sans-serif", marginBottom: "8px" }}>Viri</h3>
+                <h3 style={{ fontSize: "14px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--dim)", fontFamily: "system-ui, sans-serif", marginBottom: "8px" }}>Viri</h3>
                 <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
                   {sources.map((s, i) => (
                     <li key={i} style={{ marginBottom: "4px", fontSize: "14px", fontFamily: "system-ui, sans-serif" }}>
@@ -206,9 +206,9 @@ export default async function PreviewPage({ params }: Props) {
         )}
 
         {/* Footer */}
-        <div style={{ marginTop: "48px", paddingTop: "16px", borderTop: "1px solid #333", fontSize: "12px", color: "#666", fontFamily: "system-ui, sans-serif", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ marginTop: "48px", paddingTop: "16px", borderTop: "1px solid #333", fontSize: "12px", color: "var(--dim)", fontFamily: "system-ui, sans-serif", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span>Generirano z AI &middot; {new Date(generatedAt).toLocaleDateString("sl-SI")}</span>
-          <span style={{ fontSize: "10px", color: "#444" }}>MORANA</span>
+          <span style={{ fontSize: "10px", color: "var(--dim)" }}>MORANA</span>
         </div>
       </div>
     </>

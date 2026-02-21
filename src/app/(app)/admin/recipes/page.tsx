@@ -164,35 +164,35 @@ export default function AdminRecipesPage() {
     loadRecipes();
   }
 
-  if (!session) return <div style={{ color: "#5a6a7a" }}><span style={{ color: "#ff4444" }}>[ERROR]</span> Authentication required.</div>;
-  if (!isAdmin) return <div style={{ color: "#ff4444" }}>[ACCESS DENIED] Admin privileges required.</div>;
+  if (!session) return <div style={{ color: "var(--gray)" }}><span style={{ color: "var(--red)" }}>[ERROR]</span> Authentication required.</div>;
+  if (!isAdmin) return <div style={{ color: "var(--red)" }}>[ACCESS DENIED] Admin privileges required.</div>;
 
   const st = {
-    input: { width: "100%", padding: "6px 10px", backgroundColor: "#111820", border: "1px solid #1e2a3a", color: "#e0e0e0", fontFamily: "inherit", fontSize: "12px" } as const,
-    textarea: { width: "100%", padding: "6px 10px", backgroundColor: "#111820", border: "1px solid #1e2a3a", color: "#e0e0e0", fontFamily: "inherit", fontSize: "11px", resize: "vertical" as const, minHeight: "60px" } as const,
-    label: { fontSize: "10px", fontWeight: 700 as const, color: "#00ff88", textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: "3px", display: "block" } as const,
-    labelDim: { fontSize: "10px", fontWeight: 700 as const, color: "#5a6a7a", textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: "3px", display: "block" } as const,
+    input: { width: "100%", padding: "6px 10px", backgroundColor: "var(--bg-input)", border: "1px solid var(--border)", color: "var(--white)", fontFamily: "inherit", fontSize: "12px" } as const,
+    textarea: { width: "100%", padding: "6px 10px", backgroundColor: "var(--bg-input)", border: "1px solid var(--border)", color: "var(--white)", fontFamily: "inherit", fontSize: "11px", resize: "vertical" as const, minHeight: "60px" } as const,
+    label: { fontSize: "10px", fontWeight: 700 as const, color: "var(--green)", textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: "3px", display: "block" } as const,
+    labelDim: { fontSize: "10px", fontWeight: 700 as const, color: "var(--gray)", textTransform: "uppercase" as const, letterSpacing: "0.1em", marginBottom: "3px", display: "block" } as const,
   };
 
   return (
     <div>
       <div style={{ marginBottom: "24px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-          <Link href="/admin" className="no-underline" style={{ color: "#ff4444", fontSize: "18px", fontWeight: 700 }}>[ADMIN]</Link>
+          <Link href="/admin" className="no-underline" style={{ color: "var(--red)", fontSize: "18px", fontWeight: 700 }}>[ADMIN]</Link>
           <span style={{ color: "#333" }}>/</span>
           <span style={{ color: "#ff8800", fontSize: "18px", fontWeight: 700 }}>RECIPES</span>
         </div>
-        <div style={{ color: "#5a6a7a", fontSize: "13px" }}>$ admin --recipes --builder</div>
+        <div style={{ color: "var(--gray)", fontSize: "13px" }}>$ admin --recipes --builder</div>
       </div>
 
       <div style={{ marginBottom: "20px", display: "flex", gap: "12px", alignItems: "center" }}>
-        <button onClick={() => { if (showForm && !editingId) setShowForm(false); else { resetForm(); setShowForm(true); } }} style={{ padding: "8px 20px", background: "transparent", border: "1px solid #00ff88", color: "#00ff88", fontFamily: "inherit", fontSize: "12px", fontWeight: 700, cursor: "pointer", textTransform: "uppercase" }}>{showForm && !editingId ? "[  CANCEL  ]" : "[  + NEW RECIPE  ]"}</button>
-        <span style={{ color: "#5a6a7a", fontSize: "12px" }}>{recipes.length} recipes</span>
+        <button onClick={() => { if (showForm && !editingId) setShowForm(false); else { resetForm(); setShowForm(true); } }} style={{ padding: "8px 20px", background: "transparent", border: "1px solid var(--green)", color: "var(--green)", fontFamily: "inherit", fontSize: "12px", fontWeight: 700, cursor: "pointer", textTransform: "uppercase" }}>{showForm && !editingId ? "[  CANCEL  ]" : "[  + NEW RECIPE  ]"}</button>
+        <span style={{ color: "var(--gray)", fontSize: "12px" }}>{recipes.length} recipes</span>
       </div>
 
       {showForm && (
-        <div style={{ padding: "16px", border: `1px solid ${editingId ? "#00e5ff" : "#00ff88"}`, backgroundColor: `rgba(${editingId ? "0, 229, 255" : "0, 255, 136"}, 0.03)`, marginBottom: "20px" }}>
-          <div style={{ fontSize: "11px", fontWeight: 700, color: editingId ? "#00e5ff" : "#00ff88", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "12px" }}>{editingId ? "EDIT RECIPE" : "NEW RECIPE"}</div>
+        <div style={{ padding: "16px", border: `1px solid ${editingId ? "var(--cyan)" : "var(--green)"}`, backgroundColor: `rgba(${editingId ? "0, 229, 255" : "0, 255, 136"}, 0.03)`, marginBottom: "20px" }}>
+          <div style={{ fontSize: "11px", fontWeight: 700, color: editingId ? "var(--cyan)" : "var(--green)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "12px" }}>{editingId ? "EDIT RECIPE" : "NEW RECIPE"}</div>
 
           {/* Basic info */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr 100px", gap: "12px", marginBottom: "12px" }}>
@@ -203,7 +203,7 @@ export default function AdminRecipesPage() {
 
           {/* Input configuration */}
           <div style={{ padding: "10px 12px", border: "1px dashed rgba(0, 229, 255, 0.3)", backgroundColor: "rgba(0, 229, 255, 0.02)", marginBottom: "12px" }}>
-            <div style={{ fontSize: "10px", fontWeight: 700, color: "#00e5ff", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "8px" }}>INPUT CONFIG</div>
+            <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--cyan)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "8px" }}>INPUT CONFIG</div>
             <div style={{ display: "flex", gap: "16px", alignItems: "flex-start", flexWrap: "wrap" }}>
               <div>
                 <label style={st.labelDim}>Input Kind</label>
@@ -228,8 +228,8 @@ export default function AdminRecipesPage() {
                       onClick={() => toggleInputMode(m)}
                       style={{
                         padding: "3px 10px", background: formInputModes.includes(m) ? "rgba(0, 229, 255, 0.1)" : "transparent",
-                        border: `1px solid ${formInputModes.includes(m) ? "#00e5ff" : "#1e2a3a"}`,
-                        color: formInputModes.includes(m) ? "#00e5ff" : "#5a6a7a",
+                        border: `1px solid ${formInputModes.includes(m) ? "var(--cyan)" : "var(--border)"}`,
+                        color: formInputModes.includes(m) ? "var(--cyan)" : "var(--gray)",
                         fontFamily: "inherit", fontSize: "10px", fontWeight: 700, cursor: "pointer",
                       }}
                     >
@@ -245,23 +245,23 @@ export default function AdminRecipesPage() {
           <div style={{ marginBottom: "12px" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
               <label style={st.label}>PIPELINE STEPS</label>
-              <button onClick={addStep} style={{ padding: "4px 12px", background: "transparent", border: "1px solid #ffcc00", color: "#ffcc00", fontFamily: "inherit", fontSize: "10px", cursor: "pointer", fontWeight: 700 }}>+ ADD STEP</button>
+              <button onClick={addStep} style={{ padding: "4px 12px", background: "transparent", border: "1px solid var(--yellow)", color: "var(--yellow)", fontFamily: "inherit", fontSize: "10px", cursor: "pointer", fontWeight: 700 }}>+ ADD STEP</button>
             </div>
             {formSteps.map((step, i) => {
               const isStepExpanded = expandedStepIdx === i;
               return (
-                <div key={i} style={{ marginBottom: "4px", border: `1px solid ${isStepExpanded ? "rgba(255, 136, 0, 0.4)" : "#1e2a3a"}`, backgroundColor: "rgba(13, 17, 23, 0.5)" }}>
+                <div key={i} style={{ marginBottom: "4px", border: `1px solid ${isStepExpanded ? "rgba(255, 136, 0, 0.4)" : "var(--border)"}`, backgroundColor: "rgba(13, 17, 23, 0.5)" }}>
                   {/* Step header row */}
                   <div style={{ display: "flex", gap: "8px", padding: "6px 8px", alignItems: "center" }}>
-                    <span style={{ color: "#ffcc00", fontWeight: 700, fontSize: "11px", minWidth: "24px" }}>#{i + 1}</span>
+                    <span style={{ color: "var(--yellow)", fontWeight: 700, fontSize: "11px", minWidth: "24px" }}>#{i + 1}</span>
                     <select value={step.type} onChange={(e) => updateStep(i, "type", e.target.value)} style={{ ...st.input, width: "110px", padding: "4px 6px" }}>
                       {STEP_TYPES.map((t) => <option key={t} value={t}>{t.toUpperCase()}</option>)}
                     </select>
                     <input value={step.name} onChange={(e) => updateStep(i, "name", e.target.value)} placeholder="Step name" style={{ ...st.input, flex: 1, padding: "4px 6px" }} />
-                    <button onClick={() => moveStep(i, "up")} disabled={i === 0} style={{ background: "transparent", border: "none", color: i === 0 ? "#333" : "#5a6a7a", cursor: i === 0 ? "default" : "pointer", fontFamily: "inherit", fontSize: "12px", padding: "2px 4px" }}>&uarr;</button>
-                    <button onClick={() => moveStep(i, "down")} disabled={i === formSteps.length - 1} style={{ background: "transparent", border: "none", color: i === formSteps.length - 1 ? "#333" : "#5a6a7a", cursor: i === formSteps.length - 1 ? "default" : "pointer", fontFamily: "inherit", fontSize: "12px", padding: "2px 4px" }}>&darr;</button>
-                    <button onClick={() => setExpandedStepIdx(isStepExpanded ? null : i)} style={{ background: "transparent", border: "none", color: isStepExpanded ? "#ff8800" : "#5a6a7a", cursor: "pointer", fontFamily: "inherit", fontSize: "10px", padding: "2px 6px" }}>{isStepExpanded ? "CLOSE" : "CONFIG"}</button>
-                    <button onClick={() => removeStep(i)} style={{ background: "transparent", border: "none", color: "#ff4444", cursor: "pointer", fontFamily: "inherit", fontSize: "14px", padding: "2px 4px" }}>x</button>
+                    <button onClick={() => moveStep(i, "up")} disabled={i === 0} style={{ background: "transparent", border: "none", color: i === 0 ? "#333" : "var(--gray)", cursor: i === 0 ? "default" : "pointer", fontFamily: "inherit", fontSize: "12px", padding: "2px 4px" }}>&uarr;</button>
+                    <button onClick={() => moveStep(i, "down")} disabled={i === formSteps.length - 1} style={{ background: "transparent", border: "none", color: i === formSteps.length - 1 ? "#333" : "var(--gray)", cursor: i === formSteps.length - 1 ? "default" : "pointer", fontFamily: "inherit", fontSize: "12px", padding: "2px 4px" }}>&darr;</button>
+                    <button onClick={() => setExpandedStepIdx(isStepExpanded ? null : i)} style={{ background: "transparent", border: "none", color: isStepExpanded ? "#ff8800" : "var(--gray)", cursor: "pointer", fontFamily: "inherit", fontSize: "10px", padding: "2px 6px" }}>{isStepExpanded ? "CLOSE" : "CONFIG"}</button>
+                    <button onClick={() => removeStep(i)} style={{ background: "transparent", border: "none", color: "var(--red)", cursor: "pointer", fontFamily: "inherit", fontSize: "14px", padding: "2px 4px" }}>x</button>
                   </div>
 
                   {/* Step config panel (expanded) */}
@@ -336,56 +336,56 @@ export default function AdminRecipesPage() {
             {formSteps.length === 0 && <div style={{ color: "#333", fontSize: "11px", padding: "8px" }}>No steps. Add steps to build the pipeline.</div>}
           </div>
 
-          {formError && <div style={{ color: "#ff4444", fontSize: "12px", marginBottom: "8px" }}>[ERROR] {formError}</div>}
+          {formError && <div style={{ color: "var(--red)", fontSize: "12px", marginBottom: "8px" }}>[ERROR] {formError}</div>}
           <div style={{ display: "flex", gap: "8px" }}>
-            <button onClick={handleSubmit} style={{ padding: "6px 16px", background: "transparent", border: `1px solid ${editingId ? "#00e5ff" : "#00ff88"}`, color: editingId ? "#00e5ff" : "#00ff88", fontFamily: "inherit", fontSize: "12px", fontWeight: 700, cursor: "pointer", textTransform: "uppercase" }}>{editingId ? "[  SAVE  ]" : "[  CREATE  ]"}</button>
-            {editingId && <button onClick={() => { resetForm(); setShowForm(false); }} style={{ padding: "6px 16px", background: "transparent", border: "1px solid #5a6a7a", color: "#5a6a7a", fontFamily: "inherit", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>[  CANCEL  ]</button>}
+            <button onClick={handleSubmit} style={{ padding: "6px 16px", background: "transparent", border: `1px solid ${editingId ? "var(--cyan)" : "var(--green)"}`, color: editingId ? "var(--cyan)" : "var(--green)", fontFamily: "inherit", fontSize: "12px", fontWeight: 700, cursor: "pointer", textTransform: "uppercase" }}>{editingId ? "[  SAVE  ]" : "[  CREATE  ]"}</button>
+            {editingId && <button onClick={() => { resetForm(); setShowForm(false); }} style={{ padding: "6px 16px", background: "transparent", border: "1px solid var(--gray)", color: "var(--gray)", fontFamily: "inherit", fontSize: "12px", fontWeight: 700, cursor: "pointer" }}>[  CANCEL  ]</button>}
           </div>
         </div>
       )}
 
-      {error && <div style={{ padding: "12px", backgroundColor: "rgba(255, 68, 68, 0.08)", border: "1px solid #ff4444", color: "#ff4444", fontSize: "13px", marginBottom: "16px" }}>[ERROR] {error}</div>}
+      {error && <div style={{ padding: "12px", backgroundColor: "rgba(255, 68, 68, 0.08)", border: "1px solid var(--red)", color: "var(--red)", fontSize: "13px", marginBottom: "16px" }}>[ERROR] {error}</div>}
 
-      {loading ? <div style={{ color: "#00ff88" }}>Loading...</div> : (
+      {loading ? <div style={{ color: "var(--green)" }}>Loading...</div> : (
         <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
           {recipes.map((r) => {
             const isExpanded = expandedId === r.id;
-            const statusColor = r.status === "active" ? "#00ff88" : r.status === "draft" ? "#ffcc00" : "#5a6a7a";
+            const statusColor = r.status === "active" ? "var(--green)" : r.status === "draft" ? "var(--yellow)" : "var(--gray)";
             return (
-              <div key={r.id} style={{ border: `1px solid ${isExpanded ? "rgba(255, 136, 0, 0.3)" : "#1e2a3a"}` }}>
+              <div key={r.id} style={{ border: `1px solid ${isExpanded ? "rgba(255, 136, 0, 0.3)" : "var(--border)"}` }}>
                 <div onClick={() => setExpandedId(isExpanded ? null : r.id)} style={{ padding: "10px 16px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                     <span style={{ color: isExpanded ? "#ff8800" : "#444", fontSize: "10px" }}>{isExpanded ? "\u25BC" : "\u25B6"}</span>
-                    <span style={{ color: "#e0e0e0", fontWeight: 600 }}>{r.name}</span>
+                    <span style={{ color: "var(--white)", fontWeight: 600 }}>{r.name}</span>
                     {r.isPreset && <span style={{ padding: "1px 6px", backgroundColor: "rgba(255, 136, 0, 0.1)", border: "1px solid rgba(255, 136, 0, 0.3)", color: "#ff8800", fontSize: "8px", fontWeight: 700 }}>PRESET</span>}
-                    {r.inputKind === "audio" && <span style={{ padding: "1px 6px", backgroundColor: "rgba(0, 229, 255, 0.1)", border: "1px solid rgba(0, 229, 255, 0.3)", color: "#00e5ff", fontSize: "8px", fontWeight: 700 }}>AUDIO</span>}
-                    {r.description && <span style={{ color: "#5a6a7a", fontSize: "11px" }}>&mdash; {r.description}</span>}
+                    {r.inputKind === "audio" && <span style={{ padding: "1px 6px", backgroundColor: "rgba(0, 229, 255, 0.1)", border: "1px solid rgba(0, 229, 255, 0.3)", color: "var(--cyan)", fontSize: "8px", fontWeight: 700 }}>AUDIO</span>}
+                    {r.description && <span style={{ color: "var(--gray)", fontSize: "11px" }}>&mdash; {r.description}</span>}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                     <span style={{ color: statusColor, fontSize: "10px", fontWeight: 700, textTransform: "uppercase" }}>{r.status}</span>
-                    <span style={{ color: "#5a6a7a", fontSize: "10px" }}>{r.steps.length} steps | {r._count.executions} runs</span>
+                    <span style={{ color: "var(--gray)", fontSize: "10px" }}>{r.steps.length} steps | {r._count.executions} runs</span>
                   </div>
                 </div>
                 {isExpanded && (
                   <div style={{ padding: "0 16px 12px", borderTop: "1px solid rgba(30, 42, 58, 0.5)" }}>
                     {/* Recipe details */}
-                    <div style={{ display: "flex", gap: "12px", padding: "6px 0", fontSize: "10px", color: "#5a6a7a" }}>
-                      <span>inputKind: <span style={{ color: "#00e5ff" }}>{r.inputKind}</span></span>
-                      {r.inputModes && <span>modes: <span style={{ color: "#00e5ff" }}>{r.inputModes.join(", ")}</span></span>}
-                      {r.defaultLang && <span>lang: <span style={{ color: "#ffcc00" }}>{r.defaultLang}</span></span>}
+                    <div style={{ display: "flex", gap: "12px", padding: "6px 0", fontSize: "10px", color: "var(--gray)" }}>
+                      <span>inputKind: <span style={{ color: "var(--cyan)" }}>{r.inputKind}</span></span>
+                      {r.inputModes && <span>modes: <span style={{ color: "var(--cyan)" }}>{r.inputModes.join(", ")}</span></span>}
+                      {r.defaultLang && <span>lang: <span style={{ color: "var(--yellow)" }}>{r.defaultLang}</span></span>}
                     </div>
                     <div style={{ margin: "4px 0 8px" }}>
                       {r.steps.map((s) => (
                         <div key={s.id} style={{ display: "flex", gap: "8px", padding: "4px 8px", fontSize: "11px", borderLeft: "2px solid #ff8800", marginBottom: "2px", backgroundColor: "rgba(13, 17, 23, 0.5)" }}>
-                          <span style={{ color: "#ffcc00", fontWeight: 700, width: "24px" }}>#{s.stepIndex + 1}</span>
+                          <span style={{ color: "var(--yellow)", fontWeight: 700, width: "24px" }}>#{s.stepIndex + 1}</span>
                           <span style={{ color: "#ff8800", fontWeight: 700, textTransform: "uppercase", width: "80px" }}>{s.type}</span>
-                          <span style={{ color: "#e0e0e0" }}>{s.name}</span>
+                          <span style={{ color: "var(--white)" }}>{s.name}</span>
                         </div>
                       ))}
                     </div>
                     <div style={{ display: "flex", gap: "8px" }}>
-                      <button onClick={() => startEdit(r)} style={{ padding: "4px 12px", background: "transparent", border: "1px solid #00e5ff", color: "#00e5ff", fontFamily: "inherit", fontSize: "10px", cursor: "pointer", fontWeight: 700 }}>EDIT</button>
-                      <button onClick={() => handleDelete(r.id)} style={{ padding: "4px 12px", background: "transparent", border: "1px solid #ff4444", color: "#ff4444", fontFamily: "inherit", fontSize: "10px", cursor: "pointer", fontWeight: 700 }}>DELETE</button>
+                      <button onClick={() => startEdit(r)} style={{ padding: "4px 12px", background: "transparent", border: "1px solid var(--cyan)", color: "var(--cyan)", fontFamily: "inherit", fontSize: "10px", cursor: "pointer", fontWeight: 700 }}>EDIT</button>
+                      <button onClick={() => handleDelete(r.id)} style={{ padding: "4px 12px", background: "transparent", border: "1px solid var(--red)", color: "var(--red)", fontFamily: "inherit", fontSize: "10px", cursor: "pointer", fontWeight: 700 }}>DELETE</button>
                     </div>
                   </div>
                 )}

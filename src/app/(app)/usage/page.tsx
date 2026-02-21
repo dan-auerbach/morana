@@ -84,8 +84,8 @@ export default function UsagePage() {
 
   if (!session) {
     return (
-      <div style={{ color: "#5a6a7a" }}>
-        <span style={{ color: "#ff4444" }}>[ERROR]</span> Authentication required. Please sign in.
+      <div style={{ color: "var(--gray)" }}>
+        <span style={{ color: "var(--red)" }}>[ERROR]</span> Authentication required. Please sign in.
       </div>
     );
   }
@@ -96,7 +96,7 @@ export default function UsagePage() {
       <div style={{ marginBottom: "24px" }}>
         <div
           style={{
-            color: "#00ff88",
+            color: "var(--green)",
             fontSize: "18px",
             fontWeight: 700,
             marginBottom: "4px",
@@ -104,7 +104,7 @@ export default function UsagePage() {
         >
           [USAGE]
         </div>
-        <div style={{ color: "#5a6a7a", fontSize: "13px" }}>
+        <div style={{ color: "var(--gray)", fontSize: "13px" }}>
           $ stats --costs --usage {provider ? `--provider ${provider}` : "--all"}
         </div>
       </div>
@@ -118,7 +118,7 @@ export default function UsagePage() {
           gap: "12px",
           marginBottom: "24px",
           paddingBottom: "12px",
-          borderBottom: "1px solid #1e2a3a",
+          borderBottom: "1px solid var(--border)",
         }}
       >
         <div>
@@ -128,7 +128,7 @@ export default function UsagePage() {
               marginBottom: "4px",
               fontSize: "11px",
               fontWeight: 700,
-              color: "#00ff88",
+              color: "var(--green)",
               textTransform: "uppercase",
               letterSpacing: "0.1em",
             }}
@@ -141,9 +141,9 @@ export default function UsagePage() {
             onChange={(e) => setFrom(e.target.value)}
             style={{
               padding: "6px 12px",
-              backgroundColor: "#111820",
-              border: "1px solid #1e2a3a",
-              color: "#e0e0e0",
+              backgroundColor: "var(--bg-input)",
+              border: "1px solid var(--border)",
+              color: "var(--white)",
               fontFamily: "inherit",
               fontSize: "12px",
             }}
@@ -156,7 +156,7 @@ export default function UsagePage() {
               marginBottom: "4px",
               fontSize: "11px",
               fontWeight: 700,
-              color: "#00ff88",
+              color: "var(--green)",
               textTransform: "uppercase",
               letterSpacing: "0.1em",
             }}
@@ -169,9 +169,9 @@ export default function UsagePage() {
             onChange={(e) => setTo(e.target.value)}
             style={{
               padding: "6px 12px",
-              backgroundColor: "#111820",
-              border: "1px solid #1e2a3a",
-              color: "#e0e0e0",
+              backgroundColor: "var(--bg-input)",
+              border: "1px solid var(--border)",
+              color: "var(--white)",
               fontFamily: "inherit",
               fontSize: "12px",
             }}
@@ -184,7 +184,7 @@ export default function UsagePage() {
               marginBottom: "4px",
               fontSize: "11px",
               fontWeight: 700,
-              color: "#00ff88",
+              color: "var(--green)",
               textTransform: "uppercase",
               letterSpacing: "0.1em",
             }}
@@ -196,9 +196,9 @@ export default function UsagePage() {
             onChange={(e) => setProvider(e.target.value)}
             style={{
               padding: "6px 12px",
-              backgroundColor: "#111820",
-              border: "1px solid #1e2a3a",
-              color: "#e0e0e0",
+              backgroundColor: "var(--bg-input)",
+              border: "1px solid var(--border)",
+              color: "var(--white)",
               fontFamily: "inherit",
               fontSize: "12px",
             }}
@@ -217,8 +217,8 @@ export default function UsagePage() {
           style={{
             padding: "6px 16px",
             background: "transparent",
-            border: "1px solid #00ff88",
-            color: "#00ff88",
+            border: "1px solid var(--green)",
+            color: "var(--green)",
             fontFamily: "inherit",
             fontSize: "12px",
             fontWeight: 700,
@@ -242,7 +242,7 @@ export default function UsagePage() {
 
       {/* Error */}
       {error && (
-        <div style={{ padding: "12px", marginBottom: "16px", backgroundColor: "rgba(255, 68, 68, 0.08)", border: "1px solid #ff4444", color: "#ff4444", fontSize: "13px" }}>
+        <div style={{ padding: "12px", marginBottom: "16px", backgroundColor: "rgba(255, 68, 68, 0.08)", border: "1px solid var(--red)", color: "var(--red)", fontSize: "13px" }}>
           <span style={{ fontWeight: 700 }}>[ERROR]</span> {error}
         </div>
       )}
@@ -256,8 +256,8 @@ export default function UsagePage() {
           {/* Total runs */}
           <div
             style={{
-              border: "1px solid #00ff88",
-              backgroundColor: "#0d1117",
+              border: "1px solid var(--green)",
+              backgroundColor: "var(--bg-panel)",
               padding: "16px",
             }}
           >
@@ -265,7 +265,7 @@ export default function UsagePage() {
               style={{
                 fontSize: "11px",
                 fontWeight: 700,
-                color: "#00ff88",
+                color: "var(--green)",
                 textTransform: "uppercase",
                 letterSpacing: "0.1em",
                 marginBottom: "8px",
@@ -277,7 +277,7 @@ export default function UsagePage() {
               style={{
                 fontSize: "28px",
                 fontWeight: 700,
-                color: "#00ff88",
+                color: "var(--green)",
                 textShadow: "0 0 15px rgba(0, 255, 136, 0.4)",
               }}
             >
@@ -288,8 +288,8 @@ export default function UsagePage() {
           {/* Estimated cost */}
           <div
             style={{
-              border: "1px solid #ffcc00",
-              backgroundColor: "#0d1117",
+              border: "1px solid var(--yellow)",
+              backgroundColor: "var(--bg-panel)",
               padding: "16px",
             }}
           >
@@ -297,7 +297,7 @@ export default function UsagePage() {
               style={{
                 fontSize: "11px",
                 fontWeight: 700,
-                color: "#ffcc00",
+                color: "var(--yellow)",
                 textTransform: "uppercase",
                 letterSpacing: "0.1em",
                 marginBottom: "8px",
@@ -309,7 +309,7 @@ export default function UsagePage() {
               style={{
                 fontSize: "28px",
                 fontWeight: 700,
-                color: "#ffcc00",
+                color: "var(--yellow)",
                 textShadow: "0 0 15px rgba(255, 204, 0, 0.4)",
               }}
             >
@@ -320,8 +320,8 @@ export default function UsagePage() {
           {/* Total latency */}
           <div
             style={{
-              border: "1px solid #00e5ff",
-              backgroundColor: "#0d1117",
+              border: "1px solid var(--cyan)",
+              backgroundColor: "var(--bg-panel)",
               padding: "16px",
             }}
           >
@@ -329,7 +329,7 @@ export default function UsagePage() {
               style={{
                 fontSize: "11px",
                 fontWeight: 700,
-                color: "#00e5ff",
+                color: "var(--cyan)",
                 textTransform: "uppercase",
                 letterSpacing: "0.1em",
                 marginBottom: "8px",
@@ -341,7 +341,7 @@ export default function UsagePage() {
               style={{
                 fontSize: "28px",
                 fontWeight: 700,
-                color: "#00e5ff",
+                color: "var(--cyan)",
                 textShadow: "0 0 15px rgba(0, 229, 255, 0.4)",
               }}
             >
@@ -358,12 +358,12 @@ export default function UsagePage() {
             style={{
               fontSize: "11px",
               fontWeight: 700,
-              color: "#ffcc00",
+              color: "var(--yellow)",
               textTransform: "uppercase",
               letterSpacing: "0.15em",
               marginBottom: "12px",
               paddingBottom: "8px",
-              borderBottom: "1px solid #1e2a3a",
+              borderBottom: "1px solid var(--border)",
             }}
           >
             Breakdown by Model
@@ -373,26 +373,26 @@ export default function UsagePage() {
               <div
                 key={key}
                 style={{
-                  border: "1px solid #1e2a3a",
-                  backgroundColor: "#0d1117",
+                  border: "1px solid var(--border)",
+                  backgroundColor: "var(--bg-panel)",
                   padding: "12px",
                   transition: "border-color 0.2s",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = "#00ff88";
+                  e.currentTarget.style.borderColor = "var(--green)";
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = "#1e2a3a";
+                  e.currentTarget.style.borderColor = "var(--border)";
                 }}
               >
-                <div style={{ color: "#e0e0e0", fontWeight: 700, fontSize: "13px" }}>
+                <div style={{ color: "var(--white)", fontWeight: 700, fontSize: "13px" }}>
                   {key}
                 </div>
                 <div style={{ fontSize: "12px", marginTop: "4px" }}>
-                  <span style={{ color: "#00e5ff" }}>{val.count}</span>{" "}
-                  <span style={{ color: "#5a6a7a" }}>runs</span>
-                  <span style={{ color: "#5a6a7a" }}> | </span>
-                  <span style={{ color: "#ffcc00" }}>${val.cost.toFixed(4)}</span>
+                  <span style={{ color: "var(--cyan)" }}>{val.count}</span>{" "}
+                  <span style={{ color: "var(--gray)" }}>runs</span>
+                  <span style={{ color: "var(--gray)" }}> | </span>
+                  <span style={{ color: "var(--yellow)" }}>${val.cost.toFixed(4)}</span>
                 </div>
               </div>
             ))}
@@ -412,7 +412,7 @@ export default function UsagePage() {
               letterSpacing: "0.15em",
               marginBottom: "12px",
               paddingBottom: "8px",
-              borderBottom: "1px solid #1e2a3a",
+              borderBottom: "1px solid var(--border)",
             }}
           >
             Recipe Executions ({recipeSummary.totalExecutions} total &mdash; ${recipeSummary.totalCost.toFixed(4)})
@@ -428,17 +428,17 @@ export default function UsagePage() {
                   gap: "12px",
                   padding: "8px 12px",
                   backgroundColor: "rgba(13, 17, 23, 0.5)",
-                  border: "1px solid #1e2a3a",
+                  border: "1px solid var(--border)",
                   borderLeft: "3px solid #ff8800",
                   textDecoration: "none",
                   transition: "border-color 0.2s",
                 }}
                 onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#ff8800"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#1e2a3a"; e.currentTarget.style.borderLeftColor = "#ff8800"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.borderLeftColor = "#ff8800"; }}
               >
-                <span style={{ color: "#e0e0e0", fontSize: "12px", flex: 1 }}>{re.recipeName}</span>
-                <span style={{ color: "#ffcc00", fontSize: "11px", fontWeight: 700 }}>${re.totalCost.toFixed(4)}</span>
-                <span style={{ color: "#5a6a7a", fontSize: "10px" }}>
+                <span style={{ color: "var(--white)", fontSize: "12px", flex: 1 }}>{re.recipeName}</span>
+                <span style={{ color: "var(--yellow)", fontSize: "11px", fontWeight: 700 }}>${re.totalCost.toFixed(4)}</span>
+                <span style={{ color: "var(--gray)", fontSize: "10px" }}>
                   {new Date(re.startedAt).toLocaleString("sl-SI", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
                 </span>
               </a>
@@ -449,7 +449,7 @@ export default function UsagePage() {
 
       {/* Events table */}
       {loading ? (
-        <div style={{ color: "#00ff88", fontSize: "13px" }}>
+        <div style={{ color: "var(--green)", fontSize: "13px" }}>
           <span style={{ animation: "blink 1s step-end infinite" }}>_</span> Querying usage data...
         </div>
       ) : (
@@ -465,14 +465,14 @@ export default function UsagePage() {
             <thead>
               <tr
                 style={{
-                  borderBottom: "1px solid #00ff88",
+                  borderBottom: "1px solid var(--green)",
                   textAlign: "left",
                 }}
               >
                 <th
                   style={{
                     padding: "8px 16px 8px 0",
-                    color: "#00ff88",
+                    color: "var(--green)",
                     fontWeight: 700,
                     fontSize: "11px",
                     textTransform: "uppercase",
@@ -484,7 +484,7 @@ export default function UsagePage() {
                 <th
                   style={{
                     padding: "8px 16px 8px 0",
-                    color: "#00ff88",
+                    color: "var(--green)",
                     fontWeight: 700,
                     fontSize: "11px",
                     textTransform: "uppercase",
@@ -496,7 +496,7 @@ export default function UsagePage() {
                 <th
                   style={{
                     padding: "8px 16px 8px 0",
-                    color: "#00ff88",
+                    color: "var(--green)",
                     fontWeight: 700,
                     fontSize: "11px",
                     textTransform: "uppercase",
@@ -508,7 +508,7 @@ export default function UsagePage() {
                 <th
                   style={{
                     padding: "8px 16px 8px 0",
-                    color: "#00ff88",
+                    color: "var(--green)",
                     fontWeight: 700,
                     fontSize: "11px",
                     textTransform: "uppercase",
@@ -521,7 +521,7 @@ export default function UsagePage() {
                   <th
                     style={{
                       padding: "8px 16px 8px 0",
-                      color: "#00ff88",
+                      color: "var(--green)",
                       fontWeight: 700,
                       fontSize: "11px",
                       textTransform: "uppercase",
@@ -534,7 +534,7 @@ export default function UsagePage() {
                 <th
                   style={{
                     padding: "8px 0",
-                    color: "#00ff88",
+                    color: "var(--green)",
                     fontWeight: 700,
                     fontSize: "11px",
                     textTransform: "uppercase",
@@ -560,24 +560,24 @@ export default function UsagePage() {
                     ev.currentTarget.style.backgroundColor = "transparent";
                   }}
                 >
-                  <td style={{ padding: "8px 16px 8px 0", color: "#e0e0e0" }}>
+                  <td style={{ padding: "8px 16px 8px 0", color: "var(--white)" }}>
                     {e.provider}
                   </td>
-                  <td style={{ padding: "8px 16px 8px 0", color: "#5a6a7a" }}>
+                  <td style={{ padding: "8px 16px 8px 0", color: "var(--gray)" }}>
                     {e.model}
                   </td>
-                  <td style={{ padding: "8px 16px 8px 0", color: "#ffcc00" }}>
+                  <td style={{ padding: "8px 16px 8px 0", color: "var(--yellow)" }}>
                     ${e.costEstimate.toFixed(4)}
                   </td>
-                  <td style={{ padding: "8px 16px 8px 0", color: "#00e5ff" }}>
+                  <td style={{ padding: "8px 16px 8px 0", color: "var(--cyan)" }}>
                     {(e.latencyMs / 1000).toFixed(1)}s
                   </td>
                   {isAdmin && (
-                    <td style={{ padding: "8px 16px 8px 0", color: "#5a6a7a" }}>
+                    <td style={{ padding: "8px 16px 8px 0", color: "var(--gray)" }}>
                       {e.user?.email}
                     </td>
                   )}
-                  <td style={{ padding: "8px 0", color: "#5a6a7a" }}>
+                  <td style={{ padding: "8px 0", color: "var(--gray)" }}>
                     {new Date(e.createdAt).toLocaleString()}
                   </td>
                 </tr>

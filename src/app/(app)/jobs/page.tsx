@@ -84,15 +84,15 @@ export default function JobsPage() {
 
   if (!session)
     return (
-      <div style={{ color: "#ff4444" }}>[ERROR] Authentication required.</div>
+      <div style={{ color: "var(--red)" }}>[ERROR] Authentication required.</div>
     );
 
   const statusColor = (s: string) => {
-    if (s === "done") return "#00ff88";
-    if (s === "running" || s === "pending") return "#ffcc00";
-    if (s === "error") return "#ff4444";
-    if (s === "cancelled") return "#5a6a7a";
-    return "#5a6a7a";
+    if (s === "done") return "var(--green)";
+    if (s === "running" || s === "pending") return "var(--yellow)";
+    if (s === "error") return "var(--red)";
+    if (s === "cancelled") return "var(--gray)";
+    return "var(--gray)";
   };
 
   const statusIcon = (s: string) => {
@@ -129,7 +129,7 @@ export default function JobsPage() {
         >
           [JOBS]
         </div>
-        <div style={{ color: "#5a6a7a", fontSize: "13px" }}>
+        <div style={{ color: "var(--gray)", fontSize: "13px" }}>
           $ jobs --monitor --status
         </div>
       </div>
@@ -141,17 +141,17 @@ export default function JobsPage() {
           gap: "16px",
           marginBottom: "20px",
           padding: "12px 16px",
-          border: "1px solid #1e2a3a",
+          border: "1px solid var(--border)",
           flexWrap: "wrap",
         }}
       >
         {(
           [
-            ["all", "#e0e0e0", "Total"],
-            ["running", "#ffcc00", "Running"],
-            ["done", "#00ff88", "Done"],
-            ["error", "#ff4444", "Error"],
-            ["cancelled", "#5a6a7a", "Cancelled"],
+            ["all", "var(--white)", "Total"],
+            ["running", "var(--yellow)", "Running"],
+            ["done", "var(--green)", "Done"],
+            ["error", "var(--red)", "Error"],
+            ["cancelled", "var(--gray)", "Cancelled"],
           ] as [string, string, string][]
         ).map(([key, color, label]) => (
           <button
@@ -159,7 +159,7 @@ export default function JobsPage() {
             onClick={() => setFilter(key)}
             style={{
               background:
-                filter === key ? `rgba(${color === "#e0e0e0" ? "224,224,224" : color === "#ffcc00" ? "255,204,0" : color === "#00ff88" ? "0,255,136" : color === "#ff4444" ? "255,68,68" : "90,106,122"}, 0.1)` : "transparent",
+                filter === key ? `rgba(${color === "var(--white)" ? "224,224,224" : color === "var(--yellow)" ? "255,204,0" : color === "var(--green)" ? "0,255,136" : color === "var(--red)" ? "255,68,68" : "90,106,122"}, 0.1)` : "transparent",
               border:
                 filter === key
                   ? `1px solid ${color}`
@@ -187,7 +187,7 @@ export default function JobsPage() {
 
       {loading && (
         <div
-          style={{ color: "#00ff88", fontSize: "13px", marginBottom: "12px" }}
+          style={{ color: "var(--green)", fontSize: "13px", marginBottom: "12px" }}
         >
           Loading...
         </div>
@@ -210,7 +210,7 @@ export default function JobsPage() {
             <div
               key={job.id}
               style={{
-                border: `1px solid ${isExpanded ? statusColor(job.status) : "#1e2a3a"}`,
+                border: `1px solid ${isExpanded ? statusColor(job.status) : "var(--border)"}`,
               }}
             >
               {/* Job row */}
@@ -252,14 +252,14 @@ export default function JobsPage() {
 
                 {/* Recipe name */}
                 <span
-                  style={{ color: "#e0e0e0", fontSize: "12px", flex: 1 }}
+                  style={{ color: "var(--white)", fontSize: "12px", flex: 1 }}
                 >
                   {job.recipe.name}
                 </span>
 
                 {/* Progress for running */}
                 {(job.status === "running" || job.status === "pending") && (
-                  <span style={{ color: "#ffcc00", fontSize: "10px" }}>
+                  <span style={{ color: "var(--yellow)", fontSize: "10px" }}>
                     {job.progress}% — step {job.currentStep + 1}/
                     {job.totalSteps}
                   </span>
@@ -267,20 +267,20 @@ export default function JobsPage() {
 
                 {/* Cost */}
                 {job.totalCostCents > 0 && (
-                  <span style={{ color: "#ffcc00", fontSize: "10px", fontWeight: 700 }}>
+                  <span style={{ color: "var(--yellow)", fontSize: "10px", fontWeight: 700 }}>
                     ${(job.totalCostCents / 100).toFixed(2)}
                   </span>
                 )}
 
                 {/* Duration */}
                 {duration !== null && (
-                  <span style={{ color: "#5a6a7a", fontSize: "10px" }}>
+                  <span style={{ color: "var(--gray)", fontSize: "10px" }}>
                     {duration}s
                   </span>
                 )}
 
                 {/* Timestamp */}
-                <span style={{ color: "#5a6a7a", fontSize: "10px" }}>
+                <span style={{ color: "var(--gray)", fontSize: "10px" }}>
                   {new Date(job.startedAt).toLocaleString("sl-SI", {
                     day: "2-digit",
                     month: "2-digit",
@@ -322,14 +322,14 @@ export default function JobsPage() {
                       <div
                         style={{
                           fontSize: "9px",
-                          color: "#5a6a7a",
+                          color: "var(--gray)",
                           textTransform: "uppercase",
                           letterSpacing: "0.05em",
                         }}
                       >
                         Job ID
                       </div>
-                      <div style={{ fontSize: "11px", color: "#8b949e" }}>
+                      <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
                         {job.id.substring(0, 12)}...
                       </div>
                     </div>
@@ -337,14 +337,14 @@ export default function JobsPage() {
                       <div
                         style={{
                           fontSize: "9px",
-                          color: "#5a6a7a",
+                          color: "var(--gray)",
                           textTransform: "uppercase",
                           letterSpacing: "0.05em",
                         }}
                       >
                         User
                       </div>
-                      <div style={{ fontSize: "11px", color: "#8b949e" }}>
+                      <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
                         {job.user.email}
                       </div>
                     </div>
@@ -352,14 +352,14 @@ export default function JobsPage() {
                       <div
                         style={{
                           fontSize: "9px",
-                          color: "#5a6a7a",
+                          color: "var(--gray)",
                           textTransform: "uppercase",
                           letterSpacing: "0.05em",
                         }}
                       >
                         Started
                       </div>
-                      <div style={{ fontSize: "11px", color: "#8b949e" }}>
+                      <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
                         {new Date(job.startedAt).toLocaleString("sl-SI")}
                       </div>
                     </div>
@@ -368,14 +368,14 @@ export default function JobsPage() {
                         <div
                           style={{
                             fontSize: "9px",
-                            color: "#5a6a7a",
+                            color: "var(--gray)",
                             textTransform: "uppercase",
                             letterSpacing: "0.05em",
                           }}
                         >
                           Finished
                         </div>
-                        <div style={{ fontSize: "11px", color: "#8b949e" }}>
+                        <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
                           {new Date(job.finishedAt).toLocaleString("sl-SI")}
                         </div>
                       </div>
@@ -385,14 +385,14 @@ export default function JobsPage() {
                         <div
                           style={{
                             fontSize: "9px",
-                            color: "#5a6a7a",
+                            color: "var(--gray)",
                             textTransform: "uppercase",
                             letterSpacing: "0.05em",
                           }}
                         >
                           Duration
                         </div>
-                        <div style={{ fontSize: "11px", color: "#8b949e" }}>
+                        <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
                           {duration}s
                         </div>
                       </div>
@@ -405,7 +405,7 @@ export default function JobsPage() {
                       <div
                         style={{
                           height: "4px",
-                          backgroundColor: "#1e2a3a",
+                          backgroundColor: "var(--border)",
                           borderRadius: "2px",
                           overflow: "hidden",
                         }}
@@ -414,7 +414,7 @@ export default function JobsPage() {
                           style={{
                             height: "100%",
                             width: `${job.progress}%`,
-                            backgroundColor: "#ffcc00",
+                            backgroundColor: "var(--yellow)",
                             transition: "width 0.5s",
                           }}
                         />
@@ -422,7 +422,7 @@ export default function JobsPage() {
                       <div
                         style={{
                           fontSize: "10px",
-                          color: "#5a6a7a",
+                          color: "var(--gray)",
                           marginTop: "4px",
                         }}
                       >
@@ -437,7 +437,7 @@ export default function JobsPage() {
                   {job.errorMessage && (
                     <div
                       style={{
-                        color: "#ff4444",
+                        color: "var(--red)",
                         fontSize: "11px",
                         marginBottom: "12px",
                         padding: "8px",
@@ -455,7 +455,7 @@ export default function JobsPage() {
                       <div
                         style={{
                           fontSize: "9px",
-                          color: "#5a6a7a",
+                          color: "var(--gray)",
                           textTransform: "uppercase",
                           letterSpacing: "0.05em",
                           marginBottom: "8px",
@@ -493,7 +493,7 @@ export default function JobsPage() {
                             >
                               <span
                                 style={{
-                                  color: "#ffcc00",
+                                  color: "var(--yellow)",
                                   fontWeight: 700,
                                   fontSize: "9px",
                                 }}
@@ -513,7 +513,7 @@ export default function JobsPage() {
                               {stepDuration !== null && (
                                 <span
                                   style={{
-                                    color: "#5a6a7a",
+                                    color: "var(--gray)",
                                     fontSize: "9px",
                                   }}
                                 >
@@ -534,8 +534,8 @@ export default function JobsPage() {
                       className="no-underline"
                       style={{
                         padding: "6px 14px",
-                        border: "1px solid #00e5ff",
-                        color: "#00e5ff",
+                        border: "1px solid var(--cyan)",
+                        color: "var(--cyan)",
                         fontSize: "10px",
                         fontWeight: 700,
                         textTransform: "uppercase",
@@ -554,8 +554,8 @@ export default function JobsPage() {
                         style={{
                           padding: "6px 14px",
                           background: "transparent",
-                          border: "1px solid #ff4444",
-                          color: "#ff4444",
+                          border: "1px solid var(--red)",
+                          color: "var(--red)",
                           fontFamily: "inherit",
                           fontSize: "10px",
                           fontWeight: 700,
@@ -577,8 +577,8 @@ export default function JobsPage() {
                         style={{
                           padding: "6px 14px",
                           background: "transparent",
-                          border: "1px solid #ffcc00",
-                          color: "#ffcc00",
+                          border: "1px solid var(--yellow)",
+                          color: "var(--yellow)",
                           fontFamily: "inherit",
                           fontSize: "10px",
                           fontWeight: 700,

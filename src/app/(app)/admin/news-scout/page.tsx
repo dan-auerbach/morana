@@ -46,13 +46,13 @@ type Tab = "topics" | "sources" | "runs";
 
 /* ── Shared styles ─────────────────────────────────── */
 const s = {
-  label: { display: "block", fontSize: "10px", color: "#5a6a7a", textTransform: "uppercase" as const, letterSpacing: "0.05em", marginBottom: "3px" },
-  input: { width: "100%", padding: "6px 8px", backgroundColor: "#0a0e14", border: "1px solid #1e2a3a", borderRadius: "4px", color: "#c9d1d9", fontFamily: "inherit", fontSize: "12px" },
+  label: { display: "block", fontSize: "10px", color: "var(--gray)", textTransform: "uppercase" as const, letterSpacing: "0.05em", marginBottom: "3px" },
+  input: { width: "100%", padding: "6px 8px", backgroundColor: "var(--bg)", border: "1px solid var(--border)", borderRadius: "4px", color: "var(--white)", fontFamily: "inherit", fontSize: "12px" },
   btn: (color: string, bg: string, border: string): React.CSSProperties => ({
     padding: "5px 12px", backgroundColor: bg, color, border: `1px solid ${border}`,
     borderRadius: "4px", fontFamily: "inherit", fontSize: "11px", fontWeight: 600, cursor: "pointer",
   }),
-  row: { display: "grid", gap: "8px", padding: "8px 12px", borderBottom: "1px solid #111820", alignItems: "center" as const, fontSize: "12px" },
+  row: { display: "grid", gap: "8px", padding: "8px 12px", borderBottom: "1px solid var(--bg-input)", alignItems: "center" as const, fontSize: "12px" },
   badge: (color: string): React.CSSProperties => ({
     display: "inline-block", padding: "1px 6px", borderRadius: "3px", fontSize: "10px", fontWeight: 600,
     backgroundColor: `${color}15`, color, border: `1px solid ${color}30`,
@@ -119,8 +119,8 @@ export default function NewsScoutPage() {
     if (session && isAdmin) loadAll();
   }, [session, isAdmin, loadAll]);
 
-  if (!session) return <div style={{ padding: "40px", color: "#8b949e" }}>Authentication required.</div>;
-  if (!isAdmin) return <div style={{ padding: "40px", color: "#ff4444" }}>[ACCESS DENIED] Admin privileges required.</div>;
+  if (!session) return <div style={{ padding: "40px", color: "var(--text-secondary)" }}>Authentication required.</div>;
+  if (!isAdmin) return <div style={{ padding: "40px", color: "var(--red)" }}>[ACCESS DENIED] Admin privileges required.</div>;
 
   // ── Topic CRUD ──
   function resetTopicForm() {
@@ -267,9 +267,9 @@ export default function NewsScoutPage() {
 
   // ── Status helpers ──
   function statusColor(status: string) {
-    if (status === "done") return "#00ff88";
-    if (status === "error") return "#ff4444";
-    return "#00e5ff";
+    if (status === "done") return "var(--green)";
+    if (status === "error") return "var(--red)";
+    return "var(--cyan)";
   }
 
   function formatDuration(start: string, end: string | null) {
@@ -288,8 +288,8 @@ export default function NewsScoutPage() {
         padding: "6px 16px", border: "1px solid", borderRadius: "4px",
         fontFamily: "inherit", fontSize: "12px", fontWeight: 600, cursor: "pointer",
         backgroundColor: tab === t ? "rgba(255, 68, 68, 0.12)" : "transparent",
-        color: tab === t ? "#ff4444" : "#5a6a7a",
-        borderColor: tab === t ? "rgba(255, 68, 68, 0.3)" : "#1e2a3a",
+        color: tab === t ? "var(--red)" : "var(--gray)",
+        borderColor: tab === t ? "rgba(255, 68, 68, 0.3)" : "var(--border)",
       }}
     >
       {label}
@@ -300,16 +300,16 @@ export default function NewsScoutPage() {
     <div style={{ maxWidth: "960px", margin: "0 auto", padding: "24px 16px" }}>
       {/* Header */}
       <div style={{ marginBottom: "20px" }}>
-        <div style={{ fontSize: "11px", color: "#5a6a7a", marginBottom: "4px" }}>
-          <span style={{ color: "#ff4444" }}>[ADMIN]</span> / <span style={{ color: "#ff8800" }}>[NEWS SCOUT]</span>
+        <div style={{ fontSize: "11px", color: "var(--gray)", marginBottom: "4px" }}>
+          <span style={{ color: "var(--red)" }}>[ADMIN]</span> / <span style={{ color: "#ff8800" }}>[NEWS SCOUT]</span>
         </div>
-        <div style={{ fontSize: "13px", color: "#6b7280" }}>$ news-scout --manage --admin</div>
+        <div style={{ fontSize: "13px", color: "var(--gray)" }}>$ news-scout --manage --admin</div>
       </div>
 
       {error && (
-        <div style={{ padding: "8px 12px", marginBottom: "12px", backgroundColor: "rgba(255,68,68,0.08)", border: "1px solid rgba(255,68,68,0.2)", borderRadius: "4px", color: "#ff4444", fontSize: "12px" }}>
+        <div style={{ padding: "8px 12px", marginBottom: "12px", backgroundColor: "rgba(255,68,68,0.08)", border: "1px solid rgba(255,68,68,0.2)", borderRadius: "4px", color: "var(--red)", fontSize: "12px" }}>
           {error}
-          <button onClick={() => setError("")} style={{ float: "right", background: "none", border: "none", color: "#ff4444", cursor: "pointer", fontFamily: "inherit" }}>x</button>
+          <button onClick={() => setError("")} style={{ float: "right", background: "none", border: "none", color: "var(--red)", cursor: "pointer", fontFamily: "inherit" }}>x</button>
         </div>
       )}
 
@@ -318,7 +318,7 @@ export default function NewsScoutPage() {
         {tabBtn("topics", `Topics (${topics.length})`)}
         {tabBtn("sources", `Sources (${sources.length})`)}
         {tabBtn("runs", `Runs (${runs.length})`)}
-        <button onClick={loadAll} style={{ ...s.btn("#5a6a7a", "transparent", "#1e2a3a"), marginLeft: "auto" }}>
+        <button onClick={loadAll} style={{ ...s.btn("var(--gray)", "transparent", "var(--border)"), marginLeft: "auto" }}>
           {loading ? "..." : "Refresh"}
         </button>
       </div>
@@ -327,14 +327,14 @@ export default function NewsScoutPage() {
       {tab === "topics" && (
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-            <span style={{ fontSize: "11px", color: "#5a6a7a" }}>{topics.length} topics | {topics.filter((t) => t.isActive).length} active</span>
-            <button onClick={() => { resetTopicForm(); setShowTopicForm(!showTopicForm); }} style={s.btn("#ff4444", "rgba(255,68,68,0.08)", "rgba(255,68,68,0.3)")}>
+            <span style={{ fontSize: "11px", color: "var(--gray)" }}>{topics.length} topics | {topics.filter((t) => t.isActive).length} active</span>
+            <button onClick={() => { resetTopicForm(); setShowTopicForm(!showTopicForm); }} style={s.btn("var(--red)", "rgba(255,68,68,0.08)", "rgba(255,68,68,0.3)")}>
               {showTopicForm ? "Cancel" : "+ New Topic"}
             </button>
           </div>
 
           {showTopicForm && (
-            <div style={{ padding: "12px", marginBottom: "12px", border: "1px solid #1e2a3a", borderRadius: "4px", backgroundColor: "#0a0e14" }}>
+            <div style={{ padding: "12px", marginBottom: "12px", border: "1px solid var(--border)", borderRadius: "4px", backgroundColor: "var(--bg)" }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "8px" }}>
                 <div>
                   <label style={s.label}>Name</label>
@@ -359,37 +359,37 @@ export default function NewsScoutPage() {
                   <input style={s.input} type="number" value={topicForm.maxSourcesPerRun} onChange={(e) => setTopicForm({ ...topicForm, maxSourcesPerRun: e.target.value })} />
                 </div>
               </div>
-              <button onClick={saveTopic} style={s.btn("#00ff88", "rgba(0,255,136,0.08)", "rgba(0,255,136,0.3)")}>
+              <button onClick={saveTopic} style={s.btn("var(--green)", "rgba(0,255,136,0.08)", "rgba(0,255,136,0.3)")}>
                 {editingTopicId ? "Update" : "Create"} Topic
               </button>
             </div>
           )}
 
           {/* Topics table */}
-          <div style={{ border: "1px solid #1e2a3a", borderRadius: "4px" }}>
-            <div style={{ ...s.row, gridTemplateColumns: "2fr 2fr 1fr 1fr 1fr 120px", color: "#5a6a7a", borderBottom: "1px solid #1e2a3a", fontSize: "10px", textTransform: "uppercase" }}>
+          <div style={{ border: "1px solid var(--border)", borderRadius: "4px" }}>
+            <div style={{ ...s.row, gridTemplateColumns: "2fr 2fr 1fr 1fr 1fr 120px", color: "var(--gray)", borderBottom: "1px solid var(--border)", fontSize: "10px", textTransform: "uppercase" }}>
               <span>Name</span><span>Description</span><span>Model</span><span>Active</span><span>Runs</span><span>Actions</span>
             </div>
             {topics.map((t) => (
-              <div key={t.id} style={{ ...s.row, gridTemplateColumns: "2fr 2fr 1fr 1fr 1fr 120px", color: t.isActive ? "#c9d1d9" : "#5a6a7a" }}>
+              <div key={t.id} style={{ ...s.row, gridTemplateColumns: "2fr 2fr 1fr 1fr 1fr 120px", color: t.isActive ? "var(--white)" : "var(--gray)" }}>
                 <span style={{ fontWeight: 600 }}>{t.name}</span>
                 <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.description}</span>
-                <span style={s.badge("#00e5ff")}>{t.model}</span>
+                <span style={s.badge("var(--cyan)")}>{t.model}</span>
                 <span>
-                  <button onClick={() => toggleTopic(t)} style={{ ...s.btn(t.isActive ? "#00ff88" : "#5a6a7a", "transparent", t.isActive ? "rgba(0,255,136,0.3)" : "#1e2a3a"), fontSize: "10px", padding: "2px 8px" }}>
+                  <button onClick={() => toggleTopic(t)} style={{ ...s.btn(t.isActive ? "var(--green)" : "var(--gray)", "transparent", t.isActive ? "rgba(0,255,136,0.3)" : "var(--border)"), fontSize: "10px", padding: "2px 8px" }}>
                     {t.isActive ? "ON" : "OFF"}
                   </button>
                 </span>
                 <span>{t._count.runs}</span>
                 <span style={{ display: "flex", gap: "4px" }}>
-                  <button onClick={() => triggerRun(t.id)} style={{ ...s.btn("#00e5ff", "rgba(0,229,255,0.08)", "rgba(0,229,255,0.3)"), fontSize: "10px", padding: "2px 6px" }}>Run</button>
+                  <button onClick={() => triggerRun(t.id)} style={{ ...s.btn("var(--cyan)", "rgba(0,229,255,0.08)", "rgba(0,229,255,0.3)"), fontSize: "10px", padding: "2px 6px" }}>Run</button>
                   <button onClick={() => editTopic(t)} style={{ ...s.btn("#ff8800", "transparent", "rgba(255,136,0,0.3)"), fontSize: "10px", padding: "2px 6px" }}>Edit</button>
-                  <button onClick={() => deleteTopic(t.id)} style={{ ...s.btn("#ff4444", "transparent", "rgba(255,68,68,0.3)"), fontSize: "10px", padding: "2px 6px" }}>Del</button>
+                  <button onClick={() => deleteTopic(t.id)} style={{ ...s.btn("var(--red)", "transparent", "rgba(255,68,68,0.3)"), fontSize: "10px", padding: "2px 6px" }}>Del</button>
                 </span>
               </div>
             ))}
             {topics.length === 0 && (
-              <div style={{ padding: "20px", textAlign: "center", color: "#5a6a7a", fontSize: "12px" }}>No topics yet. Create one to get started.</div>
+              <div style={{ padding: "20px", textAlign: "center", color: "var(--gray)", fontSize: "12px" }}>No topics yet. Create one to get started.</div>
             )}
           </div>
         </div>
@@ -399,14 +399,14 @@ export default function NewsScoutPage() {
       {tab === "sources" && (
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-            <span style={{ fontSize: "11px", color: "#5a6a7a" }}>{sources.length} sources | {sources.filter((src) => src.isActive).length} active</span>
-            <button onClick={() => { resetSourceForm(); setShowSourceForm(!showSourceForm); }} style={s.btn("#ff4444", "rgba(255,68,68,0.08)", "rgba(255,68,68,0.3)")}>
+            <span style={{ fontSize: "11px", color: "var(--gray)" }}>{sources.length} sources | {sources.filter((src) => src.isActive).length} active</span>
+            <button onClick={() => { resetSourceForm(); setShowSourceForm(!showSourceForm); }} style={s.btn("var(--red)", "rgba(255,68,68,0.08)", "rgba(255,68,68,0.3)")}>
               {showSourceForm ? "Cancel" : "+ New Source"}
             </button>
           </div>
 
           {showSourceForm && (
-            <div style={{ padding: "12px", marginBottom: "12px", border: "1px solid #1e2a3a", borderRadius: "4px", backgroundColor: "#0a0e14" }}>
+            <div style={{ padding: "12px", marginBottom: "12px", border: "1px solid var(--border)", borderRadius: "4px", backgroundColor: "var(--bg)" }}>
               <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "8px", marginBottom: "8px" }}>
                 <div>
                   <label style={s.label}>Name</label>
@@ -445,35 +445,35 @@ export default function NewsScoutPage() {
                   />
                 </div>
               )}
-              <button onClick={saveSource} style={s.btn("#00ff88", "rgba(0,255,136,0.08)", "rgba(0,255,136,0.3)")}>
+              <button onClick={saveSource} style={s.btn("var(--green)", "rgba(0,255,136,0.08)", "rgba(0,255,136,0.3)")}>
                 {editingSourceId ? "Update" : "Create"} Source
               </button>
             </div>
           )}
 
           {/* Sources table */}
-          <div style={{ border: "1px solid #1e2a3a", borderRadius: "4px" }}>
-            <div style={{ ...s.row, gridTemplateColumns: "2fr 1fr 3fr 1fr 100px", color: "#5a6a7a", borderBottom: "1px solid #1e2a3a", fontSize: "10px", textTransform: "uppercase" }}>
+          <div style={{ border: "1px solid var(--border)", borderRadius: "4px" }}>
+            <div style={{ ...s.row, gridTemplateColumns: "2fr 1fr 3fr 1fr 100px", color: "var(--gray)", borderBottom: "1px solid var(--border)", fontSize: "10px", textTransform: "uppercase" }}>
               <span>Name</span><span>Type</span><span>URL</span><span>Active</span><span>Actions</span>
             </div>
             {sources.map((src) => (
-              <div key={src.id} style={{ ...s.row, gridTemplateColumns: "2fr 1fr 3fr 1fr 100px", color: src.isActive ? "#c9d1d9" : "#5a6a7a" }}>
+              <div key={src.id} style={{ ...s.row, gridTemplateColumns: "2fr 1fr 3fr 1fr 100px", color: src.isActive ? "var(--white)" : "var(--gray)" }}>
                 <span style={{ fontWeight: 600 }}>{src.name}</span>
                 <span style={s.badge("#ff8800")}>{src.type}</span>
                 <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: "11px" }}>{src.rssUrl || src.baseUrl}</span>
                 <span>
-                  <button onClick={() => toggleSource(src)} style={{ ...s.btn(src.isActive ? "#00ff88" : "#5a6a7a", "transparent", src.isActive ? "rgba(0,255,136,0.3)" : "#1e2a3a"), fontSize: "10px", padding: "2px 8px" }}>
+                  <button onClick={() => toggleSource(src)} style={{ ...s.btn(src.isActive ? "var(--green)" : "var(--gray)", "transparent", src.isActive ? "rgba(0,255,136,0.3)" : "var(--border)"), fontSize: "10px", padding: "2px 8px" }}>
                     {src.isActive ? "ON" : "OFF"}
                   </button>
                 </span>
                 <span style={{ display: "flex", gap: "4px" }}>
                   <button onClick={() => editSource(src)} style={{ ...s.btn("#ff8800", "transparent", "rgba(255,136,0,0.3)"), fontSize: "10px", padding: "2px 6px" }}>Edit</button>
-                  <button onClick={() => deleteSource(src.id)} style={{ ...s.btn("#ff4444", "transparent", "rgba(255,68,68,0.3)"), fontSize: "10px", padding: "2px 6px" }}>Del</button>
+                  <button onClick={() => deleteSource(src.id)} style={{ ...s.btn("var(--red)", "transparent", "rgba(255,68,68,0.3)"), fontSize: "10px", padding: "2px 6px" }}>Del</button>
                 </span>
               </div>
             ))}
             {sources.length === 0 && (
-              <div style={{ padding: "20px", textAlign: "center", color: "#5a6a7a", fontSize: "12px" }}>No sources yet. Add RSS feeds, Google News, or HTML scrapers.</div>
+              <div style={{ padding: "20px", textAlign: "center", color: "var(--gray)", fontSize: "12px" }}>No sources yet. Add RSS feeds, Google News, or HTML scrapers.</div>
             )}
           </div>
         </div>
@@ -483,12 +483,12 @@ export default function NewsScoutPage() {
       {tab === "runs" && (
         <div>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-            <span style={{ fontSize: "11px", color: "#5a6a7a" }}>{runs.length} runs</span>
-            <button onClick={loadRuns} style={s.btn("#5a6a7a", "transparent", "#1e2a3a")}>Refresh</button>
+            <span style={{ fontSize: "11px", color: "var(--gray)" }}>{runs.length} runs</span>
+            <button onClick={loadRuns} style={s.btn("var(--gray)", "transparent", "var(--border)")}>Refresh</button>
           </div>
 
-          <div style={{ border: "1px solid #1e2a3a", borderRadius: "4px" }}>
-            <div style={{ ...s.row, gridTemplateColumns: "2fr 1fr 3fr 1fr 1fr 1fr 80px", color: "#5a6a7a", borderBottom: "1px solid #1e2a3a", fontSize: "10px", textTransform: "uppercase" }}>
+          <div style={{ border: "1px solid var(--border)", borderRadius: "4px" }}>
+            <div style={{ ...s.row, gridTemplateColumns: "2fr 1fr 3fr 1fr 1fr 1fr 80px", color: "var(--gray)", borderBottom: "1px solid var(--border)", fontSize: "10px", textTransform: "uppercase" }}>
               <span>Topic</span><span>Status</span><span>Results</span><span>Candidates</span><span>Cost</span><span>Duration</span><span>Actions</span>
             </div>
             {runs.map((run) => (
@@ -497,7 +497,7 @@ export default function NewsScoutPage() {
                   style={{ ...s.row, gridTemplateColumns: "2fr 1fr 3fr 1fr 1fr 1fr 80px", cursor: "pointer" }}
                   onClick={() => setExpandedRunId(expandedRunId === run.id ? null : run.id)}
                 >
-                  <span style={{ fontWeight: 600, color: "#c9d1d9" }}>{run.topic.name}</span>
+                  <span style={{ fontWeight: 600, color: "var(--white)" }}>{run.topic.name}</span>
                   <span>
                     <span style={{
                       ...s.badge(statusColor(run.status)),
@@ -509,43 +509,43 @@ export default function NewsScoutPage() {
                   <span style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
                     {run.resultMeta?.map((r, i) => (
                       <a key={i} href={r.url} target="_blank" rel="noopener noreferrer"
-                        style={{ color: "#00e5ff", fontSize: "11px", textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "180px" }}
+                        style={{ color: "var(--cyan)", fontSize: "11px", textDecoration: "none", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "180px" }}
                         onClick={(e) => e.stopPropagation()}
                         title={r.title}
                       >
                         {r.title}
                       </a>
-                    )) || (run.status === "running" ? <span style={{ color: "#5a6a7a" }}>...</span> : <span style={{ color: "#5a6a7a" }}>-</span>)}
+                    )) || (run.status === "running" ? <span style={{ color: "var(--gray)" }}>...</span> : <span style={{ color: "var(--gray)" }}>-</span>)}
                   </span>
-                  <span style={{ color: "#8b949e" }}>{run.candidateCount}</span>
-                  <span style={{ color: "#8b949e" }}>{run.costCents > 0 ? `${(run.costCents / 100).toFixed(3)}$` : "-"}</span>
-                  <span style={{ color: "#8b949e" }}>{formatDuration(run.createdAt, run.finishedAt)}</span>
+                  <span style={{ color: "var(--text-secondary)" }}>{run.candidateCount}</span>
+                  <span style={{ color: "var(--text-secondary)" }}>{run.costCents > 0 ? `${(run.costCents / 100).toFixed(3)}$` : "-"}</span>
+                  <span style={{ color: "var(--text-secondary)" }}>{formatDuration(run.createdAt, run.finishedAt)}</span>
                   <span style={{ display: "flex", gap: "4px" }} onClick={(e) => e.stopPropagation()}>
                     {run.status === "running" && (
-                      <button onClick={() => cancelRun(run.id)} style={{ ...s.btn("#ffcc00", "transparent", "rgba(255,204,0,0.3)"), fontSize: "10px", padding: "2px 6px" }}>Cancel</button>
+                      <button onClick={() => cancelRun(run.id)} style={{ ...s.btn("var(--yellow)", "transparent", "rgba(255,204,0,0.3)"), fontSize: "10px", padding: "2px 6px" }}>Cancel</button>
                     )}
-                    <button onClick={() => deleteRun(run.id)} style={{ ...s.btn("#ff4444", "transparent", "rgba(255,68,68,0.3)"), fontSize: "10px", padding: "2px 6px" }}>Del</button>
+                    <button onClick={() => deleteRun(run.id)} style={{ ...s.btn("var(--red)", "transparent", "rgba(255,68,68,0.3)"), fontSize: "10px", padding: "2px 6px" }}>Del</button>
                   </span>
                 </div>
 
                 {/* Expanded detail */}
                 {expandedRunId === run.id && (
-                  <div style={{ padding: "8px 12px", backgroundColor: "#0a0e14", borderBottom: "1px solid #1e2a3a" }}>
+                  <div style={{ padding: "8px 12px", backgroundColor: "var(--bg)", borderBottom: "1px solid var(--border)" }}>
                     {run.errorMessage && (
-                      <div style={{ marginBottom: "8px", padding: "6px 8px", backgroundColor: "rgba(255,68,68,0.08)", border: "1px solid rgba(255,68,68,0.2)", borderRadius: "4px", color: "#ff4444", fontSize: "11px" }}>
+                      <div style={{ marginBottom: "8px", padding: "6px 8px", backgroundColor: "rgba(255,68,68,0.08)", border: "1px solid rgba(255,68,68,0.2)", borderRadius: "4px", color: "var(--red)", fontSize: "11px" }}>
                         {run.errorMessage}
                       </div>
                     )}
 
                     {run.resultMeta && run.resultMeta.length > 0 && (
                       <div style={{ marginBottom: "8px" }}>
-                        <div style={{ fontSize: "10px", color: "#5a6a7a", textTransform: "uppercase", marginBottom: "4px" }}>Results</div>
+                        <div style={{ fontSize: "10px", color: "var(--gray)", textTransform: "uppercase", marginBottom: "4px" }}>Results</div>
                         {run.resultMeta.map((r, i) => (
                           <div key={i} style={{ marginBottom: "4px" }}>
-                            <a href={r.url} target="_blank" rel="noopener noreferrer" style={{ color: "#00e5ff", fontSize: "12px", textDecoration: "none" }}>
+                            <a href={r.url} target="_blank" rel="noopener noreferrer" style={{ color: "var(--cyan)", fontSize: "12px", textDecoration: "none" }}>
                               {i + 1}. {r.title}
                             </a>
-                            <div style={{ color: "#5a6a7a", fontSize: "11px", marginLeft: "16px" }}>{r.reason}</div>
+                            <div style={{ color: "var(--gray)", fontSize: "11px", marginLeft: "16px" }}>{r.reason}</div>
                           </div>
                         ))}
                       </div>
@@ -553,11 +553,11 @@ export default function NewsScoutPage() {
 
                     {run.logs && run.logs.length > 0 && (
                       <div>
-                        <div style={{ fontSize: "10px", color: "#5a6a7a", textTransform: "uppercase", marginBottom: "4px" }}>Logs</div>
-                        <div style={{ maxHeight: "200px", overflow: "auto", fontFamily: "monospace", fontSize: "10px", lineHeight: "1.6", color: "#6b7280" }}>
+                        <div style={{ fontSize: "10px", color: "var(--gray)", textTransform: "uppercase", marginBottom: "4px" }}>Logs</div>
+                        <div style={{ maxHeight: "200px", overflow: "auto", fontFamily: "monospace", fontSize: "10px", lineHeight: "1.6", color: "var(--gray)" }}>
                           {run.logs.map((l, i) => (
                             <div key={i}>
-                              <span style={{ color: "#5a6a7a" }}>{new Date(l.ts).toLocaleTimeString()}</span>{" "}
+                              <span style={{ color: "var(--gray)" }}>{new Date(l.ts).toLocaleTimeString()}</span>{" "}
                               <span style={{ color: "#ff8800" }}>[{l.phase}]</span>{" "}
                               <span>{l.message}</span>
                             </div>
@@ -570,7 +570,7 @@ export default function NewsScoutPage() {
               </div>
             ))}
             {runs.length === 0 && (
-              <div style={{ padding: "20px", textAlign: "center", color: "#5a6a7a", fontSize: "12px" }}>No runs yet. Trigger a run from the Topics tab.</div>
+              <div style={{ padding: "20px", textAlign: "center", color: "var(--gray)", fontSize: "12px" }}>No runs yet. Trigger a run from the Topics tab.</div>
             )}
           </div>
         </div>

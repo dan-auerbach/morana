@@ -51,22 +51,22 @@ export default function ExecutionDetailPage() {
     return () => clearInterval(interval);
   }, [execution, load]);
 
-  if (!session) return <div style={{ color: "#ff4444" }}>[ERROR] Authentication required.</div>;
-  if (loading) return <div style={{ color: "#00ff88" }}>Loading...</div>;
-  if (!execution) return <div style={{ color: "#ff4444" }}>[ERROR] Execution not found.</div>;
+  if (!session) return <div style={{ color: "var(--red)" }}>[ERROR] Authentication required.</div>;
+  if (loading) return <div style={{ color: "var(--green)" }}>Loading...</div>;
+  if (!execution) return <div style={{ color: "var(--red)" }}>[ERROR] Execution not found.</div>;
 
   const statusColor = (s: string) => {
-    if (s === "done") return "#00ff88";
-    if (s === "running" || s === "pending") return "#ffcc00";
-    if (s === "error") return "#ff4444";
-    if (s === "skipped") return "#5a6a7a";
-    return "#5a6a7a";
+    if (s === "done") return "var(--green)";
+    if (s === "running" || s === "pending") return "var(--yellow)";
+    if (s === "error") return "var(--red)";
+    if (s === "skipped") return "var(--gray)";
+    return "var(--gray)";
   };
 
   const confidenceColor = (score: number) => {
-    if (score > 80) return "#00ff88";
-    if (score > 50) return "#ffcc00";
-    return "#ff4444";
+    if (score > 80) return "var(--green)";
+    if (score > 50) return "var(--yellow)";
+    return "var(--red)";
   };
 
   return (
@@ -75,9 +75,9 @@ export default function ExecutionDetailPage() {
         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
           <Link href="/recipes" className="no-underline" style={{ color: "#ff8800", fontSize: "18px", fontWeight: 700 }}>[RECIPES]</Link>
           <span style={{ color: "#333" }}>/</span>
-          <span style={{ color: "#e0e0e0", fontSize: "18px", fontWeight: 700 }}>{execution.recipe.name}</span>
+          <span style={{ color: "var(--white)", fontSize: "18px", fontWeight: 700 }}>{execution.recipe.name}</span>
         </div>
-        <div style={{ color: "#5a6a7a", fontSize: "13px" }}>Execution {id.substring(0, 8)}...</div>
+        <div style={{ color: "var(--gray)", fontSize: "13px" }}>Execution {id.substring(0, 8)}...</div>
       </div>
 
       {/* Status bar */}
@@ -86,10 +86,10 @@ export default function ExecutionDetailPage() {
           <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
             <span style={{ color: statusColor(execution.status), fontWeight: 700, fontSize: "14px", textTransform: "uppercase" }}>{execution.status}</span>
             {execution.recipeVersion != null && (
-              <span style={{ color: "#5a6a7a", fontSize: "10px", border: "1px solid #1e2a3a", padding: "1px 6px" }}>v{execution.recipeVersion}</span>
+              <span style={{ color: "var(--gray)", fontSize: "10px", border: "1px solid var(--border)", padding: "1px 6px" }}>v{execution.recipeVersion}</span>
             )}
             {execution.totalCostCents > 0 && (
-              <span style={{ color: "#ffcc00", fontSize: "11px", fontWeight: 700 }}>${(execution.totalCostCents / 100).toFixed(4)}</span>
+              <span style={{ color: "var(--yellow)", fontSize: "11px", fontWeight: 700 }}>${(execution.totalCostCents / 100).toFixed(4)}</span>
             )}
             {/* Confidence score badge */}
             {execution.confidenceScore != null && (
@@ -110,7 +110,7 @@ export default function ExecutionDetailPage() {
                 color: "#fff",
                 fontSize: "10px",
                 fontWeight: 700,
-                backgroundColor: execution.warningFlag === "high_risk" ? "#ff4444" : "#ff8800",
+                backgroundColor: execution.warningFlag === "high_risk" ? "var(--red)" : "#ff8800",
                 padding: "2px 8px",
                 textTransform: "uppercase",
                 letterSpacing: "0.05em",
@@ -125,7 +125,7 @@ export default function ExecutionDetailPage() {
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{
-                  color: "#00e5ff",
+                  color: "var(--cyan)",
                   fontSize: "11px",
                   fontWeight: 700,
                   border: "1px solid rgba(0, 229, 255, 0.4)",
@@ -140,17 +140,17 @@ export default function ExecutionDetailPage() {
               </a>
             )}
           </div>
-          <span style={{ color: "#5a6a7a", fontSize: "11px" }}>
+          <span style={{ color: "var(--gray)", fontSize: "11px" }}>
             {new Date(execution.startedAt).toLocaleString("sl-SI")}
             {execution.finishedAt && ` — ${Math.round((new Date(execution.finishedAt).getTime() - new Date(execution.startedAt).getTime()) / 1000)}s`}
           </span>
         </div>
         {/* Progress bar */}
-        <div style={{ height: "4px", backgroundColor: "#1e2a3a", borderRadius: "2px", overflow: "hidden" }}>
+        <div style={{ height: "4px", backgroundColor: "var(--border)", borderRadius: "2px", overflow: "hidden" }}>
           <div style={{ height: "100%", width: `${execution.progress}%`, backgroundColor: statusColor(execution.status), transition: "width 0.5s" }} />
         </div>
-        <div style={{ fontSize: "10px", color: "#5a6a7a", marginTop: "4px" }}>Step {Math.min(execution.currentStep + 1, execution.totalSteps)} of {execution.totalSteps} — {execution.progress}%</div>
-        {execution.errorMessage && <div style={{ color: "#ff4444", fontSize: "12px", marginTop: "8px" }}>[ERROR] {execution.errorMessage}</div>}
+        <div style={{ fontSize: "10px", color: "var(--gray)", marginTop: "4px" }}>Step {Math.min(execution.currentStep + 1, execution.totalSteps)} of {execution.totalSteps} — {execution.progress}%</div>
+        {execution.errorMessage && <div style={{ color: "var(--red)", fontSize: "12px", marginTop: "8px" }}>[ERROR] {execution.errorMessage}</div>}
       </div>
 
       {/* Step results */}
@@ -159,13 +159,13 @@ export default function ExecutionDetailPage() {
           const isExpanded = expandedStep === sr.stepIndex;
           const isSkipped = sr.status === "skipped";
           return (
-            <div key={sr.id} style={{ border: `1px solid ${isExpanded ? statusColor(sr.status) : "#1e2a3a"}`, opacity: isSkipped ? 0.5 : 1 }}>
+            <div key={sr.id} style={{ border: `1px solid ${isExpanded ? statusColor(sr.status) : "var(--border)"}`, opacity: isSkipped ? 0.5 : 1 }}>
               <div onClick={() => setExpandedStep(isExpanded ? null : sr.stepIndex)} style={{ padding: "10px 16px", cursor: "pointer", display: "flex", alignItems: "center", gap: "12px" }}>
-                <span style={{ color: "#ffcc00", fontWeight: 700, fontSize: "11px" }}>#{sr.stepIndex + 1}</span>
+                <span style={{ color: "var(--yellow)", fontWeight: 700, fontSize: "11px" }}>#{sr.stepIndex + 1}</span>
                 <span style={{ color: statusColor(sr.status), fontWeight: 700, fontSize: "10px", textTransform: "uppercase", width: "60px" }}>
                   {sr.status}
                 </span>
-                <span style={{ color: isSkipped ? "#5a6a7a" : "#e0e0e0", fontSize: "12px", flex: 1, fontStyle: isSkipped ? "italic" : "normal" }}>
+                <span style={{ color: isSkipped ? "var(--gray)" : "var(--white)", fontSize: "12px", flex: 1, fontStyle: isSkipped ? "italic" : "normal" }}>
                   {isSkipped ? "[Skipped by condition]" : sr.outputPreview ? sr.outputPreview.substring(0, 100) + "..." : "—"}
                 </span>
                 <span style={{ color: isExpanded ? statusColor(sr.status) : "#444", fontSize: "10px" }}>{isExpanded ? "▼" : "▶"}</span>
@@ -174,8 +174,8 @@ export default function ExecutionDetailPage() {
                 <div style={{ padding: "0 16px 12px", borderTop: "1px solid rgba(30, 42, 58, 0.5)" }}>
                   {sr.inputPreview && !isSkipped && (
                     <div style={{ marginTop: "8px" }}>
-                      <div style={{ fontSize: "10px", color: "#00e5ff", fontWeight: 700, marginBottom: "4px" }}>INPUT</div>
-                      <div style={{ padding: "8px", backgroundColor: "#0a0e14", border: "1px solid #1e2a3a", fontSize: "11px", color: "#8b949e", maxHeight: "100px", overflowY: "auto", whiteSpace: "pre-wrap" }}>{sr.inputPreview}</div>
+                      <div style={{ fontSize: "10px", color: "var(--cyan)", fontWeight: 700, marginBottom: "4px" }}>INPUT</div>
+                      <div style={{ padding: "8px", backgroundColor: "var(--bg)", border: "1px solid var(--border)", fontSize: "11px", color: "var(--text-secondary)", maxHeight: "100px", overflowY: "auto", whiteSpace: "pre-wrap" }}>{sr.inputPreview}</div>
                     </div>
                   )}
                   {sr.outputFull && (sr.outputFull as { text?: string }).text && (() => {
@@ -191,29 +191,29 @@ export default function ExecutionDetailPage() {
                       return (
                         <div style={{ marginTop: "8px" }}>
                           <div style={{ fontSize: "10px", color: "#ff6b9d", fontWeight: 700, marginBottom: "4px" }}>VIDEO OUTPUT</div>
-                          <div style={{ padding: "12px", backgroundColor: "#0a0e14", border: "1px solid rgba(255, 107, 157, 0.3)" }}>
+                          <div style={{ padding: "12px", backgroundColor: "var(--bg)", border: "1px solid rgba(255, 107, 157, 0.3)" }}>
                             <video
                               controls
                               autoPlay
                               loop
                               muted
                               playsInline
-                              style={{ width: "100%", maxWidth: "640px", borderRadius: "4px", border: "1px solid #1e2a3a" }}
+                              style={{ width: "100%", maxWidth: "640px", borderRadius: "4px", border: "1px solid var(--border)" }}
                               src={videoData.videoUrl}
                             />
                             <div style={{ display: "flex", gap: "16px", marginTop: "8px", flexWrap: "wrap" }}>
                               {videoData.width && videoData.height && (
-                                <span style={{ fontSize: "10px", color: "#5a6a7a" }}>
+                                <span style={{ fontSize: "10px", color: "var(--gray)" }}>
                                   {videoData.width}x{videoData.height}
                                 </span>
                               )}
                               {videoData.duration && (
-                                <span style={{ fontSize: "10px", color: "#5a6a7a" }}>
+                                <span style={{ fontSize: "10px", color: "var(--gray)" }}>
                                   {videoData.duration}s
                                 </span>
                               )}
                               {videoData.fps && (
-                                <span style={{ fontSize: "10px", color: "#5a6a7a" }}>
+                                <span style={{ fontSize: "10px", color: "var(--gray)" }}>
                                   {videoData.fps} fps
                                 </span>
                               )}
@@ -234,27 +234,27 @@ export default function ExecutionDetailPage() {
 
                     return (
                       <div style={{ marginTop: "8px" }}>
-                        <div style={{ fontSize: "10px", color: "#00ff88", fontWeight: 700, marginBottom: "4px" }}>OUTPUT</div>
-                        <div style={{ padding: "8px", backgroundColor: "#0a0e14", border: "1px solid #1e2a3a", fontSize: "11px", color: "#e0e0e0", maxHeight: "300px", overflowY: "auto", whiteSpace: "pre-wrap" }}>{text}</div>
+                        <div style={{ fontSize: "10px", color: "var(--green)", fontWeight: 700, marginBottom: "4px" }}>OUTPUT</div>
+                        <div style={{ padding: "8px", backgroundColor: "var(--bg)", border: "1px solid var(--border)", fontSize: "11px", color: "var(--white)", maxHeight: "300px", overflowY: "auto", whiteSpace: "pre-wrap" }}>{text}</div>
                       </div>
                     );
                   })()}
                   {sr.errorMessage && (
-                    <div style={{ marginTop: "8px", color: "#ff4444", fontSize: "11px" }}>[ERROR] {sr.errorMessage}</div>
+                    <div style={{ marginTop: "8px", color: "var(--red)", fontSize: "11px" }}>[ERROR] {sr.errorMessage}</div>
                   )}
                   {sr.finishedAt && sr.startedAt && (
-                    <div style={{ marginTop: "4px", fontSize: "10px", color: "#5a6a7a" }}>
+                    <div style={{ marginTop: "4px", fontSize: "10px", color: "var(--gray)" }}>
                       Duration: {Math.round((new Date(sr.finishedAt).getTime() - new Date(sr.startedAt).getTime()) / 1000)}s
                     </div>
                   )}
                   {/* Audit trail — hashes and provider response ID */}
                   {(sr.inputHash || sr.outputHash || sr.providerResponseId) && (
                     <details style={{ marginTop: "8px" }}>
-                      <summary style={{ fontSize: "9px", color: "#5a6a7a", cursor: "pointer", textTransform: "uppercase", letterSpacing: "0.05em" }}>Audit Trail</summary>
-                      <div style={{ marginTop: "4px", padding: "6px 8px", backgroundColor: "#0a0e14", border: "1px solid #1e2a3a", fontSize: "10px", color: "#5a6a7a", fontFamily: "monospace" }}>
-                        {sr.inputHash && <div>INPUT_HASH: <span style={{ color: "#8b949e" }}>{sr.inputHash.substring(0, 16)}...</span></div>}
-                        {sr.outputHash && <div>OUTPUT_HASH: <span style={{ color: "#8b949e" }}>{sr.outputHash.substring(0, 16)}...</span></div>}
-                        {sr.providerResponseId && <div>PROVIDER_ID: <span style={{ color: "#8b949e" }}>{sr.providerResponseId}</span></div>}
+                      <summary style={{ fontSize: "9px", color: "var(--gray)", cursor: "pointer", textTransform: "uppercase", letterSpacing: "0.05em" }}>Audit Trail</summary>
+                      <div style={{ marginTop: "4px", padding: "6px 8px", backgroundColor: "var(--bg)", border: "1px solid var(--border)", fontSize: "10px", color: "var(--gray)", fontFamily: "monospace" }}>
+                        {sr.inputHash && <div>INPUT_HASH: <span style={{ color: "var(--text-secondary)" }}>{sr.inputHash.substring(0, 16)}...</span></div>}
+                        {sr.outputHash && <div>OUTPUT_HASH: <span style={{ color: "var(--text-secondary)" }}>{sr.outputHash.substring(0, 16)}...</span></div>}
+                        {sr.providerResponseId && <div>PROVIDER_ID: <span style={{ color: "var(--text-secondary)" }}>{sr.providerResponseId}</span></div>}
                       </div>
                     </details>
                   )}

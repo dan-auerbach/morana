@@ -128,8 +128,8 @@ export default function LLMPage() {
 
   if (!session) {
     return (
-      <div style={{ color: "#5a6a7a" }}>
-        <span style={{ color: "#ff4444" }}>[ERROR]</span> Authentication required. Please sign in.
+      <div style={{ color: "var(--gray)" }}>
+        <span style={{ color: "var(--red)" }}>[ERROR]</span> Authentication required. Please sign in.
       </div>
     );
   }
@@ -295,8 +295,8 @@ export default function LLMPage() {
         style={{
           width: sidebarOpen ? "260px" : "0px",
           minWidth: sidebarOpen ? "260px" : "0px",
-          borderRight: sidebarOpen ? "1px solid #1e2a3a" : "none",
-          backgroundColor: "#0a0e14",
+          borderRight: sidebarOpen ? "1px solid var(--border)" : "none",
+          backgroundColor: "var(--bg)",
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
@@ -311,8 +311,8 @@ export default function LLMPage() {
               width: "100%",
               padding: "8px 12px",
               background: "transparent",
-              border: "1px solid #00ff88",
-              color: "#00ff88",
+              border: "1px solid var(--green)",
+              color: "var(--green)",
               fontFamily: "inherit",
               fontSize: "12px",
               cursor: "pointer",
@@ -366,7 +366,7 @@ export default function LLMPage() {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div
                   style={{
-                    color: c.id === activeConvId ? "#00ff88" : "#8b949e",
+                    color: c.id === activeConvId ? "var(--green)" : "var(--text-secondary)",
                     fontSize: "12px",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
@@ -375,7 +375,7 @@ export default function LLMPage() {
                 >
                   {c.title}
                 </div>
-                <div style={{ color: "#444", fontSize: "10px", marginTop: "2px" }}>
+                <div style={{ color: "var(--dim)", fontSize: "10px", marginTop: "2px" }}>
                   {c._count.messages} msgs
                 </div>
               </div>
@@ -384,7 +384,7 @@ export default function LLMPage() {
                 style={{
                   background: "transparent",
                   border: "none",
-                  color: "#444",
+                  color: "var(--dim)",
                   cursor: "pointer",
                   fontSize: "14px",
                   padding: "2px 4px",
@@ -392,7 +392,7 @@ export default function LLMPage() {
                   lineHeight: 1,
                   flexShrink: 0,
                 }}
-                onMouseEnter={(e) => { e.currentTarget.style.color = "#ff4444"; }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = "var(--red)"; }}
                 onMouseLeave={(e) => { e.currentTarget.style.color = "#444"; }}
                 title="Delete conversation"
               >
@@ -414,8 +414,8 @@ export default function LLMPage() {
         <div
           style={{
             padding: "10px 16px",
-            borderBottom: "1px solid #1e2a3a",
-            backgroundColor: "#0d1117",
+            borderBottom: "1px solid var(--border)",
+            backgroundColor: "var(--bg-panel)",
             display: "flex",
             alignItems: "center",
             gap: "8px",
@@ -432,8 +432,8 @@ export default function LLMPage() {
             onClick={() => setSidebarOpen(!sidebarOpen)}
             style={{
               background: "transparent",
-              border: "1px solid #1e2a3a",
-              color: "#5a6a7a",
+              border: "1px solid var(--border)",
+              color: "var(--gray)",
               cursor: "pointer",
               padding: "4px 8px",
               fontFamily: "inherit",
@@ -444,7 +444,7 @@ export default function LLMPage() {
             {sidebarOpen ? "<<" : ">>"}
           </button>
 
-          <span style={{ color: "#00ff88", fontSize: "14px", fontWeight: 700 }}>
+          <span style={{ color: "var(--green)", fontSize: "14px", fontWeight: 700 }}>
             [LLM]
           </span>
 
@@ -455,9 +455,9 @@ export default function LLMPage() {
             onChange={(e) => handleModelChange(e.target.value)}
             style={{
               padding: "4px 8px",
-              backgroundColor: "#111820",
-              border: "1px solid #1e2a3a",
-              color: "#e0e0e0",
+              backgroundColor: "var(--bg-input)",
+              border: "1px solid var(--border)",
+              color: "var(--white)",
               fontFamily: "inherit",
               fontSize: "12px",
             }}
@@ -477,9 +477,9 @@ export default function LLMPage() {
                 onChange={(e) => handleTemplateChange(e.target.value)}
                 style={{
                   padding: "4px 8px",
-                  backgroundColor: "#111820",
-                  border: `1px solid ${selectedTemplateId ? "rgba(255, 204, 0, 0.4)" : "#1e2a3a"}`,
-                  color: selectedTemplateId ? "#ffcc00" : "#5a6a7a",
+                  backgroundColor: "var(--bg-input)",
+                  border: `1px solid ${selectedTemplateId ? "rgba(255, 204, 0, 0.4)" : "var(--border)"}`,
+                  color: selectedTemplateId ? "var(--yellow)" : "var(--gray)",
                   fontFamily: "inherit",
                   fontSize: "12px",
                   maxWidth: "180px",
@@ -515,9 +515,9 @@ export default function LLMPage() {
                 }}
                 style={{
                   padding: "4px 8px",
-                  backgroundColor: "#111820",
-                  border: `1px solid ${selectedKBIds.length > 0 ? "rgba(0, 229, 255, 0.4)" : "#1e2a3a"}`,
-                  color: selectedKBIds.length > 0 ? "#00e5ff" : "#5a6a7a",
+                  backgroundColor: "var(--bg-input)",
+                  border: `1px solid ${selectedKBIds.length > 0 ? "rgba(0, 229, 255, 0.4)" : "var(--border)"}`,
+                  color: selectedKBIds.length > 0 ? "var(--cyan)" : "var(--gray)",
                   fontFamily: "inherit",
                   fontSize: "12px",
                   maxWidth: "150px",
@@ -552,8 +552,8 @@ export default function LLMPage() {
                 style={{
                   padding: "4px 10px",
                   backgroundColor: webSearchEnabled ? "rgba(0, 150, 255, 0.12)" : "transparent",
-                  border: `1px solid ${webSearchEnabled ? "rgba(0, 150, 255, 0.5)" : "#1e2a3a"}`,
-                  color: webSearchEnabled ? "#0096ff" : "#5a6a7a",
+                  border: `1px solid ${webSearchEnabled ? "rgba(0, 150, 255, 0.5)" : "var(--border)"}`,
+                  color: webSearchEnabled ? "#0096ff" : "var(--gray)",
                   fontFamily: "inherit",
                   fontSize: "11px",
                   fontWeight: webSearchEnabled ? 700 : 400,
@@ -570,8 +570,8 @@ export default function LLMPage() {
                 }}
                 onMouseLeave={(e) => {
                   if (!webSearchEnabled) {
-                    e.currentTarget.style.borderColor = "#1e2a3a";
-                    e.currentTarget.style.color = "#5a6a7a";
+                    e.currentTarget.style.borderColor = "var(--border)";
+                    e.currentTarget.style.color = "var(--gray)";
                   }
                 }}
                 title="Enable web search (OpenAI Responses API)"
@@ -584,7 +584,7 @@ export default function LLMPage() {
           {activeConv && (
             <>
               <span className="chat-sep" style={{ color: "#333" }}>|</span>
-              <span style={{ color: "#5a6a7a", fontSize: "12px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span style={{ color: "var(--gray)", fontSize: "12px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {activeConv.title}
               </span>
             </>
@@ -615,7 +615,7 @@ export default function LLMPage() {
               }}
             >
               <div style={{ fontSize: "48px", opacity: 0.3 }}>{">"}_</div>
-              <div style={{ fontSize: "13px", color: "#444" }}>
+              <div style={{ fontSize: "13px", color: "var(--dim)" }}>
                 Start a conversation or select one from the sidebar
               </div>
             </div>
@@ -639,7 +639,7 @@ export default function LLMPage() {
                   textTransform: "uppercase",
                   letterSpacing: "0.1em",
                   marginBottom: "4px",
-                  color: msg.role === "user" ? "#00e5ff" : "#00ff88",
+                  color: msg.role === "user" ? "var(--cyan)" : "var(--green)",
                 }}
               >
                 {msg.role === "user" ? "you" : "assistant"}
@@ -657,7 +657,7 @@ export default function LLMPage() {
                   wordBreak: "break-word",
                   fontSize: "13px",
                   lineHeight: "1.6",
-                  color: "#e0e0e0",
+                  color: "var(--white)",
                 }}
               >
                 {msg.content}
@@ -683,7 +683,7 @@ export default function LLMPage() {
                     </div>
                     {cites.map((c: Citation, i: number) => (
                       <div key={i} style={{ marginBottom: "2px" }}>
-                        <span style={{ color: "#555" }}>&#8226; </span>
+                        <span style={{ color: "var(--dim)" }}>&#8226; </span>
                         <a
                           href={c.url}
                           target="_blank"
@@ -708,22 +708,22 @@ export default function LLMPage() {
                     gap: "12px",
                     fontSize: "10px",
                     marginTop: "4px",
-                    color: "#444",
+                    color: "var(--dim)",
                   }}
                 >
                   {msg.inputTokens != null && (
                     <span>
-                      <span style={{ color: "#555" }}>in:</span> {msg.inputTokens}
+                      <span style={{ color: "var(--dim)" }}>in:</span> {msg.inputTokens}
                     </span>
                   )}
                   {msg.outputTokens != null && (
                     <span>
-                      <span style={{ color: "#555" }}>out:</span> {msg.outputTokens}
+                      <span style={{ color: "var(--dim)" }}>out:</span> {msg.outputTokens}
                     </span>
                   )}
                   {msg.latencyMs != null && (
                     <span>
-                      <span style={{ color: "#555" }}>latency:</span> {(msg.latencyMs / 1000).toFixed(1)}s
+                      <span style={{ color: "var(--dim)" }}>latency:</span> {(msg.latencyMs / 1000).toFixed(1)}s
                     </span>
                   )}
                 </div>
@@ -747,7 +747,7 @@ export default function LLMPage() {
                   textTransform: "uppercase",
                   letterSpacing: "0.1em",
                   marginBottom: "4px",
-                  color: "#00ff88",
+                  color: "var(--green)",
                 }}
               >
                 assistant
@@ -758,7 +758,7 @@ export default function LLMPage() {
                   backgroundColor: "rgba(0, 255, 136, 0.04)",
                   border: "1px solid rgba(0, 255, 136, 0.12)",
                   borderRadius: "4px",
-                  color: "#00ff88",
+                  color: "var(--green)",
                   fontSize: "13px",
                 }}
               >
@@ -777,8 +777,8 @@ export default function LLMPage() {
               margin: "0 16px",
               padding: "8px 12px",
               backgroundColor: "rgba(255, 68, 68, 0.08)",
-              border: "1px solid #ff4444",
-              color: "#ff4444",
+              border: "1px solid var(--red)",
+              color: "var(--red)",
               fontSize: "12px",
             }}
           >
@@ -800,8 +800,8 @@ export default function LLMPage() {
         <div
           style={{
             padding: "12px 16px",
-            borderTop: "1px solid #1e2a3a",
-            backgroundColor: "#0d1117",
+            borderTop: "1px solid var(--border)",
+            backgroundColor: "var(--bg-panel)",
             display: "flex",
             gap: "8px",
             alignItems: "flex-end",
@@ -818,9 +818,9 @@ export default function LLMPage() {
             style={{
               flex: 1,
               padding: "10px 12px",
-              backgroundColor: "#111820",
-              border: "1px solid #1e2a3a",
-              color: "#e0e0e0",
+              backgroundColor: "var(--bg-input)",
+              border: "1px solid var(--border)",
+              color: "var(--white)",
               fontFamily: "inherit",
               fontSize: "13px",
               resize: "none",
@@ -837,7 +837,7 @@ export default function LLMPage() {
               e.currentTarget.style.borderColor = "rgba(0, 255, 136, 0.4)";
             }}
             onBlur={(e) => {
-              e.currentTarget.style.borderColor = "#1e2a3a";
+              e.currentTarget.style.borderColor = "var(--border)";
             }}
           />
           <button
@@ -846,8 +846,8 @@ export default function LLMPage() {
             style={{
               padding: "10px 20px",
               background: "transparent",
-              border: `1px solid ${loading || !input.trim() ? "#333" : "#00ff88"}`,
-              color: loading || !input.trim() ? "#333" : "#00ff88",
+              border: `1px solid ${loading || !input.trim() ? "#333" : "var(--green)"}`,
+              color: loading || !input.trim() ? "#333" : "var(--green)",
               fontFamily: "inherit",
               fontSize: "12px",
               fontWeight: 700,

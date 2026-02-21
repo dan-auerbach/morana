@@ -48,7 +48,7 @@ export default function CostPreview({
       style={{
         fontSize: "10px",
         fontFamily: "inherit",
-        color: "#ffcc00",
+        color: "var(--yellow)",
         padding: "4px 8px",
         backgroundColor: "rgba(255, 204, 0, 0.06)",
         border: "1px solid rgba(255, 204, 0, 0.15)",
@@ -58,7 +58,7 @@ export default function CostPreview({
         gap: "6px",
       }}
     >
-      <span style={{ color: "#00ff88", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+      <span style={{ color: "var(--green)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>
         COST
       </span>
       <span>{display}</span>

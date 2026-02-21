@@ -119,8 +119,8 @@ export default function ImagePage() {
 
   if (!session) {
     return (
-      <div style={{ color: "#5a6a7a" }}>
-        <span style={{ color: "#ff4444" }}>[ERROR]</span> Authentication required.
+      <div style={{ color: "var(--gray)" }}>
+        <span style={{ color: "var(--red)" }}>[ERROR]</span> Authentication required.
       </div>
     );
   }
@@ -472,7 +472,7 @@ export default function ImagePage() {
   // ─── Derived ─────────────────────────────────────────────
 
   const charPercent = Math.min((prompt.length / 10000) * 100, 100);
-  const charColor = charPercent > 90 ? "#ff4444" : charPercent > 70 ? "#ffcc00" : "#5a6a7a";
+  const charColor = charPercent > 90 ? "var(--red)" : charPercent > 70 ? "var(--yellow)" : "var(--gray)";
   const selectedModel = FAL_MODELS.find((m) => m.id === modelId);
 
   // ─── Render ──────────────────────────────────────────────
@@ -485,15 +485,15 @@ export default function ImagePage() {
         style={{
           width: sidebarOpen ? "240px" : "0px",
           minWidth: sidebarOpen ? "240px" : "0px",
-          borderRight: sidebarOpen ? "1px solid #1e2a3a" : "none",
-          backgroundColor: "#0a0e14",
+          borderRight: sidebarOpen ? "1px solid var(--border)" : "none",
+          backgroundColor: "var(--bg)",
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
           transition: "all 0.2s",
         }}
       >
-        <div style={{ padding: "8px", borderBottom: "1px solid #1e2a3a" }}>
+        <div style={{ padding: "8px", borderBottom: "1px solid var(--border)" }}>
           <button
             onClick={() => {
               setRunId("");
@@ -512,8 +512,8 @@ export default function ImagePage() {
               width: "100%",
               padding: "7px 12px",
               background: "transparent",
-              border: "1px solid #00ff88",
-              color: "#00ff88",
+              border: "1px solid var(--green)",
+              color: "var(--green)",
               fontFamily: "inherit",
               fontSize: "11px",
               fontWeight: 700,
@@ -528,7 +528,7 @@ export default function ImagePage() {
             + New Image
           </button>
         </div>
-        <div style={{ padding: "8px 12px 4px", fontSize: "11px", fontWeight: 700, color: "#ffcc00", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+        <div style={{ padding: "8px 12px 4px", fontSize: "11px", fontWeight: 700, color: "var(--yellow)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
           History
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: "4px 8px" }}>
@@ -548,14 +548,14 @@ export default function ImagePage() {
               onMouseEnter={(e) => { if (r.id !== runId) e.currentTarget.style.backgroundColor = "rgba(0, 255, 136, 0.04)"; }}
               onMouseLeave={(e) => { if (r.id !== runId) e.currentTarget.style.backgroundColor = "transparent"; }}
             >
-              <div style={{ color: r.id === runId ? "#e0e0e0" : "#8b949e", fontSize: "11px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: "3px" }}>
+              <div style={{ color: r.id === runId ? "var(--white)" : "var(--text-secondary)", fontSize: "11px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: "3px" }}>
                 {r.preview || r.id.slice(0, 16) + "..."}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                <span style={{ color: "#444", fontSize: "9px" }}>
+                <span style={{ color: "var(--dim)", fontSize: "9px" }}>
                   {new Date(r.createdAt).toLocaleString("sl-SI", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
                 </span>
-                <span style={{ color: r.model?.includes("flux") || r.model?.includes("face") ? "#00e5ff" : "#ffcc00", fontSize: "9px" }}>
+                <span style={{ color: r.model?.includes("flux") || r.model?.includes("face") ? "var(--cyan)" : "var(--yellow)", fontSize: "9px" }}>
                   {r.model?.includes("schnell") ? "SCH" : r.model?.includes("face-swap") ? "SWAP" : r.model?.includes("flux-2") ? "FX2" : r.model?.includes("dev") ? "DEV" : r.model?.includes("kontext") ? "KTX" : "GEM"}
                 </span>
               </div>
@@ -570,15 +570,15 @@ export default function ImagePage() {
       {/* Main area */}
       <div className="page-main" style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, overflowY: "auto" }}>
         {/* Header */}
-        <div style={{ padding: "10px 16px", borderBottom: "1px solid #1e2a3a", backgroundColor: "#0d1117", display: "flex", alignItems: "center", gap: "12px", flexShrink: 0, flexWrap: "wrap" }}>
+        <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--border)", backgroundColor: "var(--bg-panel)", display: "flex", alignItems: "center", gap: "12px", flexShrink: 0, flexWrap: "wrap" }}>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            style={{ background: "transparent", border: "1px solid #1e2a3a", color: "#5a6a7a", cursor: "pointer", padding: "4px 8px", fontFamily: "inherit", fontSize: "12px" }}
+            style={{ background: "transparent", border: "1px solid var(--border)", color: "var(--gray)", cursor: "pointer", padding: "4px 8px", fontFamily: "inherit", fontSize: "12px" }}
           >
             {sidebarOpen ? "<<" : ">>"}
           </button>
-          <span style={{ color: "#00ff88", fontSize: "14px", fontWeight: 700 }}>[IMAGE]</span>
-          <span style={{ color: "#5a6a7a", fontSize: "12px" }}>$ image --provider {provider} --{operation}</span>
+          <span style={{ color: "var(--green)", fontSize: "14px", fontWeight: 700 }}>[IMAGE]</span>
+          <span style={{ color: "var(--gray)", fontSize: "12px" }}>$ image --provider {provider} --{operation}</span>
         </div>
 
         {/* Content */}
@@ -587,7 +587,7 @@ export default function ImagePage() {
           {/* Provider & Operation toggle */}
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
             {/* Provider toggle */}
-            <div style={{ display: "flex", border: "1px solid #1e2a3a", overflow: "hidden" }}>
+            <div style={{ display: "flex", border: "1px solid var(--border)", overflow: "hidden" }}>
               {(["fal", "gemini"] as const).map((p) => (
                 <button
                   key={p}
@@ -604,8 +604,8 @@ export default function ImagePage() {
                     padding: "6px 14px",
                     background: provider === p ? (p === "fal" ? "rgba(0, 229, 255, 0.15)" : "rgba(255, 204, 0, 0.15)") : "transparent",
                     border: "none",
-                    borderRight: p === "fal" ? "1px solid #1e2a3a" : "none",
-                    color: provider === p ? (p === "fal" ? "#00e5ff" : "#ffcc00") : "#5a6a7a",
+                    borderRight: p === "fal" ? "1px solid var(--border)" : "none",
+                    color: provider === p ? (p === "fal" ? "var(--cyan)" : "var(--yellow)") : "var(--gray)",
                     fontFamily: "inherit",
                     fontSize: "12px",
                     fontWeight: provider === p ? 700 : 400,
@@ -621,7 +621,7 @@ export default function ImagePage() {
 
             {/* Operation toggle (only for fal) */}
             {provider === "fal" && (
-              <div style={{ display: "flex", border: "1px solid #1e2a3a", overflow: "hidden" }}>
+              <div style={{ display: "flex", border: "1px solid var(--border)", overflow: "hidden" }}>
                 {([
                   { id: "generate" as const, label: "Generate" },
                   { id: "img2img" as const, label: "Img2Img" },
@@ -655,8 +655,8 @@ export default function ImagePage() {
                       padding: "6px 14px",
                       background: operation === op.id ? "rgba(0, 255, 136, 0.12)" : "transparent",
                       border: "none",
-                      borderRight: idx < 3 ? "1px solid #1e2a3a" : "none",
-                      color: operation === op.id ? "#00ff88" : "#5a6a7a",
+                      borderRight: idx < 3 ? "1px solid var(--border)" : "none",
+                      color: operation === op.id ? "var(--green)" : "var(--gray)",
                       fontFamily: "inherit",
                       fontSize: "12px",
                       fontWeight: operation === op.id ? 700 : 400,
@@ -675,7 +675,7 @@ export default function ImagePage() {
           {/* Model selector (fal only, not for face-swap or multi-edit) */}
           {provider === "fal" && operation !== "face-swap" && operation !== "multi-edit" && (
             <div>
-              <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#00e5ff", textTransform: "uppercase", letterSpacing: "0.1em" }}>--model</label>
+              <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "var(--cyan)", textTransform: "uppercase", letterSpacing: "0.1em" }}>--model</label>
               <select
                 value={modelId}
                 onChange={(e) => {
@@ -685,7 +685,7 @@ export default function ImagePage() {
                     setOperation("generate");
                   }
                 }}
-                style={{ padding: "6px 10px", backgroundColor: "#111820", border: "1px solid #1e2a3a", color: "#e0e0e0", fontFamily: "inherit", fontSize: "13px", width: "100%", maxWidth: "400px" }}
+                style={{ padding: "6px 10px", backgroundColor: "var(--bg-input)", border: "1px solid var(--border)", color: "var(--white)", fontFamily: "inherit", fontSize: "13px", width: "100%", maxWidth: "400px" }}
               >
                 {FAL_MODELS.map((m) => (
                   <option key={m.id} value={m.id}>{m.label}</option>
@@ -697,7 +697,7 @@ export default function ImagePage() {
           {/* Prompt input (not shown for face-swap) */}
           {operation !== "face-swap" && (
           <div>
-            <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#00ff88", textTransform: "uppercase", letterSpacing: "0.1em" }}>--prompt</label>
+            <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "var(--green)", textTransform: "uppercase", letterSpacing: "0.1em" }}>--prompt</label>
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
@@ -707,7 +707,7 @@ export default function ImagePage() {
                 operation === "multi-edit" ? "Describe how to combine/edit the reference images..." :
                 "Describe the image to generate..."
               }
-              style={{ width: "100%", padding: "8px 12px", backgroundColor: "#111820", border: "1px solid #1e2a3a", color: "#e0e0e0", fontFamily: "inherit", fontSize: "13px", resize: "vertical" }}
+              style={{ width: "100%", padding: "8px 12px", backgroundColor: "var(--bg-input)", border: "1px solid var(--border)", color: "var(--white)", fontFamily: "inherit", fontSize: "13px", resize: "vertical" }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
@@ -717,10 +717,10 @@ export default function ImagePage() {
             />
             <div style={{ marginTop: "4px", fontSize: "11px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span style={{ color: charColor }}>
-                <span style={{ color: "#ffcc00" }}>CHARS:</span> {prompt.length.toLocaleString()} / 10,000
+                <span style={{ color: "var(--yellow)" }}>CHARS:</span> {prompt.length.toLocaleString()} / 10,000
               </span>
-              <div style={{ width: "120px", height: "4px", backgroundColor: "#1e2a3a", overflow: "hidden" }}>
-                <div style={{ width: `${charPercent}%`, height: "100%", backgroundColor: charColor === "#ff4444" ? "#ff4444" : charColor === "#ffcc00" ? "#ffcc00" : "#00ff88", transition: "width 0.2s" }} />
+              <div style={{ width: "120px", height: "4px", backgroundColor: "var(--border)", overflow: "hidden" }}>
+                <div style={{ width: `${charPercent}%`, height: "100%", backgroundColor: charColor === "var(--red)" ? "var(--red)" : charColor === "var(--yellow)" ? "var(--yellow)" : "var(--green)", transition: "width 0.2s" }} />
               </div>
             </div>
           </div>
@@ -729,7 +729,7 @@ export default function ImagePage() {
           {/* Aspect ratio (fal only, not for face-swap) */}
           {provider === "fal" && operation !== "face-swap" && (
             <div>
-              <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#00e5ff", textTransform: "uppercase", letterSpacing: "0.1em" }}>--aspect-ratio</label>
+              <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "var(--cyan)", textTransform: "uppercase", letterSpacing: "0.1em" }}>--aspect-ratio</label>
               <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
                 {ASPECT_RATIOS.map((ar) => (
                   <button
@@ -738,8 +738,8 @@ export default function ImagePage() {
                     style={{
                       padding: "5px 12px",
                       background: aspectRatio === ar.id ? "rgba(0, 229, 255, 0.15)" : "transparent",
-                      border: `1px solid ${aspectRatio === ar.id ? "#00e5ff" : "#1e2a3a"}`,
-                      color: aspectRatio === ar.id ? "#00e5ff" : "#5a6a7a",
+                      border: `1px solid ${aspectRatio === ar.id ? "var(--cyan)" : "var(--border)"}`,
+                      color: aspectRatio === ar.id ? "var(--cyan)" : "var(--gray)",
                       fontFamily: "inherit",
                       fontSize: "12px",
                       cursor: "pointer",
@@ -757,7 +757,7 @@ export default function ImagePage() {
           {provider === "fal" && operation !== "face-swap" && operation !== "multi-edit" && (
             <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
               <div>
-                <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#00e5ff", textTransform: "uppercase", letterSpacing: "0.1em" }}>--count</label>
+                <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "var(--cyan)", textTransform: "uppercase", letterSpacing: "0.1em" }}>--count</label>
                 <div style={{ display: "flex", gap: "4px" }}>
                   {[1, 2, 3, 4].map((n) => (
                     <button
@@ -766,8 +766,8 @@ export default function ImagePage() {
                       style={{
                         padding: "5px 12px",
                         background: numImages === n ? "rgba(0, 229, 255, 0.15)" : "transparent",
-                        border: `1px solid ${numImages === n ? "#00e5ff" : "#1e2a3a"}`,
-                        color: numImages === n ? "#00e5ff" : "#5a6a7a",
+                        border: `1px solid ${numImages === n ? "var(--cyan)" : "var(--border)"}`,
+                        color: numImages === n ? "var(--cyan)" : "var(--gray)",
                         fontFamily: "inherit",
                         fontSize: "12px",
                         cursor: "pointer",
@@ -781,7 +781,7 @@ export default function ImagePage() {
               </div>
 
               <div>
-                <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#00e5ff", textTransform: "uppercase", letterSpacing: "0.1em" }}>--format</label>
+                <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "var(--cyan)", textTransform: "uppercase", letterSpacing: "0.1em" }}>--format</label>
                 <div style={{ display: "flex", gap: "4px" }}>
                   {(["jpeg", "png"] as const).map((fmt) => (
                     <button
@@ -790,8 +790,8 @@ export default function ImagePage() {
                       style={{
                         padding: "5px 12px",
                         background: outputFormat === fmt ? "rgba(0, 229, 255, 0.15)" : "transparent",
-                        border: `1px solid ${outputFormat === fmt ? "#00e5ff" : "#1e2a3a"}`,
-                        color: outputFormat === fmt ? "#00e5ff" : "#5a6a7a",
+                        border: `1px solid ${outputFormat === fmt ? "var(--cyan)" : "var(--border)"}`,
+                        color: outputFormat === fmt ? "var(--cyan)" : "var(--gray)",
                         fontFamily: "inherit",
                         fontSize: "12px",
                         cursor: "pointer",
@@ -810,8 +810,8 @@ export default function ImagePage() {
           {/* Image upload (img2img or Gemini edit) */}
           {(operation === "img2img" || provider === "gemini") && (
             <div>
-              <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#00ff88", textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                --input-image {provider === "gemini" && <span style={{ color: "#5a6a7a", fontWeight: 400, textTransform: "none" }}>(optional, for editing)</span>}
+              <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "var(--green)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                --input-image {provider === "gemini" && <span style={{ color: "var(--gray)", fontWeight: 400, textTransform: "none" }}>(optional, for editing)</span>}
               </label>
               <input
                 ref={fileRef}
@@ -826,8 +826,8 @@ export default function ImagePage() {
                   style={{
                     padding: "10px 20px",
                     background: "transparent",
-                    border: "1px dashed #1e2a3a",
-                    color: "#5a6a7a",
+                    border: "1px dashed var(--border)",
+                    color: "var(--gray)",
                     fontFamily: "inherit",
                     fontSize: "12px",
                     cursor: "pointer",
@@ -835,28 +835,28 @@ export default function ImagePage() {
                     textAlign: "center",
                     transition: "all 0.2s",
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(0, 255, 136, 0.4)"; e.currentTarget.style.color = "#00ff88"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#1e2a3a"; e.currentTarget.style.color = "#5a6a7a"; }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(0, 255, 136, 0.4)"; e.currentTarget.style.color = "var(--green)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.color = "var(--gray)"; }}
                 >
                   [  UPLOAD IMAGE  ] — PNG, JPEG, WebP, GIF (max 20MB)
                 </button>
               ) : (
-                <div style={{ border: "1px solid #1e2a3a", backgroundColor: "#111820", padding: "12px", display: "flex", alignItems: "center", gap: "12px" }}>
+                <div style={{ border: "1px solid var(--border)", backgroundColor: "var(--bg-input)", padding: "12px", display: "flex", alignItems: "center", gap: "12px" }}>
                   <img
                     src={uploadedImage}
                     alt="Uploaded"
-                    style={{ width: "80px", height: "80px", objectFit: "cover", border: "1px solid #1e2a3a" }}
+                    style={{ width: "80px", height: "80px", objectFit: "cover", border: "1px solid var(--border)" }}
                   />
                   <div style={{ flex: 1 }}>
-                    <div style={{ color: "#e0e0e0", fontSize: "12px" }}>{uploadedImageName}</div>
-                    <div style={{ color: "#5a6a7a", fontSize: "11px", marginTop: "2px" }}>{uploadedImageMime}</div>
+                    <div style={{ color: "var(--white)", fontSize: "12px" }}>{uploadedImageName}</div>
+                    <div style={{ color: "var(--gray)", fontSize: "11px", marginTop: "2px" }}>{uploadedImageMime}</div>
                   </div>
                   <button
                     onClick={removeUploadedImage}
                     style={{
                       background: "transparent",
                       border: "1px solid rgba(255, 68, 68, 0.3)",
-                      color: "#ff4444",
+                      color: "var(--red)",
                       padding: "4px 10px",
                       fontFamily: "inherit",
                       fontSize: "11px",
@@ -880,24 +880,24 @@ export default function ImagePage() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                 {/* Face source */}
                 <div>
-                  <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#00e5ff", textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                    --face-image <span style={{ color: "#5a6a7a", fontWeight: 400, textTransform: "none" }}>(your face)</span>
+                  <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "var(--cyan)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                    --face-image <span style={{ color: "var(--gray)", fontWeight: 400, textTransform: "none" }}>(your face)</span>
                   </label>
                   {faceImage ? (
-                    <div style={{ border: "1px solid #1e2a3a", backgroundColor: "#111820", padding: "8px", position: "relative" }}>
-                      <img src={faceImage.dataUri} alt="Face" style={{ width: "100%", height: "140px", objectFit: "cover", border: "1px solid #1e2a3a" }} />
-                      <div style={{ color: "#5a6a7a", fontSize: "10px", marginTop: "4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{faceImage.name}</div>
+                    <div style={{ border: "1px solid var(--border)", backgroundColor: "var(--bg-input)", padding: "8px", position: "relative" }}>
+                      <img src={faceImage.dataUri} alt="Face" style={{ width: "100%", height: "140px", objectFit: "cover", border: "1px solid var(--border)" }} />
+                      <div style={{ color: "var(--gray)", fontSize: "10px", marginTop: "4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{faceImage.name}</div>
                       <button
                         onClick={() => { setFaceImage(null); if (faceFileRef.current) faceFileRef.current.value = ""; }}
-                        style={{ position: "absolute", top: "4px", right: "4px", background: "rgba(0,0,0,0.7)", border: "1px solid #ff4444", color: "#ff4444", padding: "1px 5px", fontFamily: "inherit", fontSize: "10px", cursor: "pointer" }}
+                        style={{ position: "absolute", top: "4px", right: "4px", background: "rgba(0,0,0,0.7)", border: "1px solid var(--red)", color: "var(--red)", padding: "1px 5px", fontFamily: "inherit", fontSize: "10px", cursor: "pointer" }}
                       >x</button>
                     </div>
                   ) : (
                     <button
                       onClick={() => faceFileRef.current?.click()}
-                      style={{ padding: "30px 10px", background: "transparent", border: "1px dashed #1e2a3a", color: "#5a6a7a", fontFamily: "inherit", fontSize: "11px", cursor: "pointer", width: "100%", textAlign: "center", transition: "all 0.2s" }}
-                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(0, 229, 255, 0.4)"; e.currentTarget.style.color = "#00e5ff"; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#1e2a3a"; e.currentTarget.style.color = "#5a6a7a"; }}
+                      style={{ padding: "30px 10px", background: "transparent", border: "1px dashed var(--border)", color: "var(--gray)", fontFamily: "inherit", fontSize: "11px", cursor: "pointer", width: "100%", textAlign: "center", transition: "all 0.2s" }}
+                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(0, 229, 255, 0.4)"; e.currentTarget.style.color = "var(--cyan)"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.color = "var(--gray)"; }}
                     >
                       [  UPLOAD FACE  ]
                     </button>
@@ -906,24 +906,24 @@ export default function ImagePage() {
 
                 {/* Target scene */}
                 <div>
-                  <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#00e5ff", textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                    --target-image <span style={{ color: "#5a6a7a", fontWeight: 400, textTransform: "none" }}>(scene)</span>
+                  <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "var(--cyan)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                    --target-image <span style={{ color: "var(--gray)", fontWeight: 400, textTransform: "none" }}>(scene)</span>
                   </label>
                   {targetImage ? (
-                    <div style={{ border: "1px solid #1e2a3a", backgroundColor: "#111820", padding: "8px", position: "relative" }}>
-                      <img src={targetImage.dataUri} alt="Target" style={{ width: "100%", height: "140px", objectFit: "cover", border: "1px solid #1e2a3a" }} />
-                      <div style={{ color: "#5a6a7a", fontSize: "10px", marginTop: "4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{targetImage.name}</div>
+                    <div style={{ border: "1px solid var(--border)", backgroundColor: "var(--bg-input)", padding: "8px", position: "relative" }}>
+                      <img src={targetImage.dataUri} alt="Target" style={{ width: "100%", height: "140px", objectFit: "cover", border: "1px solid var(--border)" }} />
+                      <div style={{ color: "var(--gray)", fontSize: "10px", marginTop: "4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{targetImage.name}</div>
                       <button
                         onClick={() => { setTargetImage(null); if (targetFileRef.current) targetFileRef.current.value = ""; }}
-                        style={{ position: "absolute", top: "4px", right: "4px", background: "rgba(0,0,0,0.7)", border: "1px solid #ff4444", color: "#ff4444", padding: "1px 5px", fontFamily: "inherit", fontSize: "10px", cursor: "pointer" }}
+                        style={{ position: "absolute", top: "4px", right: "4px", background: "rgba(0,0,0,0.7)", border: "1px solid var(--red)", color: "var(--red)", padding: "1px 5px", fontFamily: "inherit", fontSize: "10px", cursor: "pointer" }}
                       >x</button>
                     </div>
                   ) : (
                     <button
                       onClick={() => targetFileRef.current?.click()}
-                      style={{ padding: "30px 10px", background: "transparent", border: "1px dashed #1e2a3a", color: "#5a6a7a", fontFamily: "inherit", fontSize: "11px", cursor: "pointer", width: "100%", textAlign: "center", transition: "all 0.2s" }}
-                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(0, 229, 255, 0.4)"; e.currentTarget.style.color = "#00e5ff"; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#1e2a3a"; e.currentTarget.style.color = "#5a6a7a"; }}
+                      style={{ padding: "30px 10px", background: "transparent", border: "1px dashed var(--border)", color: "var(--gray)", fontFamily: "inherit", fontSize: "11px", cursor: "pointer", width: "100%", textAlign: "center", transition: "all 0.2s" }}
+                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(0, 229, 255, 0.4)"; e.currentTarget.style.color = "var(--cyan)"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.color = "var(--gray)"; }}
                     >
                       [  UPLOAD SCENE  ]
                     </button>
@@ -931,7 +931,7 @@ export default function ImagePage() {
                 </div>
               </div>
 
-              <div style={{ fontSize: "10px", color: "#5a6a7a", fontStyle: "italic" }}>
+              <div style={{ fontSize: "10px", color: "var(--gray)", fontStyle: "italic" }}>
                 Upload your face photo and a target scene. The face will be swapped onto the person in the scene.
               </div>
             </div>
@@ -940,8 +940,8 @@ export default function ImagePage() {
           {/* Multi-edit upload (FLUX.2) */}
           {operation === "multi-edit" && provider === "fal" && (
             <div>
-              <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#00ff88", textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                --reference-images <span style={{ color: "#e0e0e0", fontWeight: 400, textTransform: "none" }}>({multiImages.length}/4)</span>
+              <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "var(--green)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                --reference-images <span style={{ color: "var(--white)", fontWeight: 400, textTransform: "none" }}>({multiImages.length}/4)</span>
               </label>
               <input
                 ref={multiFileRef}
@@ -956,13 +956,13 @@ export default function ImagePage() {
               {multiImages.length > 0 && (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: "8px", marginBottom: "8px" }}>
                   {multiImages.map((img, idx) => (
-                    <div key={idx} style={{ border: "1px solid #1e2a3a", backgroundColor: "#111820", padding: "8px", position: "relative" }}>
-                      <div style={{ color: "#00e5ff", fontSize: "10px", fontWeight: 700, marginBottom: "4px", textTransform: "uppercase" }}>Image {idx + 1}</div>
-                      <img src={img.dataUri} alt={`Input ${idx + 1}`} style={{ width: "100%", height: "100px", objectFit: "cover", border: "1px solid #1e2a3a" }} />
-                      <div style={{ color: "#5a6a7a", fontSize: "10px", marginTop: "4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{img.name}</div>
+                    <div key={idx} style={{ border: "1px solid var(--border)", backgroundColor: "var(--bg-input)", padding: "8px", position: "relative" }}>
+                      <div style={{ color: "var(--cyan)", fontSize: "10px", fontWeight: 700, marginBottom: "4px", textTransform: "uppercase" }}>Image {idx + 1}</div>
+                      <img src={img.dataUri} alt={`Input ${idx + 1}`} style={{ width: "100%", height: "100px", objectFit: "cover", border: "1px solid var(--border)" }} />
+                      <div style={{ color: "var(--gray)", fontSize: "10px", marginTop: "4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{img.name}</div>
                       <button
                         onClick={() => removeMultiImage(idx)}
-                        style={{ position: "absolute", top: "4px", right: "4px", background: "rgba(0,0,0,0.7)", border: "1px solid #ff4444", color: "#ff4444", padding: "1px 5px", fontFamily: "inherit", fontSize: "10px", cursor: "pointer" }}
+                        style={{ position: "absolute", top: "4px", right: "4px", background: "rgba(0,0,0,0.7)", border: "1px solid var(--red)", color: "var(--red)", padding: "1px 5px", fontFamily: "inherit", fontSize: "10px", cursor: "pointer" }}
                       >
                         x
                       </button>
@@ -977,8 +977,8 @@ export default function ImagePage() {
                   style={{
                     padding: "10px 20px",
                     background: "transparent",
-                    border: "1px dashed #1e2a3a",
-                    color: "#5a6a7a",
+                    border: "1px dashed var(--border)",
+                    color: "var(--gray)",
                     fontFamily: "inherit",
                     fontSize: "12px",
                     cursor: "pointer",
@@ -986,14 +986,14 @@ export default function ImagePage() {
                     textAlign: "center",
                     transition: "all 0.2s",
                   }}
-                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(0, 255, 136, 0.4)"; e.currentTarget.style.color = "#00ff88"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#1e2a3a"; e.currentTarget.style.color = "#5a6a7a"; }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(0, 255, 136, 0.4)"; e.currentTarget.style.color = "var(--green)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.color = "var(--gray)"; }}
                 >
                   [  + ADD IMAGE{multiImages.length > 0 ? "S" : ""}  ] — PNG, JPEG, WebP (max 20MB each, up to 4)
                 </button>
               )}
 
-              <div style={{ fontSize: "10px", color: "#5a6a7a", marginTop: "6px", fontStyle: "italic" }}>
+              <div style={{ fontSize: "10px", color: "var(--gray)", marginTop: "6px", fontStyle: "italic" }}>
                 Reference images by order in your prompt. FLUX.2 multi-reference editing for compositing, style transfer, and context-aware edits.
               </div>
             </div>
@@ -1002,8 +1002,8 @@ export default function ImagePage() {
           {/* Strength slider (img2img only) */}
           {operation === "img2img" && provider === "fal" && (
             <div>
-              <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#00e5ff", textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                --strength <span style={{ color: "#e0e0e0", fontWeight: 400 }}>{strength.toFixed(2)}</span>
+              <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "var(--cyan)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
+                --strength <span style={{ color: "var(--white)", fontWeight: 400 }}>{strength.toFixed(2)}</span>
               </label>
               <input
                 type="range"
@@ -1012,9 +1012,9 @@ export default function ImagePage() {
                 step="0.01"
                 value={strength}
                 onChange={(e) => setStrength(parseFloat(e.target.value))}
-                style={{ width: "100%", maxWidth: "400px", accentColor: "#00e5ff" }}
+                style={{ width: "100%", maxWidth: "400px", accentColor: "var(--cyan)" }}
               />
-              <div style={{ fontSize: "10px", color: "#5a6a7a", display: "flex", justifyContent: "space-between", maxWidth: "400px" }}>
+              <div style={{ fontSize: "10px", color: "var(--gray)", display: "flex", justifyContent: "space-between", maxWidth: "400px" }}>
                 <span>Subtle (preserve input)</span>
                 <span>Strong (new generation)</span>
               </div>
@@ -1029,7 +1029,7 @@ export default function ImagePage() {
                 style={{
                   background: "transparent",
                   border: "none",
-                  color: "#5a6a7a",
+                  color: "var(--gray)",
                   fontFamily: "inherit",
                   fontSize: "11px",
                   cursor: "pointer",
@@ -1042,11 +1042,11 @@ export default function ImagePage() {
               </button>
 
               {showAdvanced && (
-                <div style={{ padding: "12px", border: "1px solid #1e2a3a", backgroundColor: "#0a0e14", display: "flex", flexDirection: "column", gap: "12px", marginTop: "4px" }}>
+                <div style={{ padding: "12px", border: "1px solid var(--border)", backgroundColor: "var(--bg)", display: "flex", flexDirection: "column", gap: "12px", marginTop: "4px" }}>
                   {/* Steps */}
                   <div>
-                    <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#5a6a7a", textTransform: "uppercase" }}>
-                      --steps <span style={{ color: "#e0e0e0", fontWeight: 400 }}>{steps ?? selectedModel?.defaultSteps ?? "default"}</span>
+                    <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "var(--gray)", textTransform: "uppercase" }}>
+                      --steps <span style={{ color: "var(--white)", fontWeight: 400 }}>{steps ?? selectedModel?.defaultSteps ?? "default"}</span>
                     </label>
                     <input
                       type="range"
@@ -1054,14 +1054,14 @@ export default function ImagePage() {
                       max="50"
                       value={steps ?? selectedModel?.defaultSteps ?? 28}
                       onChange={(e) => setSteps(parseInt(e.target.value, 10))}
-                      style={{ width: "100%", maxWidth: "400px", accentColor: "#5a6a7a" }}
+                      style={{ width: "100%", maxWidth: "400px", accentColor: "var(--gray)" }}
                     />
                   </div>
 
                   {/* Guidance scale */}
                   <div>
-                    <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#5a6a7a", textTransform: "uppercase" }}>
-                      --guidance <span style={{ color: "#e0e0e0", fontWeight: 400 }}>{guidanceScale ?? "3.5"}</span>
+                    <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "var(--gray)", textTransform: "uppercase" }}>
+                      --guidance <span style={{ color: "var(--white)", fontWeight: 400 }}>{guidanceScale ?? "3.5"}</span>
                     </label>
                     <input
                       type="range"
@@ -1070,19 +1070,19 @@ export default function ImagePage() {
                       step="0.5"
                       value={guidanceScale ?? 3.5}
                       onChange={(e) => setGuidanceScale(parseFloat(e.target.value))}
-                      style={{ width: "100%", maxWidth: "400px", accentColor: "#5a6a7a" }}
+                      style={{ width: "100%", maxWidth: "400px", accentColor: "var(--gray)" }}
                     />
                   </div>
 
                   {/* Seed */}
                   <div>
-                    <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#5a6a7a", textTransform: "uppercase" }}>--seed</label>
+                    <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "var(--gray)", textTransform: "uppercase" }}>--seed</label>
                     <input
                       type="text"
                       value={seed}
                       onChange={(e) => setSeed(e.target.value.replace(/[^0-9]/g, ""))}
                       placeholder="Random"
-                      style={{ padding: "6px 10px", backgroundColor: "#111820", border: "1px solid #1e2a3a", color: "#e0e0e0", fontFamily: "inherit", fontSize: "13px", width: "200px" }}
+                      style={{ padding: "6px 10px", backgroundColor: "var(--bg-input)", border: "1px solid var(--border)", color: "var(--white)", fontFamily: "inherit", fontSize: "13px", width: "200px" }}
                     />
                   </div>
                 </div>
@@ -1096,7 +1096,7 @@ export default function ImagePage() {
               style={{
                 fontSize: "10px",
                 fontFamily: "inherit",
-                color: "#ffcc00",
+                color: "var(--yellow)",
                 padding: "4px 8px",
                 backgroundColor: "rgba(255, 204, 0, 0.06)",
                 border: "1px solid rgba(255, 204, 0, 0.15)",
@@ -1107,7 +1107,7 @@ export default function ImagePage() {
                 alignSelf: "flex-start",
               }}
             >
-              <span style={{ color: "#00ff88", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>COST</span>
+              <span style={{ color: "var(--green)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>COST</span>
               <span>~$0.10 per swap | Face Swap</span>
             </div>
           )}
@@ -1116,7 +1116,7 @@ export default function ImagePage() {
               style={{
                 fontSize: "10px",
                 fontFamily: "inherit",
-                color: "#ffcc00",
+                color: "var(--yellow)",
                 padding: "4px 8px",
                 backgroundColor: "rgba(255, 204, 0, 0.06)",
                 border: "1px solid rgba(255, 204, 0, 0.15)",
@@ -1127,7 +1127,7 @@ export default function ImagePage() {
                 alignSelf: "flex-start",
               }}
             >
-              <span style={{ color: "#00ff88", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>COST</span>
+              <span style={{ color: "var(--green)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>COST</span>
               <span>~$0.025 per image | FLUX.2 Edit ({multiImages.length} input{multiImages.length !== 1 ? "s" : ""})</span>
             </div>
           )}
@@ -1153,8 +1153,8 @@ export default function ImagePage() {
               style={{
                 padding: "8px 24px",
                 background: "transparent",
-                border: `1px solid ${loading ? "#5a6a7a" : "#00ff88"}`,
-                color: loading ? "#5a6a7a" : "#00ff88",
+                border: `1px solid ${loading ? "var(--gray)" : "var(--green)"}`,
+                color: loading ? "var(--gray)" : "var(--green)",
                 fontFamily: "inherit",
                 fontSize: "13px",
                 fontWeight: 700,
@@ -1184,8 +1184,8 @@ export default function ImagePage() {
                 style={{
                   padding: "8px 16px",
                   background: "transparent",
-                  border: "1px solid #ff4444",
-                  color: "#ff4444",
+                  border: "1px solid var(--red)",
+                  color: "var(--red)",
                   fontFamily: "inherit",
                   fontSize: "12px",
                   cursor: "pointer",
@@ -1199,35 +1199,35 @@ export default function ImagePage() {
 
           {/* Error */}
           {error && (
-            <div style={{ padding: "12px", backgroundColor: "rgba(255, 68, 68, 0.08)", border: "1px solid #ff4444", color: "#ff4444", fontSize: "13px" }}>
+            <div style={{ padding: "12px", backgroundColor: "rgba(255, 68, 68, 0.08)", border: "1px solid var(--red)", color: "var(--red)", fontSize: "13px" }}>
               <span style={{ fontWeight: 700 }}>[ERROR]</span> {error}
             </div>
           )}
 
           {/* Run status */}
           {runId && (
-            <div style={{ fontSize: "12px", color: "#5a6a7a", display: "flex", alignItems: "center", gap: "10px", padding: "8px 0", borderTop: "1px solid #1e2a3a", flexWrap: "wrap" }}>
-              <span><span style={{ color: "#ffcc00" }}>RUN:</span> <span style={{ color: "#e0e0e0" }}>{runId.slice(0, 8)}...</span></span>
+            <div style={{ fontSize: "12px", color: "var(--gray)", display: "flex", alignItems: "center", gap: "10px", padding: "8px 0", borderTop: "1px solid var(--border)", flexWrap: "wrap" }}>
+              <span><span style={{ color: "var(--yellow)" }}>RUN:</span> <span style={{ color: "var(--white)" }}>{runId.slice(0, 8)}...</span></span>
               <StatusBadge status={status} />
               {status === "running" && (
-                <span style={{ color: "#00e5ff", fontSize: "11px" }}>Generating on fal.ai...</span>
+                <span style={{ color: "var(--cyan)", fontSize: "11px" }}>Generating on fal.ai...</span>
               )}
             </div>
           )}
 
           {/* Stats */}
           {stats && (
-            <div style={{ display: "flex", gap: "20px", fontSize: "12px", padding: "8px 0", borderTop: "1px solid #1e2a3a", flexWrap: "wrap" }}>
-              {stats.latencyMs && <span><span style={{ color: "#ffcc00" }}>LATENCY:</span> <span style={{ color: "#00e5ff" }}>{(stats.latencyMs / 1000).toFixed(1)}s</span></span>}
-              {stats.model && <span><span style={{ color: "#ffcc00" }}>MODEL:</span> <span style={{ color: "#00e5ff" }}>{stats.model}</span></span>}
-              {stats.seed !== undefined && <span><span style={{ color: "#ffcc00" }}>SEED:</span> <span style={{ color: "#00e5ff" }}>{stats.seed}</span></span>}
+            <div style={{ display: "flex", gap: "20px", fontSize: "12px", padding: "8px 0", borderTop: "1px solid var(--border)", flexWrap: "wrap" }}>
+              {stats.latencyMs && <span><span style={{ color: "var(--yellow)" }}>LATENCY:</span> <span style={{ color: "var(--cyan)" }}>{(stats.latencyMs / 1000).toFixed(1)}s</span></span>}
+              {stats.model && <span><span style={{ color: "var(--yellow)" }}>MODEL:</span> <span style={{ color: "var(--cyan)" }}>{stats.model}</span></span>}
+              {stats.seed !== undefined && <span><span style={{ color: "var(--yellow)" }}>SEED:</span> <span style={{ color: "var(--cyan)" }}>{stats.seed}</span></span>}
             </div>
           )}
 
           {/* Response text (Gemini) */}
           {responseText && (
-            <div style={{ padding: "12px", backgroundColor: "rgba(0, 255, 136, 0.04)", border: "1px solid rgba(0, 255, 136, 0.15)", fontSize: "13px", color: "#e0e0e0", whiteSpace: "pre-wrap", lineHeight: "1.6" }}>
-              <div style={{ fontSize: "11px", fontWeight: 700, color: "#00ff88", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "8px" }}>
+            <div style={{ padding: "12px", backgroundColor: "rgba(0, 255, 136, 0.04)", border: "1px solid rgba(0, 255, 136, 0.15)", fontSize: "13px", color: "var(--white)", whiteSpace: "pre-wrap", lineHeight: "1.6" }}>
+              <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--green)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "8px" }}>
                 MODEL RESPONSE:
               </div>
               {responseText}
@@ -1236,8 +1236,8 @@ export default function ImagePage() {
 
           {/* Output gallery */}
           {outputImages.length > 0 && (
-            <div style={{ border: "1px solid #00ff88", backgroundColor: "#0d1117" }}>
-              <div style={{ padding: "8px 12px", borderBottom: "1px solid #1e2a3a", fontSize: "11px", fontWeight: 700, color: "#00ff88", textTransform: "uppercase", letterSpacing: "0.1em", backgroundColor: "rgba(0, 255, 136, 0.05)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ border: "1px solid var(--green)", backgroundColor: "var(--bg-panel)" }}>
+              <div style={{ padding: "8px 12px", borderBottom: "1px solid var(--border)", fontSize: "11px", fontWeight: 700, color: "var(--green)", textTransform: "uppercase", letterSpacing: "0.1em", backgroundColor: "rgba(0, 255, 136, 0.05)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span>GENERATED {outputImages.length > 1 ? `(${outputImages.length} IMAGES)` : "IMAGE"}:</span>
               </div>
               <div style={{
@@ -1252,14 +1252,14 @@ export default function ImagePage() {
                     <img
                       src={img.url}
                       alt={`Generated image ${idx + 1}`}
-                      style={{ maxWidth: "100%", maxHeight: outputImages.length === 1 ? "600px" : "400px", border: "1px solid #1e2a3a", cursor: "pointer", display: "block", margin: "0 auto" }}
+                      style={{ maxWidth: "100%", maxHeight: outputImages.length === 1 ? "600px" : "400px", border: "1px solid var(--border)", cursor: "pointer", display: "block", margin: "0 auto" }}
                       onClick={() => setModalImage(img.url)}
                     />
                     <div style={{ display: "flex", gap: "6px", marginTop: "8px", justifyContent: "center" }}>
                       <a
                         href={img.url}
                         download={`morana-image-${runId?.slice(0, 8) || "output"}-${idx + 1}.${outputFormat}`}
-                        style={{ color: "#00e5ff", fontSize: "10px", textDecoration: "none", border: "1px solid rgba(0, 229, 255, 0.3)", padding: "3px 10px", textTransform: "uppercase" }}
+                        style={{ color: "var(--cyan)", fontSize: "10px", textDecoration: "none", border: "1px solid rgba(0, 229, 255, 0.3)", padding: "3px 10px", textTransform: "uppercase" }}
                         onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(0, 229, 255, 0.1)"; }}
                         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
                       >
@@ -1268,7 +1268,7 @@ export default function ImagePage() {
                       {provider === "fal" && (
                         <button
                           onClick={() => useAsInput(img.url)}
-                          style={{ color: "#ffcc00", fontSize: "10px", background: "transparent", border: "1px solid rgba(255, 204, 0, 0.3)", padding: "3px 10px", fontFamily: "inherit", cursor: "pointer", textTransform: "uppercase" }}
+                          style={{ color: "var(--yellow)", fontSize: "10px", background: "transparent", border: "1px solid rgba(255, 204, 0, 0.3)", padding: "3px 10px", fontFamily: "inherit", cursor: "pointer", textTransform: "uppercase" }}
                           onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(255, 204, 0, 0.1)"; }}
                           onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
                         >
@@ -1305,7 +1305,7 @@ export default function ImagePage() {
           <img
             src={modalImage}
             alt="Full size"
-            style={{ maxWidth: "95vw", maxHeight: "95vh", border: "1px solid #1e2a3a" }}
+            style={{ maxWidth: "95vw", maxHeight: "95vh", border: "1px solid var(--border)" }}
             onClick={(e) => e.stopPropagation()}
           />
         </div>

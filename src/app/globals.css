@@ -13,6 +13,8 @@
   --red: #ff4444;
   --white: #e0e0e0;
   --gray: #5a6a7a;
+  --text-secondary: #8b949e;
+  --dim: #444;
   --glow-green: 0 0 10px rgba(0, 255, 136, 0.3);
   --glow-yellow: 0 0 10px rgba(255, 204, 0, 0.3);
 }
@@ -38,6 +40,8 @@
   --red: #cc3333;
   --white: #1a1a2e;
   --gray: #6b7280;
+  --text-secondary: #4b5563;
+  --dim: #b0b8c0;
   --glow-green: 0 0 10px rgba(0, 143, 74, 0.2);
   --glow-yellow: 0 0 10px rgba(179, 134, 0, 0.2);
 }
@@ -161,7 +165,7 @@ input:focus, textarea:focus, select:focus {
     min-width: 100% !important;
     max-height: 200px !important;
     border-right: none !important;
-    border-bottom: 1px solid #1e2a3a !important;
+    border-bottom: 1px solid var(--border) !important;
   }
   .page-main {
     min-width: 0 !important;

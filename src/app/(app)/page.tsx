@@ -44,7 +44,7 @@ export default function Home() {
   if (status === "loading") {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <div style={{ color: "#00ff88" }}>
+        <div style={{ color: "var(--green)" }}>
           <span style={{ animation: "blink 1s step-end infinite" }}>_</span> Initializing system...
         </div>
       </div>
@@ -56,7 +56,7 @@ export default function Home() {
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-6">
         <pre
           style={{
-            color: "#00ff88",
+            color: "var(--green)",
             fontSize: "10px",
             lineHeight: "1.2",
             textShadow: "0 0 10px rgba(0, 255, 136, 0.3)",
@@ -65,15 +65,15 @@ export default function Home() {
         >
           {ASCII_LOGO}
         </pre>
-        <p style={{ color: "#5a6a7a", fontFamily: "inherit" }}>
+        <p style={{ color: "var(--gray)", fontFamily: "inherit" }}>
           [ MORANA ] Slovanska boginja smrti // internal AI ops terminal
         </p>
         <button
           onClick={() => signIn("google")}
           style={{
             background: "transparent",
-            border: "1px solid #00ff88",
-            color: "#00ff88",
+            border: "1px solid var(--green)",
+            color: "var(--green)",
             padding: "10px 24px",
             fontFamily: "inherit",
             fontSize: "13px",
@@ -101,7 +101,7 @@ export default function Home() {
     <div>
       <pre
         style={{
-          color: "#00ff88",
+          color: "var(--green)",
           fontSize: "9px",
           lineHeight: "1.2",
           textShadow: "0 0 10px rgba(0, 255, 136, 0.3)",
@@ -110,23 +110,23 @@ export default function Home() {
       >
         {ASCII_LOGO}
       </pre>
-      <div style={{ marginBottom: "24px", color: "#5a6a7a", fontSize: "13px" }}>
-        <span style={{ color: "#00ff88" }}>$</span> whoami{" "}
-        <span style={{ color: "#e0e0e0" }}>{session.user?.name || session.user?.email}</span>
+      <div style={{ marginBottom: "24px", color: "var(--gray)", fontSize: "13px" }}>
+        <span style={{ color: "var(--green)" }}>$</span> whoami{" "}
+        <span style={{ color: "var(--white)" }}>{session.user?.name || session.user?.email}</span>
         <br />
-        <span style={{ color: "#00ff88" }}>$</span> status{" "}
-        <span style={{ color: "#00ff88" }}>ONLINE</span>{" "}
-        <span style={{ color: "#5a6a7a" }}>| session active | {visibleCards.length} modules loaded</span>
+        <span style={{ color: "var(--green)" }}>$</span> status{" "}
+        <span style={{ color: "var(--green)" }}>ONLINE</span>{" "}
+        <span style={{ color: "var(--gray)" }}>| session active | {visibleCards.length} modules loaded</span>
       </div>
 
       <div
         style={{
-          color: "#ffcc00",
+          color: "var(--yellow)",
           fontSize: "11px",
           textTransform: "uppercase",
           letterSpacing: "0.15em",
           marginBottom: "12px",
-          borderBottom: "1px solid #1e2a3a",
+          borderBottom: "1px solid var(--border)",
           paddingBottom: "8px",
         }}
       >
@@ -134,7 +134,7 @@ export default function Home() {
       </div>
 
       {!modulesLoaded ? (
-        <div style={{ color: "#00ff88", fontSize: "13px", padding: "12px 0" }}>
+        <div style={{ color: "var(--green)", fontSize: "13px", padding: "12px 0" }}>
           <span style={{ animation: "blink 1s step-end infinite" }}>_</span> Loading modules...
         </div>
       ) : (
@@ -145,24 +145,24 @@ export default function Home() {
             href={t.href}
             className="group block"
             style={{
-              border: "1px solid #1e2a3a",
-              backgroundColor: "#0d1117",
+              border: "1px solid var(--border)",
+              backgroundColor: "var(--bg-panel)",
               padding: "16px",
               transition: "all 0.2s ease",
               textDecoration: "none",
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = "#00ff88";
+              e.currentTarget.style.borderColor = "var(--green)";
               e.currentTarget.style.boxShadow = "0 0 15px rgba(0, 255, 136, 0.15)";
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = "#1e2a3a";
+              e.currentTarget.style.borderColor = "var(--border)";
               e.currentTarget.style.boxShadow = "none";
             }}
           >
             <div
               style={{
-                color: "#00ff88",
+                color: "var(--green)",
                 fontSize: "14px",
                 fontWeight: 700,
                 marginBottom: "4px",
@@ -171,12 +171,12 @@ export default function Home() {
             >
               [{t.label}]
             </div>
-            <div style={{ color: "#5a6a7a", fontSize: "12px", marginBottom: "8px" }}>
+            <div style={{ color: "var(--gray)", fontSize: "12px", marginBottom: "8px" }}>
               {t.desc}
             </div>
             <div
               style={{
-                color: "#00cc6a",
+                color: "var(--green-dim)",
                 fontSize: "11px",
                 fontFamily: "inherit",
                 opacity: 0.7,
