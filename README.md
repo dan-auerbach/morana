@@ -210,6 +210,37 @@ npm run build
 npm start
 ```
 
+## Usage & Cost Tracking
+
+Every AI operation logs a `UsageEvent` with provider, model, unit breakdown, and estimated cost. Costs are stored as **float cents** for sub-cent precision (e.g. a Gemini Flash call with 2000 tokens = 0.02¢).
+
+### Pricing Configuration
+
+Pricing is resolved in order:
+1. **DB-driven** — `AIModel` table records (cached 60s), managed via Admin → Models
+2. **Hardcoded fallback** — `defaultPricing` in `src/lib/config.ts`
+
+Supported pricing units:
+
+| Unit | Example | Calculation |
+|------|---------|-------------|
+| `1M_tokens` | LLM models | `(inputTokens × input + outputTokens × output) / 1M` |
+| `1k_chars` | ElevenLabs TTS/SFX | `chars × input / 1000` |
+| `per_minute` | Soniox STT | `(seconds / 60) × input` |
+| `per_image` | Flux image gen | `images × input` |
+| `per_second` | Kling video gen | `videoSeconds × input` |
+
+### Rate Limiting & Cost Caps
+
+- **Per-user daily run limit** — `User.maxRunsPerDay` (default: 200 via ENV)
+- **Per-user monthly cost cap** — `User.maxMonthlyCostCents` (optional)
+- **Workspace monthly cost cap** — `Workspace.maxMonthlyCostCents` (optional)
+- **Global monthly cost cap** — `GLOBAL_MAX_MONTHLY_COST_CENTS` ENV (default: $300)
+
+### Usage Dashboard
+
+`/usage` page shows summary cards, per-model breakdown, recipe execution costs, and a detailed event table with date/provider filtering.
+
 ## Security
 
 - Google OAuth with email whitelist
