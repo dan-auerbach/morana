@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 const s3 = new S3Client({
@@ -74,6 +74,13 @@ export async function getSignedDownloadUrl(key: string, expiresIn = 3600): Promi
     new GetObjectCommand({ Bucket: BUCKET, Key: key }),
     { expiresIn }
   );
+}
+
+/** Best-effort delete of an object from R2. */
+export function deleteFromR2(key: string): void {
+  s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key })).catch(() => {
+    /* ignore cleanup errors */
+  });
 }
 
 export async function getObjectFromR2(key: string) {

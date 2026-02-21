@@ -8,7 +8,7 @@ import { logUsage } from "@/lib/usage";
 import { validateMime } from "@/lib/mime-validate";
 import { validateFetchUrl } from "@/lib/url-validate";
 import { getActiveWorkspaceId } from "@/lib/workspace";
-import { getObjectFromR2 } from "@/lib/storage";
+import { getObjectFromR2, deleteFromR2 } from "@/lib/storage";
 import { v4 as uuid } from "uuid";
 
 // Vercel serverless: STT polling can take up to 180s
@@ -103,6 +103,8 @@ export async function POST(req: NextRequest) {
           const bytes = await obj.Body?.transformToByteArray();
           if (!bytes) throw new Error("Failed to read file from storage");
           audioBuffer = Buffer.from(bytes);
+          // Clean up R2 file — no longer needed after reading into memory
+          deleteFromR2(body.storageKey);
         } catch (err: unknown) {
           const message = err instanceof Error ? err.message : "Storage read error";
           return NextResponse.json({ error: `Failed to read uploaded file: ${message}` }, { status: 400 });
