@@ -10,9 +10,12 @@ import { v4 as uuid } from "uuid";
 import {
   type TelegramUpdate,
   type TelegramMessage,
+  type TelegramCallbackQuery,
   validateWebhookSecret,
   sendMessage,
+  editMessage,
   sendChatAction,
+  answerCallbackQuery,
   resolveUser,
   extractFileInfo,
   downloadFileById,
@@ -29,6 +32,15 @@ import {
 } from "@/lib/telegram-handlers";
 import { listVoices } from "@/lib/providers/tts";
 import { getApprovedModelsAsync } from "@/lib/config";
+import {
+  parseCallback,
+  buildSettingsKeyboard,
+  buildSettingsText,
+  buildModelKeyboard,
+  buildModelListText,
+  buildVoiceKeyboard,
+  buildVoiceListText,
+} from "@/lib/telegram-keyboards";
 
 // Allow long-running STT operations (up to 5 minutes)
 export const maxDuration = 300;
@@ -49,13 +61,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  // 3. Only handle messages (not edited, channel posts, etc.)
+  // 3. Handle callback queries (inline button presses)
+  if (update.callback_query) {
+    after(async () => {
+      try {
+        await handleCallbackQuery(update.callback_query!);
+      } catch (err) {
+        console.error("[Telegram webhook] Error handling callback query:", err instanceof Error ? err.message : err);
+      }
+    });
+    return NextResponse.json({ ok: true });
+  }
+
+  // 4. Only handle messages (not edited, channel posts, etc.)
   const msg = update.message;
   if (!msg) {
     return NextResponse.json({ ok: true });
   }
 
-  // 4. Return 200 immediately, handle in after() for long operations
+  // 5. Return 200 immediately, handle in after() for long operations
   after(async () => {
     try {
       await handleMessage(msg);
@@ -508,19 +532,9 @@ async function handleMode(chatId: string, args: string, userId: string): Promise
 // ─── /settings ───────────────────────────────────────────────────────
 
 async function handleSettings(chatId: string, settings: TgSettings): Promise<void> {
-  const lines = [
-    "*Nastavitve:*",
-    "",
-    `Nacin: *${settings.mode.toUpperCase()}*`,
-    `Jezik STT: \`${settings.sttLanguage}\``,
-    `Diarizacija: ${settings.sttDiarize ? "DA" : "NE"}`,
-    `Prevod: ${settings.sttTranslateTo || "izklopljeno"}`,
-    `TTS glas: ${settings.ttsVoiceId || "privzeti"}`,
-    `LLM model: ${settings.llmModelId || "privzeti"}`,
-    `System prompt: ${settings.llmSystemPrompt ? settings.llmSystemPrompt.slice(0, 50) + "..." : "privzeti"}`,
-    `Image provider: ${settings.imageProvider}`,
-  ];
-  await sendMessage(chatId, lines.join("\n"));
+  const text = buildSettingsText(settings);
+  const keyboard = buildSettingsKeyboard(settings);
+  await sendMessage(chatId, text, "HTML", keyboard);
 }
 
 // ─── /lang ───────────────────────────────────────────────────────────
@@ -872,4 +886,148 @@ async function listRecipes(chatId: string, workspaceId: string | null): Promise<
     chatId,
     `*Aktivni recepti:*\n\n${lines.join("\n")}\n\nUporabi: \`/run slug besedilo\``
   );
+}
+
+// ─── Callback Query Handler ──────────────────────────────────────────
+
+async function handleCallbackQuery(cbq: TelegramCallbackQuery): Promise<void> {
+  // Always acknowledge to remove spinner
+  await answerCallbackQuery(cbq.id);
+
+  const parsed = parseCallback(cbq.data);
+  if (!parsed || !cbq.message) return;
+
+  const chatId = String(cbq.message.chat.id);
+  const messageId = cbq.message.message_id;
+
+  // Resolve user (security: verify linked account)
+  const resolved = await resolveUser(chatId);
+  if (!resolved) return;
+
+  const settings = await getSettings(resolved.userId);
+
+  switch (parsed.domain) {
+    case "mode":
+      await handleModeCallback(chatId, messageId, resolved.userId, settings, parsed.value);
+      break;
+    case "lang":
+      await handleLangCallback(chatId, messageId, resolved.userId, settings, parsed.value);
+      break;
+    case "diarize":
+      await handleDiarizeCallback(chatId, messageId, resolved.userId, settings);
+      break;
+    case "translate":
+      await handleTranslateCallback(chatId, messageId, resolved.userId, settings, parsed.action, parsed.value);
+      break;
+    case "model":
+      await handleModelCallbackAction(chatId, messageId, resolved.userId, settings, parsed.action, parsed.value);
+      break;
+    case "voice":
+      await handleVoiceCallbackAction(chatId, messageId, resolved.userId, settings, parsed.action, parsed.value);
+      break;
+    case "image":
+      await handleImageCallback(chatId, messageId, resolved.userId, settings, parsed.value);
+      break;
+    case "nav":
+      if (parsed.action === "settings") {
+        await showSettingsPanel(chatId, messageId, settings);
+      }
+      break;
+  }
+}
+
+// ─── Settings Panel (edit in place) ──────────────────────────────────
+
+async function showSettingsPanel(chatId: string, messageId: number, settings: TgSettings): Promise<void> {
+  await editMessage(chatId, messageId, buildSettingsText(settings), "HTML", true, buildSettingsKeyboard(settings));
+}
+
+// ─── Domain Callback Handlers ────────────────────────────────────────
+
+async function handleModeCallback(
+  chatId: string, messageId: number, userId: string, _settings: TgSettings, value?: string
+): Promise<void> {
+  const validModes: TgMode[] = ["stt", "llm", "recipe"];
+  if (!value || !validModes.includes(value as TgMode)) return;
+  const updated = await updateSettings(userId, { mode: value as TgMode });
+  await showSettingsPanel(chatId, messageId, updated);
+}
+
+async function handleLangCallback(
+  chatId: string, messageId: number, userId: string, _settings: TgSettings, value?: string
+): Promise<void> {
+  if (!value) return;
+  const updated = await updateSettings(userId, { sttLanguage: value });
+  await showSettingsPanel(chatId, messageId, updated);
+}
+
+async function handleDiarizeCallback(
+  chatId: string, messageId: number, userId: string, settings: TgSettings
+): Promise<void> {
+  const updated = await updateSettings(userId, { sttDiarize: !settings.sttDiarize });
+  await showSettingsPanel(chatId, messageId, updated);
+}
+
+async function handleTranslateCallback(
+  chatId: string, messageId: number, userId: string, settings: TgSettings, action: string, value?: string
+): Promise<void> {
+  if (action === "set") {
+    if (!value) return;
+    const translateTo = value === "off" ? null : value;
+    const updated = await updateSettings(userId, { sttTranslateTo: translateTo });
+    await showSettingsPanel(chatId, messageId, updated);
+  } else if (action === "cycle") {
+    // Cycle: off → en → sl → off
+    const current = settings.sttTranslateTo;
+    let next: string | null;
+    if (!current) next = "en";
+    else if (current === "en") next = "sl";
+    else next = null;
+    const updated = await updateSettings(userId, { sttTranslateTo: next });
+    await showSettingsPanel(chatId, messageId, updated);
+  }
+}
+
+async function handleModelCallbackAction(
+  chatId: string, messageId: number, userId: string, settings: TgSettings, action: string, value?: string
+): Promise<void> {
+  if (action === "page") {
+    const page = parseInt(value || "0", 10);
+    const models = await getApprovedModelsAsync();
+    const text = buildModelListText(settings.llmModelId);
+    const keyboard = buildModelKeyboard(models, settings.llmModelId, page);
+    await editMessage(chatId, messageId, text, "HTML", true, keyboard);
+  } else if (action === "pick") {
+    if (!value) return;
+    // Validate model exists
+    const models = await getApprovedModelsAsync();
+    const found = models.find((m) => m.id === value);
+    if (!found) return;
+    const updated = await updateSettings(userId, { llmModelId: value });
+    await showSettingsPanel(chatId, messageId, updated);
+  }
+}
+
+async function handleVoiceCallbackAction(
+  chatId: string, messageId: number, userId: string, settings: TgSettings, action: string, value?: string
+): Promise<void> {
+  if (action === "page") {
+    const page = parseInt(value || "0", 10);
+    const voices = await listVoices();
+    const text = buildVoiceListText(settings.ttsVoiceId);
+    const keyboard = buildVoiceKeyboard(voices, settings.ttsVoiceId, page);
+    await editMessage(chatId, messageId, text, "HTML", true, keyboard);
+  } else if (action === "pick") {
+    if (!value) return;
+    const updated = await updateSettings(userId, { ttsVoiceId: value });
+    await showSettingsPanel(chatId, messageId, updated);
+  }
+}
+
+async function handleImageCallback(
+  chatId: string, messageId: number, userId: string, _settings: TgSettings, value?: string
+): Promise<void> {
+  if (!value || (value !== "gemini" && value !== "fal")) return;
+  const updated = await updateSettings(userId, { imageProvider: value as "gemini" | "fal" });
+  await showSettingsPanel(chatId, messageId, updated);
 }

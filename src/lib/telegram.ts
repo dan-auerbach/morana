@@ -109,9 +109,26 @@ export type TelegramMessage = {
   video_note?: TelegramVideoNote;
 };
 
+export type InlineKeyboardButton = {
+  text: string;
+  callback_data?: string; // max 64 bytes
+};
+
+export type InlineKeyboardMarkup = {
+  inline_keyboard: InlineKeyboardButton[][];
+};
+
+export type TelegramCallbackQuery = {
+  id: string;
+  from: TelegramUser;
+  message?: TelegramMessage;
+  data?: string;
+};
+
 export type TelegramUpdate = {
   update_id: number;
   message?: TelegramMessage;
+  callback_query?: TelegramCallbackQuery;
 };
 
 // ─── API Calls ───────────────────────────────────────────────────────
@@ -123,7 +140,8 @@ export type TelegramUpdate = {
 export async function sendMessage(
   chatId: string | number,
   text: string,
-  parseMode: "Markdown" | "MarkdownV2" | "HTML" | null = "Markdown"
+  parseMode: "Markdown" | "MarkdownV2" | "HTML" | null = "Markdown",
+  replyMarkup?: InlineKeyboardMarkup
 ): Promise<number> {
   const body: Record<string, unknown> = {
     chat_id: chatId,
@@ -131,6 +149,7 @@ export async function sendMessage(
     disable_web_page_preview: true,
   };
   if (parseMode) body.parse_mode = parseMode;
+  if (replyMarkup) body.reply_markup = replyMarkup;
 
   const resp = await fetch(apiUrl("sendMessage"), {
     method: "POST",
@@ -143,7 +162,7 @@ export async function sendMessage(
     console.error("[Telegram] sendMessage failed:", data.description);
     // Fallback: retry without parse mode in case of formatting errors
     if (parseMode) {
-      return sendMessage(chatId, text, null);
+      return sendMessage(chatId, text, null, replyMarkup);
     }
     return 0;
   }
@@ -159,6 +178,7 @@ export async function editMessage(
   text: string,
   parseMode: "Markdown" | "MarkdownV2" | "HTML" | null = "Markdown",
   disablePreview: boolean = true,
+  replyMarkup?: InlineKeyboardMarkup
 ): Promise<boolean> {
   const body: Record<string, unknown> = {
     chat_id: chatId,
@@ -167,6 +187,7 @@ export async function editMessage(
     disable_web_page_preview: disablePreview,
   };
   if (parseMode) body.parse_mode = parseMode;
+  if (replyMarkup) body.reply_markup = replyMarkup;
 
   const resp = await fetch(apiUrl("editMessageText"), {
     method: "POST",
@@ -179,7 +200,7 @@ export async function editMessage(
     console.error("[Telegram] editMessage failed:", data.description, `chatId=${chatId} msgId=${messageId}`);
     // Fallback: retry without parse mode
     if (parseMode) {
-      return editMessage(chatId, messageId, text, null, disablePreview);
+      return editMessage(chatId, messageId, text, null, disablePreview, replyMarkup);
     }
     return false;
   }
@@ -195,6 +216,24 @@ export async function sendTypingAction(chatId: string | number): Promise<void> {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ chat_id: chatId, action: "typing" }),
+    });
+  } catch {
+    // Non-critical, ignore
+  }
+}
+
+/**
+ * Acknowledge a callback query (removes the loading spinner on the button).
+ * Optionally shows a brief notification to the user.
+ */
+export async function answerCallbackQuery(callbackQueryId: string, text?: string): Promise<void> {
+  try {
+    const body: Record<string, unknown> = { callback_query_id: callbackQueryId };
+    if (text) body.text = text;
+    await fetch(apiUrl("answerCallbackQuery"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
     });
   } catch {
     // Non-critical, ignore
