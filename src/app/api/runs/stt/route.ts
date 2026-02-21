@@ -34,12 +34,16 @@ export async function POST(req: NextRequest) {
     const contentType = req.headers.get("content-type") || "";
     let audioBuffer: Buffer;
     let mimeType: string;
-    let language: "sl" | "en" = "en";
+    let language = "en";
+    let diarize = false;
+    let translateTo = "";
 
     if (contentType.includes("multipart/form-data")) {
       const formData = await req.formData();
       const file = formData.get("file") as File | null;
-      language = (formData.get("language") as string) === "sl" ? "sl" : "en";
+      language = (formData.get("language") as string) || "en";
+      diarize = (formData.get("diarize") as string) === "true";
+      translateTo = (formData.get("translateTo") as string) || "";
 
       if (!file) {
         return NextResponse.json({ error: "No file provided" }, { status: 400 });
@@ -87,7 +91,9 @@ export async function POST(req: NextRequest) {
     } else {
       const body = await req.json();
       const { url, lang } = body;
-      language = lang === "sl" ? "sl" : "en";
+      language = lang || "en";
+      diarize = !!body.diarize;
+      translateTo = body.translateTo || "";
 
       if (!url || typeof url !== "string") {
         return NextResponse.json({ error: "url is required" }, { status: 400 });
@@ -160,11 +166,15 @@ export async function POST(req: NextRequest) {
     });
 
     await prisma.runInput.create({
-      data: { runId: run.id, payloadJson: { storageKey, language, mimeType } },
+      data: { runId: run.id, payloadJson: { storageKey, language, mimeType, diarize, translateTo: translateTo || undefined } },
     });
 
     try {
-      const result = await runSTT(audioBuffer, language, mimeType);
+      const result = await runSTT(audioBuffer, mimeType, {
+        language,
+        diarize,
+        translateTo: translateTo || undefined,
+      });
 
       await prisma.run.update({
         where: { id: run.id },
@@ -178,6 +188,8 @@ export async function POST(req: NextRequest) {
             text: result.text,
             durationSeconds: result.durationSeconds,
             latencyMs: result.latencyMs,
+            tokens: result.tokens,
+            translatedText: result.translatedText,
           },
         },
       });
@@ -198,6 +210,8 @@ export async function POST(req: NextRequest) {
         text: result.text,
         durationSeconds: result.durationSeconds,
         latencyMs: result.latencyMs,
+        tokens: result.tokens,
+        translatedText: result.translatedText,
       });
     } catch (err) {
       const internalMessage = err instanceof Error ? err.message : "STT transcription failed";

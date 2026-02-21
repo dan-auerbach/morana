@@ -42,7 +42,7 @@ export const sttJob = inngest.createFunction(
       const bytes = await obj.Body?.transformToByteArray();
       if (!bytes) throw new Error("Failed to read file from storage");
 
-      const result = await runSTT(Buffer.from(bytes), language, mimeType);
+      const result = await runSTT(Buffer.from(bytes), mimeType, { language });
 
       await prisma.runOutput.create({
         data: { runId, payloadJson: { text: result.text } },

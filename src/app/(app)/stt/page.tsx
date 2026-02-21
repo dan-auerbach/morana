@@ -13,16 +13,92 @@ type HistoryRun = {
   preview?: string;
 };
 
+type STTToken = {
+  text: string;
+  start_ms: number;
+  end_ms: number;
+  speaker?: string;
+};
+
+const LANGUAGES = [
+  { code: "auto", label: "Auto-detect" },
+  { code: "en", label: "English" },
+  { code: "sl", label: "Slovenian" },
+  { code: "de", label: "German" },
+  { code: "fr", label: "French" },
+  { code: "es", label: "Spanish" },
+  { code: "it", label: "Italian" },
+  { code: "pt", label: "Portuguese" },
+  { code: "hr", label: "Croatian" },
+  { code: "sr", label: "Serbian" },
+  { code: "bs", label: "Bosnian" },
+  { code: "nl", label: "Dutch" },
+  { code: "pl", label: "Polish" },
+  { code: "cs", label: "Czech" },
+  { code: "sk", label: "Slovak" },
+  { code: "hu", label: "Hungarian" },
+  { code: "ro", label: "Romanian" },
+  { code: "bg", label: "Bulgarian" },
+  { code: "uk", label: "Ukrainian" },
+  { code: "ru", label: "Russian" },
+  { code: "ar", label: "Arabic" },
+  { code: "zh", label: "Chinese" },
+  { code: "ja", label: "Japanese" },
+  { code: "ko", label: "Korean" },
+  { code: "tr", label: "Turkish" },
+];
+
+function formatSRTTime(ms: number): string {
+  const totalSeconds = Math.floor(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const millis = ms % 1000;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")},${String(millis).padStart(3, "0")}`;
+}
+
+function generateSRT(tokens: STTToken[]): string {
+  if (tokens.length === 0) return "";
+  const segments: { text: string; start_ms: number; end_ms: number }[] = [];
+  let currentWords: string[] = [];
+  let segStart = tokens[0].start_ms;
+  let segEnd = tokens[0].end_ms;
+
+  for (const token of tokens) {
+    const trimmed = token.text.trim();
+    if (!trimmed) continue;
+    currentWords.push(trimmed);
+    segEnd = token.end_ms;
+    const lineText = currentWords.join(" ");
+    if (currentWords.length >= 10 || lineText.length >= 80) {
+      segments.push({ text: lineText, start_ms: segStart, end_ms: segEnd });
+      currentWords = [];
+      segStart = segEnd;
+    }
+  }
+  if (currentWords.length > 0) {
+    segments.push({ text: currentWords.join(" "), start_ms: segStart, end_ms: segEnd });
+  }
+
+  return segments
+    .map((seg, i) => `${i + 1}\n${formatSRTTime(seg.start_ms)} --> ${formatSRTTime(seg.end_ms)}\n${seg.text}`)
+    .join("\n\n");
+}
+
 export default function STTPage() {
   const { data: session } = useSession();
   const [mode, setMode] = useState<"file" | "url">("file");
-  const [language, setLanguage] = useState<"sl" | "en">("en");
+  const [language, setLanguage] = useState("en");
+  const [diarize, setDiarize] = useState(false);
+  const [translateTo, setTranslateTo] = useState("");
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [runId, setRunId] = useState("");
   const [status, setStatus] = useState("");
   const [transcript, setTranscript] = useState("");
+  const [tokens, setTokens] = useState<STTToken[] | null>(null);
+  const [translatedText, setTranslatedText] = useState<string | null>(null);
   const [stats, setStats] = useState<{ latencyMs: number; durationSeconds: number } | null>(null);
   const [fileName, setFileName] = useState("");
   const [fileSizeBytes, setFileSizeBytes] = useState(0);
@@ -62,6 +138,8 @@ export default function STTPage() {
     setLoading(true);
     setError("");
     setTranscript("");
+    setTokens(null);
+    setTranslatedText(null);
     setStatus("running");
     setStats(null);
     setActionResult(null);
@@ -75,13 +153,15 @@ export default function STTPage() {
         const formData = new FormData();
         formData.append("file", file);
         formData.append("language", language);
+        if (diarize) formData.append("diarize", "true");
+        if (translateTo) formData.append("translateTo", translateTo);
         resp = await fetch("/api/runs/stt", { method: "POST", body: formData });
       } else {
         if (!url) throw new Error("URL is required");
         resp = await fetch("/api/runs/stt", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url, lang: language }),
+          body: JSON.stringify({ url, lang: language, diarize, translateTo: translateTo || undefined }),
         });
       }
       const data = await resp.json();
@@ -89,6 +169,8 @@ export default function STTPage() {
       setRunId(data.runId);
       setStatus(data.status);
       if (data.text) setTranscript(data.text);
+      if (data.tokens) setTokens(data.tokens);
+      if (data.translatedText) setTranslatedText(data.translatedText);
       if (data.latencyMs) setStats({ latencyMs: data.latencyMs, durationSeconds: data.durationSeconds || 0 });
       loadHistory();
     } catch (err: unknown) {
@@ -105,6 +187,8 @@ export default function STTPage() {
       const data = await resp.json();
       if (data.output?.text) {
         setTranscript(data.output.text);
+        setTokens(data.output.tokens || null);
+        setTranslatedText(data.output.translatedText || null);
         setRunId(data.id);
         setStatus(data.status);
         setStats({
@@ -288,17 +372,50 @@ export default function STTPage() {
             </div>
           )}
 
-          {/* Language */}
-          <div>
-            <label style={{ display: "block", marginBottom: "6px", fontSize: "11px", fontWeight: 700, color: "#00ff88", textTransform: "uppercase", letterSpacing: "0.1em" }}>--lang</label>
-            <select
-              value={language}
-              onChange={(e) => setLanguage(e.target.value as "sl" | "en")}
-              style={{ padding: "8px 12px", backgroundColor: "#111820", border: "1px solid #1e2a3a", color: "#e0e0e0", fontFamily: "inherit", fontSize: "13px" }}
+          {/* Language + Options row */}
+          <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", alignItems: "flex-end" }}>
+            <div>
+              <label style={{ display: "block", marginBottom: "6px", fontSize: "11px", fontWeight: 700, color: "#00ff88", textTransform: "uppercase", letterSpacing: "0.1em" }}>--lang</label>
+              <select
+                value={language}
+                onChange={(e) => {
+                  setLanguage(e.target.value);
+                  if (e.target.value === "auto") setTranslateTo("");
+                }}
+                style={{ padding: "8px 12px", backgroundColor: "#111820", border: "1px solid #1e2a3a", color: "#e0e0e0", fontFamily: "inherit", fontSize: "13px" }}
+              >
+                {LANGUAGES.map((l) => (
+                  <option key={l.code} value={l.code}>{l.code} ({l.label})</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label style={{ display: "block", marginBottom: "6px", fontSize: "11px", fontWeight: 700, color: "#00ff88", textTransform: "uppercase", letterSpacing: "0.1em" }}>--translate-to</label>
+              <select
+                value={translateTo}
+                onChange={(e) => setTranslateTo(e.target.value)}
+                disabled={language === "auto"}
+                style={{ padding: "8px 12px", backgroundColor: "#111820", border: "1px solid #1e2a3a", color: language === "auto" ? "#5a6a7a" : "#e0e0e0", fontFamily: "inherit", fontSize: "13px", opacity: language === "auto" ? 0.5 : 1 }}
+              >
+                <option value="">None</option>
+                {LANGUAGES.filter((l) => l.code !== "auto" && l.code !== language).map((l) => (
+                  <option key={l.code} value={l.code}>{l.code} ({l.label})</option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              onClick={() => setDiarize(!diarize)}
+              style={{
+                padding: "8px 14px", background: diarize ? "rgba(0, 255, 136, 0.1)" : "transparent",
+                border: `1px solid ${diarize ? "#00ff88" : "#1e2a3a"}`,
+                color: diarize ? "#00ff88" : "#5a6a7a", fontFamily: "inherit", fontSize: "12px",
+                cursor: "pointer", transition: "all 0.2s",
+              }}
             >
-              <option value="en">en (English)</option>
-              <option value="sl">sl (Slovenian)</option>
-            </select>
+              {diarize ? "[x]" : "[ ]"} Speaker diarization
+            </button>
           </div>
 
           {/* Cost preview */}
@@ -350,11 +467,58 @@ export default function STTPage() {
           {/* Transcript output */}
           {transcript && (
             <div style={{ border: "1px solid #00ff88", backgroundColor: "#0d1117" }}>
-              <div style={{ padding: "8px 12px", borderBottom: "1px solid #1e2a3a", fontSize: "11px", fontWeight: 700, color: "#00ff88", textTransform: "uppercase", letterSpacing: "0.1em", backgroundColor: "rgba(0, 255, 136, 0.05)" }}>
-                TRANSCRIPT:
+              <div style={{ padding: "8px 12px", borderBottom: "1px solid #1e2a3a", fontSize: "11px", fontWeight: 700, color: "#00ff88", textTransform: "uppercase", letterSpacing: "0.1em", backgroundColor: "rgba(0, 255, 136, 0.05)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span>TRANSCRIPT:</span>
+                {tokens && tokens.length > 0 && (
+                  <button
+                    onClick={() => {
+                      const srt = generateSRT(tokens);
+                      const blob = new Blob([srt], { type: "text/srt" });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = "transcript.srt";
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                    style={{ padding: "3px 10px", background: "transparent", border: "1px solid #00ff88", color: "#00ff88", fontFamily: "inherit", fontSize: "10px", cursor: "pointer", textTransform: "uppercase", letterSpacing: "0.05em" }}
+                  >
+                    Download SRT
+                  </button>
+                )}
               </div>
               <div style={{ padding: "16px", whiteSpace: "pre-wrap", fontSize: "13px", color: "#e0e0e0", lineHeight: "1.6" }}>
-                {transcript}
+                {diarize && transcript.includes("[Speaker")
+                  ? transcript.split("\n\n").map((block, i) => {
+                      const match = block.match(/^\[(.+?)\]\s*/);
+                      if (!match) return <div key={i}>{block}</div>;
+                      const speaker = match[1];
+                      const text = block.slice(match[0].length);
+                      const colors = ["#00ff88", "#00e5ff", "#ffcc00", "#ff6b9d", "#b388ff", "#ff9800"];
+                      const speakerNum = parseInt(speaker.replace(/\D/g, "") || "0");
+                      const color = colors[speakerNum % colors.length];
+                      return (
+                        <div key={i} style={{ marginBottom: "12px" }}>
+                          <span style={{ display: "inline-block", padding: "2px 8px", backgroundColor: `${color}20`, border: `1px solid ${color}`, color, fontSize: "10px", fontWeight: 700, borderRadius: "3px", marginBottom: "4px", marginRight: "8px" }}>
+                            {speaker}
+                          </span>
+                          <span>{text}</span>
+                        </div>
+                      );
+                    })
+                  : transcript}
+              </div>
+            </div>
+          )}
+
+          {/* Translation output */}
+          {translatedText && (
+            <div style={{ border: "1px solid #00e5ff", backgroundColor: "#0d1117" }}>
+              <div style={{ padding: "8px 12px", borderBottom: "1px solid #1e2a3a", fontSize: "11px", fontWeight: 700, color: "#00e5ff", textTransform: "uppercase", letterSpacing: "0.1em", backgroundColor: "rgba(0, 229, 255, 0.05)" }}>
+                TRANSLATION:
+              </div>
+              <div style={{ padding: "16px", whiteSpace: "pre-wrap", fontSize: "13px", color: "#e0e0e0", lineHeight: "1.6" }}>
+                {translatedText}
               </div>
             </div>
           )}

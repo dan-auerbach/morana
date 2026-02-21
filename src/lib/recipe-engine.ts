@@ -530,7 +530,7 @@ async function executeSTTStep(
   });
 
   try {
-    const result = await runSTT(audioBuffer, language, mimeType);
+    const result = await runSTT(audioBuffer, mimeType, { language });
 
     await prisma.run.update({
       where: { id: run.id },

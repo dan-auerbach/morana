@@ -12,10 +12,25 @@ function authHeaders(apiKey: string): Record<string, string> {
   };
 }
 
+export type STTOptions = {
+  language: string;           // ISO code or "auto"
+  diarize?: boolean;
+  translateTo?: string;       // target lang ISO, e.g. "en"
+};
+
+export type STTToken = {
+  text: string;
+  start_ms: number;
+  end_ms: number;
+  speaker?: string;
+};
+
 export type STTResult = {
   text: string;
   durationSeconds: number;
   latencyMs: number;
+  tokens?: STTToken[];
+  translatedText?: string;
 };
 
 /**
@@ -26,8 +41,8 @@ export type STTResult = {
  */
 export async function runSTT(
   audioBuffer: Buffer | Uint8Array,
-  language: "sl" | "en",
-  mimeType: string
+  mimeType: string,
+  options: STTOptions
 ): Promise<STTResult> {
   const start = Date.now();
   const apiKey = getApiKey();
@@ -59,9 +74,22 @@ export async function runSTT(
   const createBody: Record<string, unknown> = {
     file_id: fileId,
     model: "stt-async-v4",
-    language_hints: [language],
-    language_hints_strict: true,
   };
+
+  if (options.language === "auto") {
+    createBody.enable_language_identification = true;
+  } else {
+    createBody.language_hints = [options.language];
+    createBody.language_hints_strict = true;
+  }
+
+  if (options.diarize) {
+    createBody.enable_speaker_diarization = true;
+  }
+
+  if (options.translateTo) {
+    createBody.translation = { target_languages: [options.translateTo] };
+  }
 
   const createResp = await fetch(`${SONIOX_BASE}/transcriptions`, {
     method: "POST",
@@ -134,12 +162,43 @@ export async function runSTT(
   }
 
   const transcriptData = await transcriptResp.json();
-  const text: string = transcriptData.text || "";
   const durationSeconds: number =
     transcriptionMeta.duration ||
     transcriptionMeta.audio_duration ||
     transcriptData.duration ||
     0;
+
+  // Parse tokens from the response
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rawTokens: any[] = transcriptData.tokens || [];
+
+  // Separate original tokens from translated tokens
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const originalTokens = rawTokens.filter((t: any) => t.translation_status !== "translation");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const translatedTokens = rawTokens.filter((t: any) => t.translation_status === "translation");
+
+  // Build STTToken array from original tokens
+  const tokens: STTToken[] = originalTokens.map((t: { text: string; start_ms?: number; end_ms?: number; speaker?: string }) => ({
+    text: t.text,
+    start_ms: t.start_ms ?? 0,
+    end_ms: t.end_ms ?? 0,
+    speaker: t.speaker,
+  }));
+
+  // Build text output
+  let text: string;
+  if (options.diarize && tokens.some((t) => t.speaker)) {
+    text = buildDiarizedText(tokens);
+  } else {
+    text = transcriptData.text || tokens.map((t) => t.text).join("") || "";
+  }
+
+  // Build translated text if present
+  let translatedText: string | undefined;
+  if (options.translateTo && translatedTokens.length > 0) {
+    translatedText = translatedTokens.map((t: { text: string }) => t.text).join("");
+  }
 
   // --- Step 5: Clean up uploaded file (best effort) ---
   cleanupFile(apiKey, fileId);
@@ -148,7 +207,38 @@ export async function runSTT(
     text,
     durationSeconds,
     latencyMs: Date.now() - start,
+    tokens: tokens.length > 0 ? tokens : undefined,
+    translatedText,
   };
+}
+
+/**
+ * Build diarized text with speaker labels from tokens.
+ * Groups consecutive tokens by the same speaker.
+ */
+function buildDiarizedText(tokens: STTToken[]): string {
+  if (tokens.length === 0) return "";
+
+  const parts: string[] = [];
+  let currentSpeaker = tokens[0].speaker || "Unknown";
+  let currentText = "";
+
+  for (const token of tokens) {
+    const speaker = token.speaker || "Unknown";
+    if (speaker !== currentSpeaker) {
+      parts.push(`[${currentSpeaker}] ${currentText.trim()}`);
+      currentSpeaker = speaker;
+      currentText = token.text;
+    } else {
+      currentText += token.text;
+    }
+  }
+  // Push last segment
+  if (currentText.trim()) {
+    parts.push(`[${currentSpeaker}] ${currentText.trim()}`);
+  }
+
+  return parts.join("\n\n");
 }
 
 /**
