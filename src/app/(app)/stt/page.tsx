@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import { useState, useRef, useEffect, useCallback } from "react";
 import StatusBadge from "@/app/components/StatusBadge";
 import CostPreview from "@/app/components/CostPreview";
+import { useT } from "@/app/components/I18nProvider";
 
 type HistoryRun = {
   id: string;
@@ -87,6 +88,7 @@ function generateSRT(tokens: STTToken[]): string {
 
 export default function STTPage() {
   const { data: session } = useSession();
+  const t = useT("stt");
   const [mode, setMode] = useState<"file" | "url">("file");
   const [language, setLanguage] = useState("auto");
   const [diarize, setDiarize] = useState(true);
@@ -129,7 +131,7 @@ export default function STTPage() {
   if (!session) {
     return (
       <div style={{ color: "var(--gray)" }}>
-        <span style={{ color: "var(--red)" }}>[ERROR]</span> Authentication required.
+        <span style={{ color: "var(--red)" }}>[ERROR]</span> {t("authRequired")}
       </div>
     );
   }
@@ -149,7 +151,7 @@ export default function STTPage() {
       let resp: Response;
       if (mode === "file") {
         const file = fileRef.current?.files?.[0];
-        if (!file) throw new Error("No file selected");
+        if (!file) throw new Error(t("noFile"));
 
         // Upload to R2 via presigned URL to bypass Vercel body size limits
         const uploadMeta = await fetch("/api/upload", {
@@ -165,7 +167,7 @@ export default function STTPage() {
           headers: { "Content-Type": file.type },
           body: file,
         });
-        if (!putResp.ok) throw new Error("Failed to upload file to storage");
+        if (!putResp.ok) throw new Error(t("uploadFailed"));
 
         resp = await fetch("/api/runs/stt", {
           method: "POST",
@@ -179,7 +181,7 @@ export default function STTPage() {
           }),
         });
       } else {
-        if (!url) throw new Error("URL is required");
+        if (!url) throw new Error(t("urlRequired"));
         resp = await fetch("/api/runs/stt", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -305,7 +307,7 @@ export default function STTPage() {
         }}
       >
         <div style={{ padding: "12px", fontSize: "11px", fontWeight: 700, color: "var(--yellow)", textTransform: "uppercase", letterSpacing: "0.1em", borderBottom: "1px solid var(--border)" }}>
-          STT History
+          {t("history")}
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: "4px 8px" }}>
           {history.map((r) => (
@@ -335,7 +337,7 @@ export default function STTPage() {
             </div>
           ))}
           {history.length === 0 && (
-            <div style={{ color: "#333", fontSize: "11px", textAlign: "center", padding: "20px 0" }}>No STT runs yet</div>
+            <div style={{ color: "#333", fontSize: "11px", textAlign: "center", padding: "20px 0" }}>{t("noRuns")}</div>
           )}
         </div>
       </div>
@@ -350,7 +352,7 @@ export default function STTPage() {
           >
             {sidebarOpen ? "<<" : ">>"}
           </button>
-          <span style={{ color: "var(--green)", fontSize: "14px", fontWeight: 700 }}>[STT]</span>
+          <span style={{ color: "var(--green)", fontSize: "14px", fontWeight: 700 }}>{t("title")}</span>
           <span style={{ color: "var(--gray)", fontSize: "12px" }}>$ stt --input {mode} --lang {language}</span>
         </div>
 
@@ -371,7 +373,7 @@ export default function STTPage() {
                   borderColor: mode === m ? "var(--green)" : "var(--border)",
                 }}
               >
-                [{m.toUpperCase()}]
+                {m === "file" ? t("tabFile") : t("tabUrl")}
               </button>
             ))}
           </div>
@@ -379,7 +381,7 @@ export default function STTPage() {
           {/* File upload or URL input */}
           {mode === "file" ? (
             <div>
-              <label style={{ display: "block", marginBottom: "6px", fontSize: "11px", fontWeight: 700, color: "var(--green)", textTransform: "uppercase", letterSpacing: "0.1em" }}>--input-file</label>
+              <label style={{ display: "block", marginBottom: "6px", fontSize: "11px", fontWeight: 700, color: "var(--green)", textTransform: "uppercase", letterSpacing: "0.1em" }}>{t("inputFile")}</label>
               <div
                 style={{ border: "2px dashed var(--green)", backgroundColor: "var(--bg-panel)", padding: "24px", textAlign: "center", cursor: "pointer", transition: "all 0.2s" }}
                 onClick={() => fileRef.current?.click()}
@@ -389,12 +391,12 @@ export default function STTPage() {
                 {fileName ? (
                   <>
                     <div style={{ color: "var(--green)", fontSize: "13px", marginBottom: "4px" }}>✓ {fileName}</div>
-                    <div style={{ color: "var(--gray)", fontSize: "11px" }}>Click to change file</div>
+                    <div style={{ color: "var(--gray)", fontSize: "11px" }}>{t("clickToChange")}</div>
                   </>
                 ) : (
                   <>
-                    <div style={{ color: "var(--green)", fontSize: "13px", marginBottom: "4px" }}>[ DROP AUDIO/VIDEO FILE OR CLICK ]</div>
-                    <div style={{ color: "var(--gray)", fontSize: "11px" }}>Supported: .mp3, .wav, .m4a, .ogg, .flac, .aac, .webm, .mp4 — max 500MB</div>
+                    <div style={{ color: "var(--green)", fontSize: "13px", marginBottom: "4px" }}>{t("dropZone")}</div>
+                    <div style={{ color: "var(--gray)", fontSize: "11px" }}>{t("dropZoneHint")}</div>
                   </>
                 )}
               </div>
@@ -402,15 +404,15 @@ export default function STTPage() {
             </div>
           ) : (
             <div>
-              <label style={{ display: "block", marginBottom: "6px", fontSize: "11px", fontWeight: 700, color: "var(--green)", textTransform: "uppercase", letterSpacing: "0.1em" }}>--input-url</label>
-              <input value={url} onChange={(e) => setUrl(e.target.value)} type="url" placeholder="https://example.com/audio.mp3" style={{ width: "100%", padding: "8px 12px", backgroundColor: "var(--bg-input)", border: "1px solid var(--border)", color: "var(--white)", fontFamily: "inherit", fontSize: "13px" }} />
+              <label style={{ display: "block", marginBottom: "6px", fontSize: "11px", fontWeight: 700, color: "var(--green)", textTransform: "uppercase", letterSpacing: "0.1em" }}>{t("inputUrl")}</label>
+              <input value={url} onChange={(e) => setUrl(e.target.value)} type="url" placeholder={t("urlPlaceholder")} style={{ width: "100%", padding: "8px 12px", backgroundColor: "var(--bg-input)", border: "1px solid var(--border)", color: "var(--white)", fontFamily: "inherit", fontSize: "13px" }} />
             </div>
           )}
 
           {/* Language + Options row */}
           <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", alignItems: "flex-end" }}>
             <div>
-              <label style={{ display: "block", marginBottom: "6px", fontSize: "11px", fontWeight: 700, color: "var(--green)", textTransform: "uppercase", letterSpacing: "0.1em" }}>--lang</label>
+              <label style={{ display: "block", marginBottom: "6px", fontSize: "11px", fontWeight: 700, color: "var(--green)", textTransform: "uppercase", letterSpacing: "0.1em" }}>{t("lang")}</label>
               <select
                 value={language}
                 onChange={(e) => setLanguage(e.target.value)}
@@ -423,13 +425,13 @@ export default function STTPage() {
             </div>
 
             <div>
-              <label style={{ display: "block", marginBottom: "6px", fontSize: "11px", fontWeight: 700, color: "var(--green)", textTransform: "uppercase", letterSpacing: "0.1em" }}>--translate-to</label>
+              <label style={{ display: "block", marginBottom: "6px", fontSize: "11px", fontWeight: 700, color: "var(--green)", textTransform: "uppercase", letterSpacing: "0.1em" }}>{t("translateTo")}</label>
               <select
                 value={translateTo}
                 onChange={(e) => setTranslateTo(e.target.value)}
                 style={{ padding: "8px 12px", backgroundColor: "var(--bg-input)", border: "1px solid var(--border)", color: "var(--white)", fontFamily: "inherit", fontSize: "13px" }}
               >
-                <option value="">None</option>
+                <option value="">{t("none")}</option>
                 {LANGUAGES.filter((l) => l.code !== "auto" && l.code !== language).map((l) => (
                   <option key={l.code} value={l.code}>{l.code} ({l.label})</option>
                 ))}
@@ -445,7 +447,7 @@ export default function STTPage() {
                 cursor: "pointer", transition: "all 0.2s",
               }}
             >
-              {diarize ? "[x]" : "[ ]"} Speaker diarization
+              {diarize ? "[x]" : "[ ]"} {t("diarization")}
             </button>
           </div>
 
@@ -471,7 +473,7 @@ export default function STTPage() {
             onMouseEnter={(e) => { if (!loading) { e.currentTarget.style.background = "rgba(0, 255, 136, 0.1)"; e.currentTarget.style.boxShadow = "0 0 15px rgba(0, 255, 136, 0.2)"; } }}
             onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.boxShadow = "none"; }}
           >
-            {loading ? "[  PROCESSING...  ]" : "[  TRANSCRIBE  ]"}
+            {loading ? t("processing") : t("transcribe")}
           </button>
 
           {/* Error */}
@@ -499,7 +501,7 @@ export default function STTPage() {
           {transcript && (
             <div style={{ border: "1px solid var(--green)", backgroundColor: "var(--bg-panel)" }}>
               <div style={{ padding: "8px 12px", borderBottom: "1px solid var(--border)", fontSize: "11px", fontWeight: 700, color: "var(--green)", textTransform: "uppercase", letterSpacing: "0.1em", backgroundColor: "rgba(0, 255, 136, 0.05)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <span>TRANSCRIPT:</span>
+                <span>{t("transcript")}</span>
                 {tokens && tokens.length > 0 && (
                   <button
                     onClick={() => {
@@ -514,7 +516,7 @@ export default function STTPage() {
                     }}
                     style={{ padding: "3px 10px", background: "transparent", border: "1px solid var(--green)", color: "var(--green)", fontFamily: "inherit", fontSize: "10px", cursor: "pointer", textTransform: "uppercase", letterSpacing: "0.05em" }}
                   >
-                    Download SRT
+                    {t("downloadSrt")}
                   </button>
                 )}
               </div>
@@ -546,7 +548,7 @@ export default function STTPage() {
           {translatedText && (
             <div style={{ border: "1px solid var(--cyan)", backgroundColor: "var(--bg-panel)" }}>
               <div style={{ padding: "8px 12px", borderBottom: "1px solid var(--border)", fontSize: "11px", fontWeight: 700, color: "var(--cyan)", textTransform: "uppercase", letterSpacing: "0.1em", backgroundColor: "rgba(0, 229, 255, 0.05)" }}>
-                TRANSLATION:
+                {t("translation")}
               </div>
               <div style={{ padding: "16px", whiteSpace: "pre-wrap", fontSize: "13px", color: "var(--white)", lineHeight: "1.6" }}>
                 {translatedText}
@@ -558,7 +560,7 @@ export default function STTPage() {
           {transcript && (
             <div>
               <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--yellow)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "8px" }}>
-                ACTIONS → LLM:
+                {t("actions")}
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
                 {actionButtons.map((btn) => (
@@ -577,7 +579,7 @@ export default function STTPage() {
                     onMouseEnter={(e) => { if (!actionLoading) { e.currentTarget.style.background = "rgba(0, 229, 255, 0.1)"; e.currentTarget.style.boxShadow = "0 0 10px rgba(0, 229, 255, 0.15)"; } }}
                     onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.boxShadow = "none"; }}
                   >
-                    {actionLoading === btn.label ? "[ PROCESSING... ]" : btn.label}
+                    {actionLoading === btn.label ? t("processing") : btn.label}
                   </button>
                 ))}
               </div>
@@ -588,7 +590,7 @@ export default function STTPage() {
           {actionResult && (
             <div style={{ border: "1px solid var(--cyan)", backgroundColor: "var(--bg-panel)" }}>
               <div style={{ padding: "8px 12px", borderBottom: "1px solid var(--border)", fontSize: "11px", fontWeight: 700, color: "var(--cyan)", textTransform: "uppercase", letterSpacing: "0.1em", backgroundColor: "rgba(0, 229, 255, 0.05)" }}>
-                {actionLabel || "LLM RESULT"}:
+                {actionLabel || t("llmResult")}:
               </div>
               <div style={{ padding: "16px", whiteSpace: "pre-wrap", fontSize: "13px", color: "var(--white)", lineHeight: "1.6" }}>
                 {actionResult}

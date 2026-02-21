@@ -3,6 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useT } from "@/app/components/I18nProvider";
 
 type StepResult = {
   id: string;
@@ -30,6 +31,7 @@ type Job = {
 
 export default function JobsPage() {
   const { data: session } = useSession();
+  const t = useT("jobs");
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedJob, setExpandedJob] = useState<string | null>(null);
@@ -84,7 +86,7 @@ export default function JobsPage() {
 
   if (!session)
     return (
-      <div style={{ color: "var(--red)" }}>[ERROR] Authentication required.</div>
+      <div style={{ color: "var(--red)" }}>{t("authRequired")}</div>
     );
 
   const statusColor = (s: string) => {
@@ -127,10 +129,10 @@ export default function JobsPage() {
             marginBottom: "4px",
           }}
         >
-          [JOBS]
+          {t("title")}
         </div>
         <div style={{ color: "var(--gray)", fontSize: "13px" }}>
-          $ jobs --monitor --status
+          {t("cmd")}
         </div>
       </div>
 
@@ -147,11 +149,11 @@ export default function JobsPage() {
       >
         {(
           [
-            ["all", "var(--white)", "Total"],
-            ["running", "var(--yellow)", "Running"],
-            ["done", "var(--green)", "Done"],
-            ["error", "var(--red)", "Error"],
-            ["cancelled", "var(--gray)", "Cancelled"],
+            ["all", "var(--white)", t("total")],
+            ["running", "var(--yellow)", t("running")],
+            ["done", "var(--green)", t("done")],
+            ["error", "var(--red)", t("error")],
+            ["cancelled", "var(--gray)", t("cancelled")],
           ] as [string, string, string][]
         ).map(([key, color, label]) => (
           <button
@@ -189,7 +191,7 @@ export default function JobsPage() {
         <div
           style={{ color: "var(--green)", fontSize: "13px", marginBottom: "12px" }}
         >
-          Loading...
+          {t("loading")}
         </div>
       )}
 
@@ -260,8 +262,7 @@ export default function JobsPage() {
                 {/* Progress for running */}
                 {(job.status === "running" || job.status === "pending") && (
                   <span style={{ color: "var(--yellow)", fontSize: "10px" }}>
-                    {job.progress}% — step {job.currentStep + 1}/
-                    {job.totalSteps}
+                    {job.progress}% — {t("step").replace("{current}", String(job.currentStep + 1)).replace("{total}", String(job.totalSteps))}
                   </span>
                 )}
 
@@ -327,7 +328,7 @@ export default function JobsPage() {
                           letterSpacing: "0.05em",
                         }}
                       >
-                        Job ID
+                        {t("jobId")}
                       </div>
                       <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
                         {job.id.substring(0, 12)}...
@@ -342,7 +343,7 @@ export default function JobsPage() {
                           letterSpacing: "0.05em",
                         }}
                       >
-                        User
+                        {t("user")}
                       </div>
                       <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
                         {job.user.email}
@@ -357,7 +358,7 @@ export default function JobsPage() {
                           letterSpacing: "0.05em",
                         }}
                       >
-                        Started
+                        {t("started")}
                       </div>
                       <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
                         {new Date(job.startedAt).toLocaleString("sl-SI")}
@@ -373,7 +374,7 @@ export default function JobsPage() {
                             letterSpacing: "0.05em",
                           }}
                         >
-                          Finished
+                          {t("finished")}
                         </div>
                         <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
                           {new Date(job.finishedAt).toLocaleString("sl-SI")}
@@ -390,7 +391,7 @@ export default function JobsPage() {
                             letterSpacing: "0.05em",
                           }}
                         >
-                          Duration
+                          {t("durationLabel")}
                         </div>
                         <div style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
                           {duration}s
@@ -426,9 +427,7 @@ export default function JobsPage() {
                           marginTop: "4px",
                         }}
                       >
-                        Step{" "}
-                        {Math.min(job.currentStep + 1, job.totalSteps)}{" "}
-                        of {job.totalSteps} — {job.progress}%
+                        {t("stepOf").replace("{current}", String(Math.min(job.currentStep + 1, job.totalSteps))).replace("{total}", String(job.totalSteps)).replace("{pct}", String(job.progress))}
                       </div>
                     </div>
                   )}
@@ -461,7 +460,7 @@ export default function JobsPage() {
                           marginBottom: "8px",
                         }}
                       >
-                        Steps
+                        {t("steps")}
                       </div>
                       <div
                         style={{
@@ -541,7 +540,7 @@ export default function JobsPage() {
                         textTransform: "uppercase",
                       }}
                     >
-                      VIEW DETAIL
+                      {t("viewDetail")}
                     </Link>
                     {(job.status === "running" ||
                       job.status === "pending") && (
@@ -563,7 +562,7 @@ export default function JobsPage() {
                           textTransform: "uppercase",
                         }}
                       >
-                        {actionLoading === job.id ? "..." : "CANCEL"}
+                        {actionLoading === job.id ? "..." : t("cancel")}
                       </button>
                     )}
                     {(job.status === "error" ||
@@ -586,7 +585,7 @@ export default function JobsPage() {
                           textTransform: "uppercase",
                         }}
                       >
-                        {actionLoading === job.id ? "..." : "RETRY"}
+                        {actionLoading === job.id ? "..." : t("retry")}
                       </button>
                     )}
                   </div>
@@ -607,8 +606,8 @@ export default function JobsPage() {
             }}
           >
             {filter === "all"
-              ? "No jobs yet. Execute a recipe to see jobs here."
-              : `No ${filter} jobs.`}
+              ? t("noJobs")
+              : t("noJobsFilter").replace("{filter}", filter)}
           </div>
         )}
       </div>

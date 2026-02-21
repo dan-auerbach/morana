@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import CostPreview from "@/app/components/CostPreview";
 import { PricingInfo } from "@/lib/cost-preview";
+import { useT } from "@/app/components/I18nProvider";
 
 type Model = { id: string; label: string; provider: string };
 type TemplateOption = {
@@ -42,6 +43,7 @@ type Message = {
 
 export default function LLMPage() {
   const { data: session } = useSession();
+  const t = useT("llm");
   const [models, setModels] = useState<Model[]>([]);
   const [pricingMap, setPricingMap] = useState<Record<string, PricingInfo>>({});
   const [templates, setTemplates] = useState<TemplateOption[]>([]);
@@ -129,7 +131,7 @@ export default function LLMPage() {
   if (!session) {
     return (
       <div style={{ color: "var(--gray)" }}>
-        <span style={{ color: "var(--red)" }}>[ERROR]</span> Authentication required. Please sign in.
+        <span style={{ color: "var(--red)" }}>[ERROR]</span> {t("authRequired")}
       </div>
     );
   }
@@ -189,7 +191,7 @@ export default function LLMPage() {
       });
       const d = await resp.json();
       if (!d.conversation) {
-        setError("Failed to create conversation");
+        setError(t("createFailed"));
         return;
       }
       convId = d.conversation.id;
@@ -329,7 +331,7 @@ export default function LLMPage() {
               e.currentTarget.style.boxShadow = "none";
             }}
           >
-            + new_conversation
+            {t("newConversation")}
           </button>
         </div>
 
@@ -402,7 +404,7 @@ export default function LLMPage() {
           ))}
           {conversations.length === 0 && (
             <div style={{ color: "#333", fontSize: "11px", textAlign: "center", padding: "20px 0" }}>
-              No conversations yet
+              {t("noConversations")}
             </div>
           )}
         </div>
@@ -439,13 +441,13 @@ export default function LLMPage() {
               fontFamily: "inherit",
               fontSize: "12px",
             }}
-            title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+            title={sidebarOpen ? t("hideSidebar") : t("showSidebar")}
           >
             {sidebarOpen ? "<<" : ">>"}
           </button>
 
           <span style={{ color: "var(--green)", fontSize: "14px", fontWeight: 700 }}>
-            [LLM]
+            {t("title")}
           </span>
 
           <span className="chat-sep" style={{ color: "#333" }}>|</span>
@@ -486,10 +488,10 @@ export default function LLMPage() {
                 }}
                 title="Prompt template"
               >
-                <option value="">-- no template --</option>
-                {templates.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
+                <option value="">{t("noTemplate")}</option>
+                {templates.map((tpl) => (
+                  <option key={tpl.id} value={tpl.id}>
+                    {tpl.name}
                   </option>
                 ))}
               </select>
@@ -524,7 +526,7 @@ export default function LLMPage() {
                 }}
                 title="Knowledge base (RAG)"
               >
-                <option value="">-- no KB --</option>
+                <option value="">{t("noKb")}</option>
                 {knowledgeBases.map((kb) => (
                   <option key={kb.id} value={kb.id}>
                     {kb.name}
@@ -574,9 +576,9 @@ export default function LLMPage() {
                     e.currentTarget.style.color = "var(--gray)";
                   }
                 }}
-                title="Enable web search (OpenAI Responses API)"
+                title={t("webSearchTooltip")}
               >
-                {webSearchEnabled ? "WEB ON" : "WEB"}
+                {webSearchEnabled ? t("webOn") : t("web")}
               </button>
             </>
           )}
@@ -616,7 +618,7 @@ export default function LLMPage() {
             >
               <div style={{ fontSize: "48px", opacity: 0.3 }}>{">"}_</div>
               <div style={{ fontSize: "13px", color: "var(--dim)" }}>
-                Start a conversation or select one from the sidebar
+                {t("emptyState")}
               </div>
             </div>
           )}
@@ -642,7 +644,7 @@ export default function LLMPage() {
                   color: msg.role === "user" ? "var(--cyan)" : "var(--green)",
                 }}
               >
-                {msg.role === "user" ? "you" : "assistant"}
+                {msg.role === "user" ? t("you") : t("assistant")}
               </div>
 
               {/* Message bubble */}
@@ -679,7 +681,7 @@ export default function LLMPage() {
                     }}
                   >
                     <div style={{ color: "#0096ff", fontWeight: 700, fontSize: "10px", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "4px" }}>
-                      sources
+                      {t("sources")}
                     </div>
                     {cites.map((c: Citation, i: number) => (
                       <div key={i} style={{ marginBottom: "2px" }}>
@@ -713,17 +715,17 @@ export default function LLMPage() {
                 >
                   {msg.inputTokens != null && (
                     <span>
-                      <span style={{ color: "var(--dim)" }}>in:</span> {msg.inputTokens}
+                      <span style={{ color: "var(--dim)" }}>{t("in")}</span> {msg.inputTokens}
                     </span>
                   )}
                   {msg.outputTokens != null && (
                     <span>
-                      <span style={{ color: "var(--dim)" }}>out:</span> {msg.outputTokens}
+                      <span style={{ color: "var(--dim)" }}>{t("out")}</span> {msg.outputTokens}
                     </span>
                   )}
                   {msg.latencyMs != null && (
                     <span>
-                      <span style={{ color: "var(--dim)" }}>latency:</span> {(msg.latencyMs / 1000).toFixed(1)}s
+                      <span style={{ color: "var(--dim)" }}>{t("latency")}</span> {(msg.latencyMs / 1000).toFixed(1)}s
                     </span>
                   )}
                 </div>
@@ -750,7 +752,7 @@ export default function LLMPage() {
                   color: "var(--green)",
                 }}
               >
-                assistant
+                {t("assistant")}
               </div>
               <div
                 style={{
@@ -762,7 +764,7 @@ export default function LLMPage() {
                   fontSize: "13px",
                 }}
               >
-                <span style={{ animation: "blink 1s step-end infinite" }}>_</span> Processing...
+                <span style={{ animation: "blink 1s step-end infinite" }}>_</span> {t("processing")}
               </div>
             </div>
           )}
@@ -814,7 +816,7 @@ export default function LLMPage() {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             rows={1}
-            placeholder="Type your message... (Enter to send, Shift+Enter for new line)"
+            placeholder={t("placeholder")}
             style={{
               flex: 1,
               padding: "10px 12px",
@@ -869,7 +871,7 @@ export default function LLMPage() {
               e.currentTarget.style.boxShadow = "none";
             }}
           >
-            {loading ? "..." : "SEND"}
+            {loading ? "..." : t("send")}
           </button>
         </div>
       </div>

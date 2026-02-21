@@ -207,10 +207,20 @@ export async function runSTT(
     text = transcriptData.text || tokens.map((t) => t.text).join("") || "";
   }
 
-  // Build translated text if present
+  // Build translated text if present (preserve speaker diarization)
   let translatedText: string | undefined;
   if (options.translateTo && translatedTokens.length > 0) {
-    translatedText = translatedTokens.map((t: { text: string }) => t.text).join("");
+    const translatedSTTTokens: STTToken[] = translatedTokens.map((t: { text: string; start_ms?: number; end_ms?: number; speaker?: string }) => ({
+      text: t.text,
+      start_ms: t.start_ms ?? 0,
+      end_ms: t.end_ms ?? 0,
+      speaker: t.speaker,
+    }));
+    if (options.diarize && translatedSTTTokens.some((t) => t.speaker)) {
+      translatedText = buildDiarizedText(translatedSTTTokens);
+    } else {
+      translatedText = translatedTokens.map((t: { text: string }) => t.text).join("");
+    }
   }
 
   // --- Step 5: Clean up uploaded file (best effort) ---

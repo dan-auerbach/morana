@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import { useState, useRef, useEffect, useCallback } from "react";
 import StatusBadge from "@/app/components/StatusBadge";
 import CostPreview from "@/app/components/CostPreview";
+import { useT } from "@/app/components/I18nProvider";
 
 // ─── Types ─────────────────────────────────────────────────
 
@@ -42,6 +43,7 @@ const ASPECT_RATIOS = [
 
 export default function ImagePage() {
   const { data: session } = useSession();
+  const t = useT("image");
 
   // Provider & mode
   const [provider, setProvider] = useState<"fal" | "gemini">("fal");
@@ -120,7 +122,7 @@ export default function ImagePage() {
   if (!session) {
     return (
       <div style={{ color: "var(--gray)" }}>
-        <span style={{ color: "var(--red)" }}>[ERROR]</span> Authentication required.
+        <span style={{ color: "var(--red)" }}>[ERROR]</span> {t("authRequired")}
       </div>
     );
   }
@@ -133,12 +135,12 @@ export default function ImagePage() {
 
     const allowedTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif"];
     if (!allowedTypes.includes(file.type)) {
-      setError(`Unsupported format: ${file.type}. Use PNG, JPEG, WebP, or GIF.`);
+      setError(t("unsupportedFormat").replace("{type}", file.type));
       return;
     }
 
     if (file.size > 20 * 1024 * 1024) {
-      setError("Image exceeds 20MB limit");
+      setError(t("fileTooLarge"));
       return;
     }
 
@@ -168,11 +170,11 @@ export default function ImagePage() {
 
     const allowedTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
     if (!allowedTypes.includes(file.type)) {
-      setError(`Unsupported format: ${file.type}. Use PNG, JPEG, or WebP.`);
+      setError(t("unsupportedFormat").replace("{type}", file.type));
       return;
     }
     if (file.size > 20 * 1024 * 1024) {
-      setError("Image exceeds 20MB limit");
+      setError(t("fileTooLarge"));
       return;
     }
     setError("");
@@ -198,11 +200,11 @@ export default function ImagePage() {
 
     for (const file of toAdd) {
       if (!allowedTypes.includes(file.type)) {
-        setError(`Unsupported format: ${file.type}. Use PNG, JPEG, or WebP.`);
+        setError(t("unsupportedFormat").replace("{type}", file.type));
         continue;
       }
       if (file.size > 20 * 1024 * 1024) {
-        setError(`"${file.name}" exceeds 20MB limit`);
+        setError(t("fileTooLarge"));
         continue;
       }
       const reader = new FileReader();
@@ -525,11 +527,11 @@ export default function ImagePage() {
             onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0, 255, 136, 0.1)"; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
           >
-            + New Image
+            {t("newImage")}
           </button>
         </div>
         <div style={{ padding: "8px 12px 4px", fontSize: "11px", fontWeight: 700, color: "var(--yellow)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
-          History
+          {t("history")}
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: "4px 8px" }}>
           {history.slice(0, 10).map((r) => (
@@ -562,7 +564,7 @@ export default function ImagePage() {
             </div>
           ))}
           {history.length === 0 && (
-            <div style={{ color: "#333", fontSize: "11px", textAlign: "center", padding: "20px 0" }}>No image runs yet</div>
+            <div style={{ color: "#333", fontSize: "11px", textAlign: "center", padding: "20px 0" }}>{t("noRuns")}</div>
           )}
         </div>
       </div>
@@ -577,7 +579,7 @@ export default function ImagePage() {
           >
             {sidebarOpen ? "<<" : ">>"}
           </button>
-          <span style={{ color: "var(--green)", fontSize: "14px", fontWeight: 700 }}>[IMAGE]</span>
+          <span style={{ color: "var(--green)", fontSize: "14px", fontWeight: 700 }}>{t("title")}</span>
           <span style={{ color: "var(--gray)", fontSize: "12px" }}>$ image --provider {provider} --{operation}</span>
         </div>
 
@@ -614,7 +616,7 @@ export default function ImagePage() {
                     letterSpacing: "0.05em",
                   }}
                 >
-                  {p === "fal" ? "fal.ai (Flux)" : "Gemini"}
+                  {p === "fal" ? t("provider.fal") : t("provider.gemini")}
                 </button>
               ))}
             </div>
@@ -623,10 +625,10 @@ export default function ImagePage() {
             {provider === "fal" && (
               <div style={{ display: "flex", border: "1px solid var(--border)", overflow: "hidden" }}>
                 {([
-                  { id: "generate" as const, label: "Generate" },
-                  { id: "img2img" as const, label: "Img2Img" },
-                  { id: "face-swap" as const, label: "Face Swap" },
-                  { id: "multi-edit" as const, label: "Multi-Edit" },
+                  { id: "generate" as const, label: t("generate") },
+                  { id: "img2img" as const, label: t("img2img") },
+                  { id: "face-swap" as const, label: t("faceSwap") },
+                  { id: "multi-edit" as const, label: t("multiEdit") },
                 ]).map((op, idx) => (
                   <button
                     key={op.id}
@@ -675,7 +677,7 @@ export default function ImagePage() {
           {/* Model selector (fal only, not for face-swap or multi-edit) */}
           {provider === "fal" && operation !== "face-swap" && operation !== "multi-edit" && (
             <div>
-              <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "var(--cyan)", textTransform: "uppercase", letterSpacing: "0.1em" }}>--model</label>
+              <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "var(--cyan)", textTransform: "uppercase", letterSpacing: "0.1em" }}>{t("model")}</label>
               <select
                 value={modelId}
                 onChange={(e) => {
@@ -697,15 +699,15 @@ export default function ImagePage() {
           {/* Prompt input (not shown for face-swap) */}
           {operation !== "face-swap" && (
           <div>
-            <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "var(--green)", textTransform: "uppercase", letterSpacing: "0.1em" }}>--prompt</label>
+            <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "var(--green)", textTransform: "uppercase", letterSpacing: "0.1em" }}>{t("prompt")}</label>
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
               rows={4}
               placeholder={
-                operation === "img2img" ? "Describe the edit to apply to the uploaded image..." :
-                operation === "multi-edit" ? "Describe how to combine/edit the reference images..." :
-                "Describe the image to generate..."
+                operation === "img2img" ? t("promptEdit") :
+                operation === "multi-edit" ? t("promptMulti") :
+                t("promptGenerate")
               }
               style={{ width: "100%", padding: "8px 12px", backgroundColor: "var(--bg-input)", border: "1px solid var(--border)", color: "var(--white)", fontFamily: "inherit", fontSize: "13px", resize: "vertical" }}
               onKeyDown={(e) => {
@@ -717,7 +719,7 @@ export default function ImagePage() {
             />
             <div style={{ marginTop: "4px", fontSize: "11px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span style={{ color: charColor }}>
-                <span style={{ color: "var(--yellow)" }}>CHARS:</span> {prompt.length.toLocaleString()} / 10,000
+                <span style={{ color: "var(--yellow)" }}>{t("chars")}</span> {prompt.length.toLocaleString()} / 10,000
               </span>
               <div style={{ width: "120px", height: "4px", backgroundColor: "var(--border)", overflow: "hidden" }}>
                 <div style={{ width: `${charPercent}%`, height: "100%", backgroundColor: charColor === "var(--red)" ? "var(--red)" : charColor === "var(--yellow)" ? "var(--yellow)" : "var(--green)", transition: "width 0.2s" }} />
@@ -729,7 +731,7 @@ export default function ImagePage() {
           {/* Aspect ratio (fal only, not for face-swap) */}
           {provider === "fal" && operation !== "face-swap" && (
             <div>
-              <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "var(--cyan)", textTransform: "uppercase", letterSpacing: "0.1em" }}>--aspect-ratio</label>
+              <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "var(--cyan)", textTransform: "uppercase", letterSpacing: "0.1em" }}>{t("aspectRatio")}</label>
               <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
                 {ASPECT_RATIOS.map((ar) => (
                   <button
@@ -757,7 +759,7 @@ export default function ImagePage() {
           {provider === "fal" && operation !== "face-swap" && operation !== "multi-edit" && (
             <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
               <div>
-                <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "var(--cyan)", textTransform: "uppercase", letterSpacing: "0.1em" }}>--count</label>
+                <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "var(--cyan)", textTransform: "uppercase", letterSpacing: "0.1em" }}>{t("count")}</label>
                 <div style={{ display: "flex", gap: "4px" }}>
                   {[1, 2, 3, 4].map((n) => (
                     <button
@@ -781,7 +783,7 @@ export default function ImagePage() {
               </div>
 
               <div>
-                <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "var(--cyan)", textTransform: "uppercase", letterSpacing: "0.1em" }}>--format</label>
+                <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "var(--cyan)", textTransform: "uppercase", letterSpacing: "0.1em" }}>{t("format")}</label>
                 <div style={{ display: "flex", gap: "4px" }}>
                   {(["jpeg", "png"] as const).map((fmt) => (
                     <button
@@ -811,7 +813,7 @@ export default function ImagePage() {
           {(operation === "img2img" || provider === "gemini") && (
             <div>
               <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "var(--green)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                --input-image {provider === "gemini" && <span style={{ color: "var(--gray)", fontWeight: 400, textTransform: "none" }}>(optional, for editing)</span>}
+                {t("inputImage")} {provider === "gemini" && <span style={{ color: "var(--gray)", fontWeight: 400, textTransform: "none" }}>{t("inputImageHint")}</span>}
               </label>
               <input
                 ref={fileRef}
@@ -838,13 +840,13 @@ export default function ImagePage() {
                   onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(0, 255, 136, 0.4)"; e.currentTarget.style.color = "var(--green)"; }}
                   onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.color = "var(--gray)"; }}
                 >
-                  [  UPLOAD IMAGE  ] — PNG, JPEG, WebP, GIF (max 20MB)
+                  {t("uploadImage")}
                 </button>
               ) : (
                 <div style={{ border: "1px solid var(--border)", backgroundColor: "var(--bg-input)", padding: "12px", display: "flex", alignItems: "center", gap: "12px" }}>
                   <img
                     src={uploadedImage}
-                    alt="Uploaded"
+                    alt={t("uploaded")}
                     style={{ width: "80px", height: "80px", objectFit: "cover", border: "1px solid var(--border)" }}
                   />
                   <div style={{ flex: 1 }}>
@@ -864,7 +866,7 @@ export default function ImagePage() {
                       textTransform: "uppercase",
                     }}
                   >
-                    Remove
+                    {t("remove")}
                   </button>
                 </div>
               )}
@@ -881,11 +883,11 @@ export default function ImagePage() {
                 {/* Face source */}
                 <div>
                   <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "var(--cyan)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                    --face-image <span style={{ color: "var(--gray)", fontWeight: 400, textTransform: "none" }}>(your face)</span>
+                    {t("faceImage")} <span style={{ color: "var(--gray)", fontWeight: 400, textTransform: "none" }}>{t("yourFace")}</span>
                   </label>
                   {faceImage ? (
                     <div style={{ border: "1px solid var(--border)", backgroundColor: "var(--bg-input)", padding: "8px", position: "relative" }}>
-                      <img src={faceImage.dataUri} alt="Face" style={{ width: "100%", height: "140px", objectFit: "cover", border: "1px solid var(--border)" }} />
+                      <img src={faceImage.dataUri} alt={t("face")} style={{ width: "100%", height: "140px", objectFit: "cover", border: "1px solid var(--border)" }} />
                       <div style={{ color: "var(--gray)", fontSize: "10px", marginTop: "4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{faceImage.name}</div>
                       <button
                         onClick={() => { setFaceImage(null); if (faceFileRef.current) faceFileRef.current.value = ""; }}
@@ -899,7 +901,7 @@ export default function ImagePage() {
                       onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(0, 229, 255, 0.4)"; e.currentTarget.style.color = "var(--cyan)"; }}
                       onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.color = "var(--gray)"; }}
                     >
-                      [  UPLOAD FACE  ]
+                      {t("uploadFace")}
                     </button>
                   )}
                 </div>
@@ -907,11 +909,11 @@ export default function ImagePage() {
                 {/* Target scene */}
                 <div>
                   <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "var(--cyan)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                    --target-image <span style={{ color: "var(--gray)", fontWeight: 400, textTransform: "none" }}>(scene)</span>
+                    {t("targetImage")} <span style={{ color: "var(--gray)", fontWeight: 400, textTransform: "none" }}>{t("scene")}</span>
                   </label>
                   {targetImage ? (
                     <div style={{ border: "1px solid var(--border)", backgroundColor: "var(--bg-input)", padding: "8px", position: "relative" }}>
-                      <img src={targetImage.dataUri} alt="Target" style={{ width: "100%", height: "140px", objectFit: "cover", border: "1px solid var(--border)" }} />
+                      <img src={targetImage.dataUri} alt={t("target")} style={{ width: "100%", height: "140px", objectFit: "cover", border: "1px solid var(--border)" }} />
                       <div style={{ color: "var(--gray)", fontSize: "10px", marginTop: "4px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{targetImage.name}</div>
                       <button
                         onClick={() => { setTargetImage(null); if (targetFileRef.current) targetFileRef.current.value = ""; }}
@@ -925,14 +927,14 @@ export default function ImagePage() {
                       onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(0, 229, 255, 0.4)"; e.currentTarget.style.color = "var(--cyan)"; }}
                       onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.color = "var(--gray)"; }}
                     >
-                      [  UPLOAD SCENE  ]
+                      {t("uploadScene")}
                     </button>
                   )}
                 </div>
               </div>
 
               <div style={{ fontSize: "10px", color: "var(--gray)", fontStyle: "italic" }}>
-                Upload your face photo and a target scene. The face will be swapped onto the person in the scene.
+                {t("faceSwapHint")}
               </div>
             </div>
           )}
@@ -941,7 +943,7 @@ export default function ImagePage() {
           {operation === "multi-edit" && provider === "fal" && (
             <div>
               <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "var(--green)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                --reference-images <span style={{ color: "var(--white)", fontWeight: 400, textTransform: "none" }}>({multiImages.length}/4)</span>
+                {t("refImages")} <span style={{ color: "var(--white)", fontWeight: 400, textTransform: "none" }}>({multiImages.length}/4)</span>
               </label>
               <input
                 ref={multiFileRef}
@@ -989,12 +991,12 @@ export default function ImagePage() {
                   onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(0, 255, 136, 0.4)"; e.currentTarget.style.color = "var(--green)"; }}
                   onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.color = "var(--gray)"; }}
                 >
-                  [  + ADD IMAGE{multiImages.length > 0 ? "S" : ""}  ] — PNG, JPEG, WebP (max 20MB each, up to 4)
+                  {multiImages.length > 0 ? t("addImages") : t("addImage")}
                 </button>
               )}
 
               <div style={{ fontSize: "10px", color: "var(--gray)", marginTop: "6px", fontStyle: "italic" }}>
-                Reference images by order in your prompt. FLUX.2 multi-reference editing for compositing, style transfer, and context-aware edits.
+                {t("refHint")}
               </div>
             </div>
           )}
@@ -1003,7 +1005,7 @@ export default function ImagePage() {
           {operation === "img2img" && provider === "fal" && (
             <div>
               <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "var(--cyan)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                --strength <span style={{ color: "var(--white)", fontWeight: 400 }}>{strength.toFixed(2)}</span>
+                {t("strength")} <span style={{ color: "var(--white)", fontWeight: 400 }}>{strength.toFixed(2)}</span>
               </label>
               <input
                 type="range"
@@ -1015,8 +1017,8 @@ export default function ImagePage() {
                 style={{ width: "100%", maxWidth: "400px", accentColor: "var(--cyan)" }}
               />
               <div style={{ fontSize: "10px", color: "var(--gray)", display: "flex", justifyContent: "space-between", maxWidth: "400px" }}>
-                <span>Subtle (preserve input)</span>
-                <span>Strong (new generation)</span>
+                <span>{t("subtlePreserve")}</span>
+                <span>{t("strongNew")}</span>
               </div>
             </div>
           )}
@@ -1038,7 +1040,7 @@ export default function ImagePage() {
                   letterSpacing: "0.05em",
                 }}
               >
-                {showAdvanced ? "▼" : "▶"} Advanced Settings
+                {showAdvanced ? "▼" : "▶"} {t("advanced")}
               </button>
 
               {showAdvanced && (
@@ -1046,7 +1048,7 @@ export default function ImagePage() {
                   {/* Steps */}
                   <div>
                     <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "var(--gray)", textTransform: "uppercase" }}>
-                      --steps <span style={{ color: "var(--white)", fontWeight: 400 }}>{steps ?? selectedModel?.defaultSteps ?? "default"}</span>
+                      {t("steps")} <span style={{ color: "var(--white)", fontWeight: 400 }}>{steps ?? selectedModel?.defaultSteps ?? "default"}</span>
                     </label>
                     <input
                       type="range"
@@ -1061,7 +1063,7 @@ export default function ImagePage() {
                   {/* Guidance scale */}
                   <div>
                     <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "var(--gray)", textTransform: "uppercase" }}>
-                      --guidance <span style={{ color: "var(--white)", fontWeight: 400 }}>{guidanceScale ?? "3.5"}</span>
+                      {t("guidance")} <span style={{ color: "var(--white)", fontWeight: 400 }}>{guidanceScale ?? "3.5"}</span>
                     </label>
                     <input
                       type="range"
@@ -1076,12 +1078,12 @@ export default function ImagePage() {
 
                   {/* Seed */}
                   <div>
-                    <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "var(--gray)", textTransform: "uppercase" }}>--seed</label>
+                    <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "var(--gray)", textTransform: "uppercase" }}>{t("seed")}</label>
                     <input
                       type="text"
                       value={seed}
                       onChange={(e) => setSeed(e.target.value.replace(/[^0-9]/g, ""))}
-                      placeholder="Random"
+                      placeholder={t("random")}
                       style={{ padding: "6px 10px", backgroundColor: "var(--bg-input)", border: "1px solid var(--border)", color: "var(--white)", fontFamily: "inherit", fontSize: "13px", width: "200px" }}
                     />
                   </div>
@@ -1107,8 +1109,8 @@ export default function ImagePage() {
                 alignSelf: "flex-start",
               }}
             >
-              <span style={{ color: "var(--green)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>COST</span>
-              <span>~$0.10 per swap | Face Swap</span>
+              <span style={{ color: "var(--green)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("cost")}</span>
+              <span>~$0.10 per swap | {t("faceSwap")}</span>
             </div>
           )}
           {operation === "multi-edit" && prompt.trim() && multiImages.length > 0 && (
@@ -1127,7 +1129,7 @@ export default function ImagePage() {
                 alignSelf: "flex-start",
               }}
             >
-              <span style={{ color: "var(--green)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>COST</span>
+              <span style={{ color: "var(--green)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>{t("cost")}</span>
               <span>~$0.025 per image | FLUX.2 Edit ({multiImages.length} input{multiImages.length !== 1 ? "s" : ""})</span>
             </div>
           )}
@@ -1168,14 +1170,14 @@ export default function ImagePage() {
               onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.boxShadow = "none"; }}
             >
               {loading
-                ? "[  GENERATING...  ]"
+                ? `[  ${t("generate").toUpperCase()}...  ]`
                 : operation === "face-swap"
-                  ? "[  SWAP FACE  ]"
+                  ? t("swapFace")
                   : operation === "img2img"
-                    ? "[  EDIT IMAGE  ]"
+                    ? t("editImage")
                     : operation === "multi-edit"
-                      ? "[  MULTI-EDIT  ]"
-                      : `[  GENERATE ${numImages > 1 ? `(${numImages})` : ""}  ]`}
+                      ? t("multiEditBtn")
+                      : `${t("generateBtn")}${numImages > 1 ? ` (${numImages})` : ""}`}
             </button>
 
             {loading && (
@@ -1192,7 +1194,7 @@ export default function ImagePage() {
                   textTransform: "uppercase",
                 }}
               >
-                Cancel
+                {t("cancel")}
               </button>
             )}
           </div>
@@ -1210,7 +1212,7 @@ export default function ImagePage() {
               <span><span style={{ color: "var(--yellow)" }}>RUN:</span> <span style={{ color: "var(--white)" }}>{runId.slice(0, 8)}...</span></span>
               <StatusBadge status={status} />
               {status === "running" && (
-                <span style={{ color: "var(--cyan)", fontSize: "11px" }}>Generating on fal.ai...</span>
+                <span style={{ color: "var(--cyan)", fontSize: "11px" }}>{t("generatingFal")}</span>
               )}
             </div>
           )}
@@ -1228,7 +1230,7 @@ export default function ImagePage() {
           {responseText && (
             <div style={{ padding: "12px", backgroundColor: "rgba(0, 255, 136, 0.04)", border: "1px solid rgba(0, 255, 136, 0.15)", fontSize: "13px", color: "var(--white)", whiteSpace: "pre-wrap", lineHeight: "1.6" }}>
               <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--green)", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "8px" }}>
-                MODEL RESPONSE:
+                {t("modelResponse")}
               </div>
               {responseText}
             </div>
@@ -1238,7 +1240,7 @@ export default function ImagePage() {
           {outputImages.length > 0 && (
             <div style={{ border: "1px solid var(--green)", backgroundColor: "var(--bg-panel)" }}>
               <div style={{ padding: "8px 12px", borderBottom: "1px solid var(--border)", fontSize: "11px", fontWeight: 700, color: "var(--green)", textTransform: "uppercase", letterSpacing: "0.1em", backgroundColor: "rgba(0, 255, 136, 0.05)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span>GENERATED {outputImages.length > 1 ? `(${outputImages.length} IMAGES)` : "IMAGE"}:</span>
+                <span>{outputImages.length > 1 ? t("generatedImages").replace("{count}", String(outputImages.length)) : t("generatedImage")}</span>
               </div>
               <div style={{
                 padding: "16px",
@@ -1263,7 +1265,7 @@ export default function ImagePage() {
                         onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(0, 229, 255, 0.1)"; }}
                         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
                       >
-                        Download
+                        {t("download")}
                       </a>
                       {provider === "fal" && (
                         <button
@@ -1272,7 +1274,7 @@ export default function ImagePage() {
                           onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(255, 204, 0, 0.1)"; }}
                           onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
                         >
-                          Use as Input
+                          {t("useAsInput")}
                         </button>
                       )}
                     </div>

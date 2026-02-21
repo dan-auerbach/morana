@@ -4,6 +4,7 @@ import { useSession } from "next-auth/react";
 import { useState, useEffect, useCallback } from "react";
 import StatusBadge from "@/app/components/StatusBadge";
 import CostPreview from "@/app/components/CostPreview";
+import { useT } from "@/app/components/I18nProvider";
 
 type Voice = { id: string; name: string };
 type HistoryRun = {
@@ -42,6 +43,7 @@ const INPUT_STYLE: React.CSSProperties = {
 
 export default function TTSPage() {
   const { data: session } = useSession();
+  const t = useT("tts");
   const [voices, setVoices] = useState<Voice[]>([]);
   const [voiceId, setVoiceId] = useState("");
   const [text, setText] = useState("");
@@ -94,7 +96,7 @@ export default function TTSPage() {
   if (!session) {
     return (
       <div style={{ color: "var(--gray)" }}>
-        <span style={{ color: "var(--red)" }}>[ERROR]</span> Authentication required.
+        <span style={{ color: "var(--red)" }}>{t("error")}</span> {t("authRequired")}
       </div>
     );
   }
@@ -230,7 +232,7 @@ export default function TTSPage() {
         }}
       >
         <div style={{ padding: "12px", fontSize: "11px", fontWeight: 700, color: "var(--yellow)", textTransform: "uppercase", letterSpacing: "0.1em", borderBottom: "1px solid var(--border)" }}>
-          TTS History
+          {t("history")}
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: "4px 8px" }}>
           {history.map((r) => (
@@ -260,7 +262,7 @@ export default function TTSPage() {
             </div>
           ))}
           {history.length === 0 && (
-            <div style={{ color: "#333", fontSize: "11px", textAlign: "center", padding: "20px 0" }}>No TTS runs yet</div>
+            <div style={{ color: "#333", fontSize: "11px", textAlign: "center", padding: "20px 0" }}>{t("noRuns")}</div>
           )}
         </div>
       </div>
@@ -275,7 +277,7 @@ export default function TTSPage() {
           >
             {sidebarOpen ? "<<" : ">>"}
           </button>
-          <span style={{ color: "var(--green)", fontSize: "14px", fontWeight: 700 }}>[TTS]</span>
+          <span style={{ color: "var(--green)", fontSize: "14px", fontWeight: 700 }}>{t("title")}</span>
 
           {/* Mode toggle */}
           <div style={{ display: "flex", gap: "0" }}>
@@ -314,12 +316,12 @@ export default function TTSPage() {
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   rows={5}
-                  placeholder="Enter text to synthesize..."
+                  placeholder={t("textPlaceholder")}
                   style={{ ...INPUT_STYLE, resize: "vertical" }}
                 />
                 <div style={{ marginTop: "6px", fontSize: "11px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span style={{ color: charColor }}>
-                    <span style={{ color: "var(--yellow)" }}>CHARS:</span> {text.length.toLocaleString()} / {charLimit.toLocaleString()}
+                    <span style={{ color: "var(--yellow)" }}>{t("chars")}</span> {text.length.toLocaleString()} / {charLimit.toLocaleString()}
                   </span>
                   <div style={{ width: "120px", height: "4px", backgroundColor: "var(--border)", overflow: "hidden" }}>
                     <div style={{ width: `${charPercent}%`, height: "100%", backgroundColor: charColor === "var(--red)" ? "var(--red)" : charColor === "var(--yellow)" ? "var(--yellow)" : "var(--green)", transition: "width 0.2s" }} />
@@ -330,7 +332,7 @@ export default function TTSPage() {
               {/* Voice + Model row */}
               <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
                 <div style={{ flex: "1 1 200px" }}>
-                  <label style={LABEL_STYLE}>--voice</label>
+                  <label style={LABEL_STYLE}>{t("voice")}</label>
                   <select value={voiceId} onChange={(e) => setVoiceId(e.target.value)} style={INPUT_STYLE}>
                     {voices.map((v) => (
                       <option key={v.id} value={v.id}>{v.name}</option>
@@ -338,7 +340,7 @@ export default function TTSPage() {
                   </select>
                 </div>
                 <div style={{ flex: "1 1 200px" }}>
-                  <label style={LABEL_STYLE}>--model</label>
+                  <label style={LABEL_STYLE}>{t("model")}</label>
                   <select value={modelId} onChange={(e) => setModelId(e.target.value)} style={INPUT_STYLE}>
                     {TTS_MODELS.map((m) => (
                       <option key={m.id} value={m.id}>{m.label} ({m.langs} langs)</option>
@@ -350,7 +352,7 @@ export default function TTSPage() {
               {/* Output format + Language row */}
               <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
                 <div style={{ flex: "1 1 200px" }}>
-                  <label style={LABEL_STYLE}>--format</label>
+                  <label style={LABEL_STYLE}>{t("format")}</label>
                   <select value={outputFormat} onChange={(e) => setOutputFormat(e.target.value)} style={INPUT_STYLE}>
                     {OUTPUT_FORMATS.map((f) => (
                       <option key={f.id} value={f.id}>{f.label}</option>
@@ -358,11 +360,11 @@ export default function TTSPage() {
                   </select>
                 </div>
                 <div style={{ flex: "1 1 200px" }}>
-                  <label style={LABEL_STYLE}>--lang <span style={{ color: "var(--gray)", fontWeight: 400 }}>(optional)</span></label>
+                  <label style={LABEL_STYLE}>{t("langOptional")}</label>
                   <input
                     value={languageCode}
                     onChange={(e) => setLanguageCode(e.target.value)}
-                    placeholder="e.g. sl, en, de"
+                    placeholder={t("langPlaceholder")}
                     style={INPUT_STYLE}
                     maxLength={5}
                   />
@@ -382,7 +384,7 @@ export default function TTSPage() {
                     display: "flex", justifyContent: "space-between", alignItems: "center",
                   }}
                 >
-                  <span>Voice Settings</span>
+                  <span>{t("voiceSettings")}</span>
                   <span style={{ color: "var(--green)" }}>{showSettings ? "[-]" : "[+]"}</span>
                 </button>
 
@@ -390,38 +392,38 @@ export default function TTSPage() {
                   <div style={{ padding: "12px", borderTop: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: "14px" }}>
                     {/* Stability */}
                     <SliderControl
-                      label="--stability"
+                      label={t("stability")}
                       value={stability}
                       onChange={setStability}
                       min={0} max={1} step={0.05}
-                      description="Lower = more expressive, Higher = more consistent"
+                      description={t("stabilityDesc")}
                     />
 
                     {/* Similarity Boost */}
                     <SliderControl
-                      label="--similarity"
+                      label={t("similarity")}
                       value={similarityBoost}
                       onChange={setSimilarityBoost}
                       min={0} max={1} step={0.05}
-                      description="How closely to match original voice"
+                      description={t("similarityDesc")}
                     />
 
                     {/* Style */}
                     <SliderControl
-                      label="--style"
+                      label={t("style")}
                       value={style}
                       onChange={setStyle}
                       min={0} max={1} step={0.05}
-                      description="Style exaggeration (recommended: 0)"
+                      description={t("styleDesc")}
                     />
 
                     {/* Speed */}
                     <SliderControl
-                      label="--speed"
+                      label={t("speed")}
                       value={speed}
                       onChange={setSpeed}
                       min={0.7} max={1.2} step={0.05}
-                      description="Speech rate multiplier"
+                      description={t("speedDesc")}
                     />
 
                     <button
@@ -433,7 +435,7 @@ export default function TTSPage() {
                         cursor: "pointer", textTransform: "uppercase",
                       }}
                     >
-                      Reset Defaults
+                      {t("resetDefaults")}
                     </button>
                   </div>
                 )}
@@ -461,7 +463,7 @@ export default function TTSPage() {
                 onMouseEnter={(e) => { if (!loading && text && voiceId) { e.currentTarget.style.background = "rgba(0, 255, 136, 0.1)"; e.currentTarget.style.boxShadow = "0 0 15px rgba(0, 255, 136, 0.2)"; } }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.boxShadow = "none"; }}
               >
-                {loading ? "[  PROCESSING...  ]" : "[  SYNTHESIZE  ]"}
+                {loading ? t("processing") : t("synthesize")}
               </button>
             </>
           ) : (
@@ -469,16 +471,16 @@ export default function TTSPage() {
             <>
               {/* SFX Prompt */}
               <div>
-                <label style={LABEL_STYLE}>--prompt</label>
+                <label style={LABEL_STYLE}>{t("sfxPrompt")}</label>
                 <textarea
                   value={sfxPrompt}
                   onChange={(e) => setSfxPrompt(e.target.value)}
                   rows={3}
-                  placeholder="Describe the sound effect... e.g. 'thunderstorm with heavy rain and distant thunder'"
+                  placeholder={t("sfxPlaceholder")}
                   style={{ ...INPUT_STYLE, resize: "vertical" }}
                 />
                 <div style={{ marginTop: "4px", fontSize: "10px", color: "var(--gray)" }}>
-                  {sfxPrompt.length} / 1,000 chars
+                  {sfxPrompt.length} / 1,000 {t("sfxChars")}
                 </div>
               </div>
 
@@ -520,7 +522,7 @@ export default function TTSPage() {
                 onMouseEnter={(e) => { if (!loading && sfxPrompt) { e.currentTarget.style.background = "rgba(255, 136, 0, 0.1)"; e.currentTarget.style.boxShadow = "0 0 15px rgba(255, 136, 0, 0.2)"; } }}
                 onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.boxShadow = "none"; }}
               >
-                {loading ? "[  GENERATING...  ]" : "[  GENERATE SFX  ]"}
+                {loading ? t("generating") : t("generateSfx")}
               </button>
             </>
           )}
@@ -528,7 +530,7 @@ export default function TTSPage() {
           {/* Error */}
           {error && (
             <div style={{ padding: "12px", backgroundColor: "rgba(255, 68, 68, 0.08)", border: "1px solid var(--red)", color: "var(--red)", fontSize: "13px" }}>
-              <span style={{ fontWeight: 700 }}>[ERROR]</span> {error}
+              <span style={{ fontWeight: 700 }}>{t("error")}</span> {error}
             </div>
           )}
 
@@ -558,7 +560,7 @@ export default function TTSPage() {
                 textTransform: "uppercase", letterSpacing: "0.1em",
                 backgroundColor: mode === "sfx" ? "rgba(255, 136, 0, 0.05)" : "rgba(0, 255, 136, 0.05)",
               }}>
-                {mode === "sfx" ? "SFX OUTPUT:" : "AUDIO OUTPUT:"}
+                {mode === "sfx" ? t("sfxOutput") : t("audioOutput")}
               </div>
               <div style={{ padding: "16px" }}>
                 <audio controls src={audioUrl} style={{ width: "100%", height: "40px", filter: mode === "sfx" ? "hue-rotate(30deg) saturate(1.5)" : "hue-rotate(100deg) saturate(1.5)" }} />
@@ -572,7 +574,7 @@ export default function TTSPage() {
                     onMouseEnter={(e) => { e.currentTarget.style.color = "var(--green)"; }}
                     onMouseLeave={(e) => { e.currentTarget.style.color = "var(--gray)"; }}
                   >
-                    [DOWNLOAD]
+                    {t("download")}
                   </a>
                 </div>
               )}

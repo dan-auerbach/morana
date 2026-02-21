@@ -3,6 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useState, useRef, useEffect, useCallback } from "react";
 import StatusBadge from "@/app/components/StatusBadge";
+import { useT } from "@/app/components/I18nProvider";
 
 // ─── Types ─────────────────────────────────────────────────
 
@@ -30,6 +31,7 @@ const ASPECT_RATIOS = ["16:9", "4:3", "3:2", "1:1", "2:3", "3:4", "9:16"];
 
 export default function VideoPage() {
   const { data: session } = useSession();
+  const t = useT("video");
 
   // Controls
   const [operation, setOperation] = useState<VideoOperation>("text2video");
@@ -75,7 +77,7 @@ export default function VideoPage() {
   if (!session) {
     return (
       <div style={{ color: "var(--gray)" }}>
-        <span style={{ color: "var(--red)" }}>[ERROR]</span> Authentication required.
+        <span style={{ color: "var(--red)" }}>[ERROR]</span> {t("authRequired")}
       </div>
     );
   }
@@ -103,13 +105,13 @@ export default function VideoPage() {
     if (currentOp.requiresFile === "image") {
       const allowed = ["image/png", "image/jpeg", "image/jpg", "image/webp"];
       if (!allowed.includes(file.type)) {
-        setError(`Unsupported image format: ${file.type}. Use PNG, JPEG, or WebP.`);
+        setError(t("unsupportedImage").replace("{type}", file.type));
         return;
       }
     } else if (currentOp.requiresFile === "video") {
       const allowed = ["video/mp4", "video/webm", "video/quicktime"];
       if (!allowed.includes(file.type)) {
-        setError(`Unsupported video format: ${file.type}. Use MP4 or WebM.`);
+        setError(t("unsupportedVideo").replace("{type}", file.type));
         return;
       }
     }
@@ -320,11 +322,11 @@ export default function VideoPage() {
             onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(0, 255, 136, 0.1)"; }}
             onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
           >
-            + New Video
+            {t("newVideo")}
           </button>
         </div>
         <div style={{ padding: "8px 12px 4px", fontSize: "11px", fontWeight: 700, color: "var(--yellow)", textTransform: "uppercase", letterSpacing: "0.1em" }}>
-          History
+          {t("history")}
         </div>
         <div style={{ flex: 1, overflowY: "auto", padding: "4px 8px" }}>
           {history.slice(0, 10).map((r) => (
@@ -357,7 +359,7 @@ export default function VideoPage() {
             </div>
           ))}
           {history.length === 0 && (
-            <div style={{ color: "#333", fontSize: "11px", textAlign: "center", padding: "20px 0" }}>No video runs yet</div>
+            <div style={{ color: "#333", fontSize: "11px", textAlign: "center", padding: "20px 0" }}>{t("noRuns")}</div>
           )}
         </div>
       </div>
@@ -372,7 +374,7 @@ export default function VideoPage() {
           >
             {sidebarOpen ? "<<" : ">>"}
           </button>
-          <span style={{ color: "#ff6b9d", fontSize: "14px", fontWeight: 700 }}>[VIDEO]</span>
+          <span style={{ color: "#ff6b9d", fontSize: "14px", fontWeight: 700 }}>{t("title")}</span>
           <span style={{ color: "var(--gray)", fontSize: "12px" }}>$ video --{operation} --{resolution}</span>
         </div>
 
@@ -381,7 +383,7 @@ export default function VideoPage() {
 
           {/* Operation toggle */}
           <div>
-            <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#ff6b9d", textTransform: "uppercase", letterSpacing: "0.1em" }}>--mode</label>
+            <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#ff6b9d", textTransform: "uppercase", letterSpacing: "0.1em" }}>{t("mode")}</label>
             <div style={{ display: "flex", border: "1px solid var(--border)", overflow: "hidden", width: "fit-content" }}>
               {OPERATIONS.map((op, idx) => (
                 <button
@@ -410,7 +412,7 @@ export default function VideoPage() {
 
           {/* Prompt */}
           <div>
-            <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "var(--green)", textTransform: "uppercase", letterSpacing: "0.1em" }}>--prompt</label>
+            <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "var(--green)", textTransform: "uppercase", letterSpacing: "0.1em" }}>{t("prompt")}</label>
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
@@ -432,7 +434,7 @@ export default function VideoPage() {
             />
             <div style={{ marginTop: "4px", fontSize: "11px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span style={{ color: charColor }}>
-                <span style={{ color: "var(--yellow)" }}>CHARS:</span> {prompt.length.toLocaleString()} / 4,096
+                <span style={{ color: "var(--yellow)" }}>{t("chars")}</span> {prompt.length.toLocaleString()} / 4,096
               </span>
               <div style={{ width: "120px", height: "4px", backgroundColor: "var(--border)", overflow: "hidden" }}>
                 <div style={{ width: `${charPercent}%`, height: "100%", backgroundColor: charColor === "var(--red)" ? "var(--red)" : charColor === "var(--yellow)" ? "var(--yellow)" : "var(--green)", transition: "width 0.2s" }} />
@@ -444,7 +446,7 @@ export default function VideoPage() {
           {currentOp.requiresFile && (
             <div>
               <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#ff6b9d", textTransform: "uppercase", letterSpacing: "0.1em" }}>
-                --input-{currentOp.requiresFile}
+                {currentOp.requiresFile === "image" ? t("inputImage") : t("inputVideo")}
               </label>
               <input
                 ref={fileRef}
@@ -472,8 +474,8 @@ export default function VideoPage() {
                   onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.color = "var(--gray)"; }}
                 >
                   {currentOp.requiresFile === "image"
-                    ? "[  UPLOAD IMAGE  ] \u2014 PNG, JPEG, WebP (max 50MB)"
-                    : "[  UPLOAD VIDEO  ] \u2014 MP4, WebM (max 50MB)"}
+                    ? t("uploadImage")
+                    : t("uploadVideo")}
                 </button>
               ) : (
                 <div style={{ border: "1px solid var(--border)", backgroundColor: "var(--bg-input)", padding: "12px", display: "flex", alignItems: "center", gap: "12px" }}>
@@ -501,7 +503,7 @@ export default function VideoPage() {
                       textTransform: "uppercase",
                     }}
                   >
-                    Remove
+                    {t("remove")}
                   </button>
                 </div>
               )}
@@ -511,7 +513,7 @@ export default function VideoPage() {
           {/* Duration slider */}
           <div>
             <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#ff6b9d", textTransform: "uppercase", letterSpacing: "0.1em" }}>
-              --duration <span style={{ color: "var(--white)", fontWeight: 400 }}>{duration}s</span>
+              {t("duration")} <span style={{ color: "var(--white)", fontWeight: 400 }}>{duration}s</span>
             </label>
             <input
               type="range"
@@ -531,7 +533,7 @@ export default function VideoPage() {
           {/* Aspect ratio (text2video only) */}
           {operation === "text2video" && (
             <div>
-              <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#ff6b9d", textTransform: "uppercase", letterSpacing: "0.1em" }}>--aspect-ratio</label>
+              <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#ff6b9d", textTransform: "uppercase", letterSpacing: "0.1em" }}>{t("aspectRatio")}</label>
               <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
                 {ASPECT_RATIOS.map((ar) => (
                   <button
@@ -557,7 +559,7 @@ export default function VideoPage() {
 
           {/* Resolution */}
           <div>
-            <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#ff6b9d", textTransform: "uppercase", letterSpacing: "0.1em" }}>--resolution</label>
+            <label style={{ display: "block", marginBottom: "4px", fontSize: "11px", fontWeight: 700, color: "#ff6b9d", textTransform: "uppercase", letterSpacing: "0.1em" }}>{t("resolution")}</label>
             <div style={{ display: "flex", gap: "4px" }}>
               {(["480p", "720p"] as const).map((res) => (
                 <button
@@ -598,7 +600,7 @@ export default function VideoPage() {
               }}
             >
               <span style={{ color: "var(--green)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                COST
+                {t("cost")}
               </span>
               <span>~${estimatedCost.toFixed(2)} | {duration}s @ {resolution}</span>
             </div>
@@ -626,7 +628,7 @@ export default function VideoPage() {
               onMouseEnter={(e) => { if (!loading && prompt.trim()) { e.currentTarget.style.background = "rgba(0, 255, 136, 0.1)"; e.currentTarget.style.boxShadow = "0 0 15px rgba(0, 255, 136, 0.2)"; } }}
               onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.boxShadow = "none"; }}
             >
-              {loading ? "[  GENERATING...  ]" : "[  GENERATE VIDEO  ]"}
+              {loading ? t("generating") : t("generateVideo")}
             </button>
 
             {loading && (
@@ -643,7 +645,7 @@ export default function VideoPage() {
                   textTransform: "uppercase",
                 }}
               >
-                Cancel
+                {t("cancel")}
               </button>
             )}
           </div>
@@ -661,7 +663,7 @@ export default function VideoPage() {
               <span><span style={{ color: "var(--yellow)" }}>RUN:</span> <span style={{ color: "var(--white)" }}>{runId.slice(0, 8)}...</span></span>
               <StatusBadge status={status} />
               {loading && (
-                <span style={{ color: "#ff6b9d", fontSize: "11px" }}>Generating video on fal.ai... (this may take a few minutes)</span>
+                <span style={{ color: "#ff6b9d", fontSize: "11px" }}>{t("generatingFal")}</span>
               )}
             </div>
           )}
@@ -680,7 +682,7 @@ export default function VideoPage() {
           {videoUrl && (
             <div style={{ border: "1px solid #ff6b9d", backgroundColor: "var(--bg-panel)" }}>
               <div style={{ padding: "8px 12px", borderBottom: "1px solid var(--border)", fontSize: "11px", fontWeight: 700, color: "#ff6b9d", textTransform: "uppercase", letterSpacing: "0.1em", backgroundColor: "rgba(255, 107, 157, 0.05)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                <span>GENERATED VIDEO:</span>
+                <span>{t("generatedVideo")}</span>
               </div>
               <div style={{ padding: "16px", display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
                 <video
@@ -698,7 +700,7 @@ export default function VideoPage() {
                     onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(255, 107, 157, 0.1)"; }}
                     onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
                   >
-                    Download
+                    {t("download")}
                   </a>
                   <button
                     onClick={useAsInput}
@@ -706,7 +708,7 @@ export default function VideoPage() {
                     onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = "rgba(255, 204, 0, 0.1)"; }}
                     onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
                   >
-                    Edit Video
+                    {t("editVideo")}
                   </button>
                 </div>
               </div>

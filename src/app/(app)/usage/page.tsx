@@ -2,6 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import { useState, useEffect, useCallback } from "react";
+import { useT } from "@/app/components/I18nProvider";
 
 type UsageEvent = {
   id: string;
@@ -35,6 +36,7 @@ type RecipeSummary = {
 
 export default function UsagePage() {
   const { data: session } = useSession();
+  const t = useT("usage");
   const [events, setEvents] = useState<UsageEvent[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [recipeExecs, setRecipeExecs] = useState<RecipeExec[]>([]);
@@ -85,7 +87,7 @@ export default function UsagePage() {
   if (!session) {
     return (
       <div style={{ color: "var(--gray)" }}>
-        <span style={{ color: "var(--red)" }}>[ERROR]</span> Authentication required. Please sign in.
+        <span style={{ color: "var(--red)" }}>{t("error")}</span> {t("authRequired")}
       </div>
     );
   }
@@ -102,10 +104,10 @@ export default function UsagePage() {
             marginBottom: "4px",
           }}
         >
-          [USAGE]
+          {t("title")}
         </div>
         <div style={{ color: "var(--gray)", fontSize: "13px" }}>
-          $ stats --costs --usage {provider ? `--provider ${provider}` : "--all"}
+          {t("cmd").replace("{filter}", provider ? `--provider ${provider}` : "--all")}
         </div>
       </div>
 
@@ -133,7 +135,7 @@ export default function UsagePage() {
               letterSpacing: "0.1em",
             }}
           >
-            --from
+            {t("from")}
           </label>
           <input
             type="date"
@@ -161,7 +163,7 @@ export default function UsagePage() {
               letterSpacing: "0.1em",
             }}
           >
-            --to
+            {t("to")}
           </label>
           <input
             type="date"
@@ -189,7 +191,7 @@ export default function UsagePage() {
               letterSpacing: "0.1em",
             }}
           >
-            --provider
+            {t("provider")}
           </label>
           <select
             value={provider}
@@ -203,7 +205,7 @@ export default function UsagePage() {
               fontSize: "12px",
             }}
           >
-            <option value="">all</option>
+            <option value="">{t("all")}</option>
             <option value="openai">openai</option>
             <option value="anthropic">anthropic</option>
             <option value="gemini">gemini</option>
@@ -236,14 +238,14 @@ export default function UsagePage() {
             e.currentTarget.style.boxShadow = "none";
           }}
         >
-          [FILTER]
+          {t("filter")}
         </button>
       </div>
 
       {/* Error */}
       {error && (
         <div style={{ padding: "12px", marginBottom: "16px", backgroundColor: "rgba(255, 68, 68, 0.08)", border: "1px solid var(--red)", color: "var(--red)", fontSize: "13px" }}>
-          <span style={{ fontWeight: 700 }}>[ERROR]</span> {error}
+          <span style={{ fontWeight: 700 }}>{t("error")}</span> {error}
         </div>
       )}
 
@@ -271,7 +273,7 @@ export default function UsagePage() {
                 marginBottom: "8px",
               }}
             >
-              TOTAL RUNS
+              {t("totalRuns")}
             </div>
             <div
               style={{
@@ -303,7 +305,7 @@ export default function UsagePage() {
                 marginBottom: "8px",
               }}
             >
-              EST. COST
+              {t("estCost")}
             </div>
             <div
               style={{
@@ -335,7 +337,7 @@ export default function UsagePage() {
                 marginBottom: "8px",
               }}
             >
-              TOTAL LATENCY
+              {t("totalLatency")}
             </div>
             <div
               style={{
@@ -366,7 +368,7 @@ export default function UsagePage() {
               borderBottom: "1px solid var(--border)",
             }}
           >
-            Breakdown by Model
+            {t("breakdownByModel")}
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             {Object.entries(summary.byModel).map(([key, val]) => (
@@ -390,7 +392,7 @@ export default function UsagePage() {
                 </div>
                 <div style={{ fontSize: "12px", marginTop: "4px" }}>
                   <span style={{ color: "var(--cyan)" }}>{val.count}</span>{" "}
-                  <span style={{ color: "var(--gray)" }}>runs</span>
+                  <span style={{ color: "var(--gray)" }}>{t("runs")}</span>
                   <span style={{ color: "var(--gray)" }}> | </span>
                   <span style={{ color: "var(--yellow)" }}>${val.cost.toFixed(4)}</span>
                 </div>
@@ -415,7 +417,7 @@ export default function UsagePage() {
               borderBottom: "1px solid var(--border)",
             }}
           >
-            Recipe Executions ({recipeSummary.totalExecutions} total &mdash; ${recipeSummary.totalCost.toFixed(4)})
+            {t("recipeExecs").replace("{count}", String(recipeSummary.totalExecutions)).replace("{cost}", recipeSummary.totalCost.toFixed(4))}
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
             {recipeExecs.map((re) => (
@@ -450,7 +452,7 @@ export default function UsagePage() {
       {/* Events table */}
       {loading ? (
         <div style={{ color: "var(--green)", fontSize: "13px" }}>
-          <span style={{ animation: "blink 1s step-end infinite" }}>_</span> Querying usage data...
+          <span style={{ animation: "blink 1s step-end infinite" }}>_</span> {t("querying")}
         </div>
       ) : (
         <div style={{ overflowX: "auto" }}>
@@ -479,7 +481,7 @@ export default function UsagePage() {
                     letterSpacing: "0.1em",
                   }}
                 >
-                  PROVIDER
+                  {t("colProvider")}
                 </th>
                 <th
                   style={{
@@ -491,7 +493,7 @@ export default function UsagePage() {
                     letterSpacing: "0.1em",
                   }}
                 >
-                  MODEL
+                  {t("colModel")}
                 </th>
                 <th
                   style={{
@@ -503,7 +505,7 @@ export default function UsagePage() {
                     letterSpacing: "0.1em",
                   }}
                 >
-                  COST
+                  {t("colCost")}
                 </th>
                 <th
                   style={{
@@ -515,7 +517,7 @@ export default function UsagePage() {
                     letterSpacing: "0.1em",
                   }}
                 >
-                  LATENCY
+                  {t("colLatency")}
                 </th>
                 {isAdmin && (
                   <th
@@ -528,7 +530,7 @@ export default function UsagePage() {
                       letterSpacing: "0.1em",
                     }}
                   >
-                    USER
+                    {t("colUser")}
                   </th>
                 )}
                 <th
@@ -541,7 +543,7 @@ export default function UsagePage() {
                     letterSpacing: "0.1em",
                   }}
                 >
-                  DATE
+                  {t("colDate")}
                 </th>
               </tr>
             </thead>

@@ -3,6 +3,7 @@
 import { useSession } from "next-auth/react";
 import { useState, useEffect, useCallback } from "react";
 import StatusBadge from "@/app/components/StatusBadge";
+import { useT } from "@/app/components/I18nProvider";
 
 type Run = {
   id: string;
@@ -32,6 +33,7 @@ type RunDetail = {
 
 export default function HistoryPage() {
   const { data: session } = useSession();
+  const t = useT("history");
   const [runs, setRuns] = useState<Run[]>([]);
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
@@ -119,7 +121,7 @@ export default function HistoryPage() {
   if (!session) {
     return (
       <div style={{ color: "var(--gray)" }}>
-        <span style={{ color: "var(--red)" }}>[ERROR]</span> Authentication required. Please sign in.
+        <span style={{ color: "var(--red)" }}>{t("errorLabel")}</span> {t("authRequired")}
       </div>
     );
   }
@@ -143,13 +145,13 @@ export default function HistoryPage() {
                 marginBottom: "6px",
               }}
             >
-              INPUT:
+              {t("input")}
             </div>
             {detail.type === "llm" && (
               <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                 {input.prompt && (
                   <div>
-                    <span style={{ color: "var(--green)", fontSize: "11px" }}>--prompt </span>
+                    <span style={{ color: "var(--green)", fontSize: "11px" }}>{t("prompt")} </span>
                     <div
                       style={{
                         marginTop: "4px",
@@ -169,7 +171,7 @@ export default function HistoryPage() {
                 )}
                 {input.sourceText && (
                   <div>
-                    <span style={{ color: "var(--green)", fontSize: "11px" }}>--source </span>
+                    <span style={{ color: "var(--green)", fontSize: "11px" }}>{t("source")} </span>
                     <div
                       style={{
                         marginTop: "4px",
@@ -194,7 +196,7 @@ export default function HistoryPage() {
               <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                 {input.text && (
                   <div>
-                    <span style={{ color: "var(--green)", fontSize: "11px" }}>--text </span>
+                    <span style={{ color: "var(--green)", fontSize: "11px" }}>{t("text")} </span>
                     <div
                       style={{
                         marginTop: "4px",
@@ -214,7 +216,7 @@ export default function HistoryPage() {
                 )}
                 {input.voiceId && (
                   <div style={{ fontSize: "11px", color: "var(--gray)", marginTop: "4px" }}>
-                    <span style={{ color: "var(--green)" }}>--voice</span> {String(input.voiceId)}
+                    <span style={{ color: "var(--green)" }}>{t("voiceLabel")}</span> {String(input.voiceId)}
                   </div>
                 )}
               </div>
@@ -223,12 +225,12 @@ export default function HistoryPage() {
               <div style={{ fontSize: "12px", color: "var(--gray)" }}>
                 {input.language && (
                   <span>
-                    <span style={{ color: "var(--green)" }}>--lang</span> {String(input.language)}{" "}
+                    <span style={{ color: "var(--green)" }}>{t("lang")}</span> {String(input.language)}{" "}
                   </span>
                 )}
                 {input.mimeType && (
                   <span>
-                    <span style={{ color: "var(--green)" }}>--mime</span> {String(input.mimeType)}
+                    <span style={{ color: "var(--green)" }}>{t("mime")}</span> {String(input.mimeType)}
                   </span>
                 )}
               </div>
@@ -249,7 +251,7 @@ export default function HistoryPage() {
                 marginBottom: "6px",
               }}
             >
-              OUTPUT:
+              {t("output")}
             </div>
             {detail.type === "llm" && output.text && (
               <div
@@ -298,14 +300,14 @@ export default function HistoryPage() {
                 <span>
                   <span style={{ color: "var(--yellow)" }}>IN:</span>{" "}
                   <span style={{ color: "var(--cyan)" }}>{String(output.inputTokens)}</span>{" "}
-                  <span style={{ color: "var(--gray)" }}>tokens</span>
+                  <span style={{ color: "var(--gray)" }}>{t("tokens")}</span>
                 </span>
               )}
               {output.outputTokens != null && (
                 <span>
                   <span style={{ color: "var(--yellow)" }}>OUT:</span>{" "}
                   <span style={{ color: "var(--cyan)" }}>{String(output.outputTokens)}</span>{" "}
-                  <span style={{ color: "var(--gray)" }}>tokens</span>
+                  <span style={{ color: "var(--gray)" }}>{t("tokens")}</span>
                 </span>
               )}
               {output.latencyMs != null && (
@@ -318,13 +320,13 @@ export default function HistoryPage() {
               )}
               {output.chars != null && (
                 <span>
-                  <span style={{ color: "var(--yellow)" }}>CHARS:</span>{" "}
+                  <span style={{ color: "var(--yellow)" }}>{t("charsLabel")}</span>{" "}
                   <span style={{ color: "var(--cyan)" }}>{String(output.chars)}</span>
                 </span>
               )}
               {output.durationSeconds != null && (
                 <span>
-                  <span style={{ color: "var(--yellow)" }}>DURATION:</span>{" "}
+                  <span style={{ color: "var(--yellow)" }}>{t("durationLabel")}</span>{" "}
                   <span style={{ color: "var(--cyan)" }}>
                     {Number(output.durationSeconds).toFixed(1)}s
                   </span>
@@ -345,14 +347,14 @@ export default function HistoryPage() {
               color: "var(--red)",
             }}
           >
-            <span style={{ fontWeight: 700 }}>[ERROR]</span> {detail.errorMessage}
+            <span style={{ fontWeight: 700 }}>{t("errorLabel")}</span> {detail.errorMessage}
           </div>
         )}
 
         {/* Timing */}
         {detail.finishedAt && (
           <div style={{ fontSize: "11px", color: "var(--gray)" }}>
-            <span style={{ color: "var(--green)" }}>FINISHED:</span>{" "}
+            <span style={{ color: "var(--green)" }}>{t("finished")}</span>{" "}
             {new Date(detail.finishedAt).toLocaleString()}
           </div>
         )}
@@ -372,11 +374,11 @@ export default function HistoryPage() {
             marginBottom: "4px",
           }}
         >
-          [HISTORY]
+          {t("title")}
         </div>
         <div style={{ color: "var(--gray)", fontSize: "13px" }}>
-          $ query runs --page {page} {typeFilter ? `--type ${typeFilter}` : "--all"}{" "}
-          <span style={{ color: "var(--gray)", opacity: 0.5 }}>// click row to expand</span>
+          {t("cmd").replace("{page}", String(page)).replace("{filter}", typeFilter ? `--type ${typeFilter}` : "--all")}{" "}
+          <span style={{ color: "var(--gray)", opacity: 0.5 }}>{t("clickToExpand")}</span>
         </div>
       </div>
 
@@ -400,7 +402,7 @@ export default function HistoryPage() {
             letterSpacing: "0.1em",
           }}
         >
-          --type
+          {t("type")}
         </label>
         <select
           value={typeFilter}
@@ -417,7 +419,7 @@ export default function HistoryPage() {
             fontSize: "12px",
           }}
         >
-          <option value="">all</option>
+          <option value="">{t("all")}</option>
           <option value="llm">llm</option>
           <option value="stt">stt</option>
           <option value="tts">tts</option>
@@ -425,18 +427,18 @@ export default function HistoryPage() {
         </select>
         {isAdmin && (
           <span style={{ fontSize: "11px", color: "var(--yellow)" }}>
-            [ADMIN] viewing all users
+            {t("adminViewing")}
           </span>
         )}
       </div>
 
       {loading ? (
         <div style={{ color: "var(--green)", fontSize: "13px" }}>
-          <span style={{ animation: "blink 1s step-end infinite" }}>_</span> Querying database...
+          <span style={{ animation: "blink 1s step-end infinite" }}>_</span> {t("querying")}
         </div>
       ) : runs.length === 0 ? (
         <div style={{ color: "var(--gray)", fontSize: "13px" }}>
-          [INFO] No runs found matching query.
+          {t("noRuns")}
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
@@ -452,7 +454,7 @@ export default function HistoryPage() {
               gap: "8px",
             }}
           >
-            {["TYPE", "STATUS", "PROVIDER", ...(isAdmin ? ["USER"] : ["PREVIEW"]), "CREATED"].map(
+            {[t("colType"), t("colStatus"), t("colProvider"), ...(isAdmin ? [t("colUser")] : [t("colPreview")]), t("colCreated")].map(
               (h) => (
                 <div
                   key={h}
@@ -567,14 +569,13 @@ export default function HistoryPage() {
                   >
                     {isLoadingThis ? (
                       <div style={{ color: "var(--green)", fontSize: "12px" }}>
-                        <span style={{ animation: "blink 1s step-end infinite" }}>_</span> Loading
-                        run details...
+                        <span style={{ animation: "blink 1s step-end infinite" }}>_</span> {t("loadingDetails")}
                       </div>
                     ) : detail ? (
                       renderInputOutput(detail)
                     ) : (
                       <div style={{ color: "var(--gray)", fontSize: "12px" }}>
-                        [INFO] No details available.
+                        {t("noDetails")}
                       </div>
                     )}
                   </div>
@@ -611,10 +612,10 @@ export default function HistoryPage() {
               opacity: page === 1 ? 0.5 : 1,
             }}
           >
-            [PREV]
+            {t("prev")}
           </button>
           <span style={{ fontSize: "12px", color: "var(--gray)" }}>
-            <span style={{ color: "var(--yellow)" }}>PAGE:</span>{" "}
+            <span style={{ color: "var(--yellow)" }}>{t("page")}</span>{" "}
             <span style={{ color: "var(--white)" }}>{page}</span> / {pages}
           </span>
           <button
@@ -631,7 +632,7 @@ export default function HistoryPage() {
               opacity: page === pages ? 0.5 : 1,
             }}
           >
-            [NEXT]
+            {t("next")}
           </button>
         </div>
       )}
