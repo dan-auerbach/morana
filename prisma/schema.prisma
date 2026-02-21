@@ -41,7 +41,7 @@ model User {
 
   // Per-user limits (null = use global defaults)
   maxRunsPerDay         Int?   // override global daily limit
-  maxMonthlyCostCents   Int?   // monthly cost cap in CENTS (integer, no float rounding)
+  maxMonthlyCostCents   Int?   // monthly cost cap in CENTS (integer)
   allowedModels         Json?  // JSON array of model ID strings, null = all models allowed
   allowedModules        Json?  // string[] e.g. ["llm","stt","tts","image","video","recipes"], null = all
 
@@ -269,7 +269,7 @@ model UsageEvent {
   provider          String
   model             String
   unitsJson         Json
-  costEstimateCents Int      @default(0)  // cost in CENTS (integer, no float rounding)
+  costEstimateCents Float    @default(0)  // cost in CENTS (float for sub-cent precision)
   latencyMs         Int      @default(0)
   createdAt         DateTime @default(now())
 
@@ -448,7 +448,7 @@ model RecipeExecution {
   totalSteps       Int
   inputData        Json?           // Initial input (e.g. file reference, text)
   recipeVersion    Int?            // Recipe version used for this execution
-  totalCostCents   Int             @default(0)  // Aggregated cost in CENTS
+  totalCostCents   Float           @default(0)  // Aggregated cost in CENTS (float for sub-cent precision)
   costBreakdownJson Json?          // { steps: [{ stepIndex, model, costCents }] }
   confidenceScore  Int?            // 0-100, extracted from fact-check step
   warningFlag      String?         // null | "needs_review" | "high_risk"
@@ -671,7 +671,7 @@ model NewsScoutRun {
   resultMeta     Json?                // [{url,title,reason}]
   logs           Json?                // RunLog[]
   errorMessage   String?   @db.Text
-  costCents      Int       @default(0)
+  costCents      Float     @default(0)
   candidateCount Int       @default(0)
   createdAt      DateTime  @default(now())
   finishedAt     DateTime?

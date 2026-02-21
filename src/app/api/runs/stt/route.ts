@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
         runId: run.id,
         provider: "soniox",
         model: "stt-async-v4",
-        units: { durationSeconds: result.durationSeconds },
+        units: { seconds: result.durationSeconds },
         latencyMs: result.latencyMs,
         workspaceId: workspaceId || undefined,
       });

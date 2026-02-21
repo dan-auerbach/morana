@@ -151,6 +151,10 @@ const defaultPricing: Record<string, { input: number; output: number; unit: stri
   // Video: Grok Imagine — cost per second of output video
   "grok-imagine-video-480p": { input: 0.05, output: 0, unit: "per_second" },
   "grok-imagine-video-720p": { input: 0.07, output: 0, unit: "per_second" },
+  // ─── Aliases: map actual model IDs to their pricing ───
+  "stt-async-v4": { input: 0.0017, output: 0, unit: "per_minute" },   // = soniox
+  "eleven_v3": { input: 0.30, output: 0, unit: "1k_chars" },          // = elevenlabs
+  "eleven_text_to_sound_v2": { input: 0.30, output: 0, unit: "1k_chars" }, // = elevenlabs SFX
 };
 
 /** Combined pricing: DB-cached pricing merged with hardcoded defaults */
@@ -191,7 +195,7 @@ export function estimateCostCents(
   } else if (p.unit === "per_second") {
     dollars = (units.videoSeconds || 0) * p.input;
   }
-  return Math.round(dollars * 100);
+  return dollars * 100; // Return float cents for sub-cent precision
 }
 
 /** Format cents as dollar string for display */

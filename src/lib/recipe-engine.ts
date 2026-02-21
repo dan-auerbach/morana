@@ -537,14 +537,13 @@ async function executeSTTStep(
       data: { status: "done", finishedAt: new Date() },
     });
 
-    const durationMinutes = Math.ceil(result.durationSeconds / 60);
     await logUsage({
       runId: run.id,
       userId,
       workspaceId: workspaceId || undefined,
       provider: "soniox",
       model: "stt-async-v4",
-      units: { durationSeconds: result.durationSeconds, durationMinutes },
+      units: { seconds: result.durationSeconds },
       latencyMs: result.latencyMs,
     });
 

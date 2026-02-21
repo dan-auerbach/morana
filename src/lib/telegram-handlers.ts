@@ -393,8 +393,8 @@ export async function handleDirectLLM(
       provider: modelEntry.provider,
       model: modelEntry.id,
       units: {
-        input_tokens: result.inputTokens,
-        output_tokens: result.outputTokens,
+        inputTokens: result.inputTokens,
+        outputTokens: result.outputTokens,
       },
       latencyMs: result.latencyMs,
       workspaceId: resolved.workspaceId,
@@ -458,7 +458,7 @@ export async function handleDirectImage(
       type: "image",
       status: "running",
       provider: settings.imageProvider,
-      model: settings.imageProvider === "gemini" ? "gemini-image" : "fal-image",
+      model: settings.imageProvider === "gemini" ? "gemini-2.5-flash-image" : "fal-ai/flux/schnell",
     },
   });
 
@@ -480,7 +480,7 @@ export async function handleDirectImage(
       runId: run.id,
       userId: resolved.userId,
       provider: settings.imageProvider,
-      model: settings.imageProvider === "gemini" ? "gemini-image" : "fal-image",
+      model: settings.imageProvider === "gemini" ? "gemini-2.5-flash-image" : "fal-ai/flux/schnell",
       units: { images: 1 },
       latencyMs: result.latencyMs,
       workspaceId: resolved.workspaceId,
