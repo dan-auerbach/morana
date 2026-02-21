@@ -441,7 +441,7 @@ export default function STTPage() {
           {/* Cost preview */}
           {(fileName || url) && (
             <div style={{ alignSelf: "flex-start" }}>
-              <CostPreview type="stt" modelId="soniox" pricing={{ input: 0.35, output: 0, unit: "per_minute" }} durationSeconds={estimatedDurationSec || 60} />
+              <CostPreview type="stt" modelId="soniox" pricing={{ input: 0.0017, output: 0, unit: "per_minute" }} durationSeconds={estimatedDurationSec || 60} />
             </div>
           )}
 
