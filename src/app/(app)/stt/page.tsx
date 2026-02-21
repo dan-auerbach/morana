@@ -150,12 +150,34 @@ export default function STTPage() {
       if (mode === "file") {
         const file = fileRef.current?.files?.[0];
         if (!file) throw new Error("No file selected");
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("language", language);
-        if (diarize) formData.append("diarize", "true");
-        if (translateTo) formData.append("translateTo", translateTo);
-        resp = await fetch("/api/runs/stt", { method: "POST", body: formData });
+
+        // Upload to R2 via presigned URL to bypass Vercel body size limits
+        const uploadMeta = await fetch("/api/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fileName: file.name, fileSize: file.size, fileType: file.type }),
+        });
+        const uploadData = await uploadMeta.json();
+        if (!uploadMeta.ok) throw new Error(uploadData.error || "Failed to get upload URL");
+
+        const putResp = await fetch(uploadData.uploadUrl, {
+          method: "PUT",
+          headers: { "Content-Type": file.type },
+          body: file,
+        });
+        if (!putResp.ok) throw new Error("Failed to upload file to storage");
+
+        resp = await fetch("/api/runs/stt", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            storageKey: uploadData.storageKey,
+            mimeType: file.type || "audio/mpeg",
+            lang: language,
+            diarize,
+            translateTo: translateTo || undefined,
+          }),
+        });
       } else {
         if (!url) throw new Error("URL is required");
         resp = await fetch("/api/runs/stt", {

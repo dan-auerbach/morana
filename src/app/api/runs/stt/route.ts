@@ -8,6 +8,7 @@ import { logUsage } from "@/lib/usage";
 import { validateMime } from "@/lib/mime-validate";
 import { validateFetchUrl } from "@/lib/url-validate";
 import { getActiveWorkspaceId } from "@/lib/workspace";
+import { getObjectFromR2 } from "@/lib/storage";
 import { v4 as uuid } from "uuid";
 
 // Vercel serverless: STT polling can take up to 180s
@@ -90,61 +91,77 @@ export async function POST(req: NextRequest) {
       }
     } else {
       const body = await req.json();
-      const { url, lang } = body;
-      language = lang || "en";
+      language = body.lang || "en";
       diarize = !!body.diarize;
       translateTo = body.translateTo || "";
 
-      if (!url || typeof url !== "string") {
-        return NextResponse.json({ error: "url is required" }, { status: 400 });
-      }
-
-      // SSRF protection: validate URL before fetching
-      const urlCheck = await validateFetchUrl(url);
-      if (!urlCheck.valid) {
-        return NextResponse.json({ error: urlCheck.reason }, { status: 400 });
-      }
-
-      const controller = new AbortController();
-      const timeout = setTimeout(
-        () => controller.abort(),
-        config.maxUrlFetchSeconds * 1000
-      );
-
-      try {
-        const resp = await fetch(urlCheck.url, { signal: controller.signal, redirect: "error" });
-        clearTimeout(timeout);
-
-        if (!resp.ok) {
-          return NextResponse.json(
-            { error: `Failed to fetch URL: ${resp.status}` },
-            { status: 400 }
-          );
+      if (body.storageKey) {
+        // File was uploaded to R2 via presigned URL
+        mimeType = body.mimeType || "audio/mpeg";
+        try {
+          const obj = await getObjectFromR2(body.storageKey);
+          const bytes = await obj.Body?.transformToByteArray();
+          if (!bytes) throw new Error("Failed to read file from storage");
+          audioBuffer = Buffer.from(bytes);
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : "Storage read error";
+          return NextResponse.json({ error: `Failed to read uploaded file: ${message}` }, { status: 400 });
+        }
+      } else if (body.url) {
+        const { url } = body;
+        if (typeof url !== "string") {
+          return NextResponse.json({ error: "url must be a string" }, { status: 400 });
         }
 
-        mimeType = resp.headers.get("content-type") || "audio/mpeg";
-        const arrayBuffer = await resp.arrayBuffer();
-        audioBuffer = Buffer.from(arrayBuffer);
-
-        if (audioBuffer.length > config.maxFileSizeMb * 1024 * 1024) {
-          return NextResponse.json(
-            { error: `Downloaded file exceeds ${config.maxFileSizeMb}MB limit` },
-            { status: 400 }
-          );
+        // SSRF protection: validate URL before fetching
+        const urlCheck = await validateFetchUrl(url);
+        if (!urlCheck.valid) {
+          return NextResponse.json({ error: urlCheck.reason }, { status: 400 });
         }
 
-        // MIME magic-bytes validation on downloaded content
-        const mimeCheck = validateMime(audioBuffer, mimeType);
-        if (!mimeCheck.valid) {
-          return NextResponse.json(
-            { error: mimeCheck.message || "Downloaded file content-type mismatch" },
-            { status: 400 }
-          );
+        const controller = new AbortController();
+        const timeout = setTimeout(
+          () => controller.abort(),
+          config.maxUrlFetchSeconds * 1000
+        );
+
+        try {
+          const resp = await fetch(urlCheck.url, { signal: controller.signal, redirect: "error" });
+          clearTimeout(timeout);
+
+          if (!resp.ok) {
+            return NextResponse.json(
+              { error: `Failed to fetch URL: ${resp.status}` },
+              { status: 400 }
+            );
+          }
+
+          mimeType = resp.headers.get("content-type") || "audio/mpeg";
+          const arrayBuffer = await resp.arrayBuffer();
+          audioBuffer = Buffer.from(arrayBuffer);
+
+          if (audioBuffer.length > config.maxFileSizeMb * 1024 * 1024) {
+            return NextResponse.json(
+              { error: `Downloaded file exceeds ${config.maxFileSizeMb}MB limit` },
+              { status: 400 }
+            );
+          }
+
+          // MIME magic-bytes validation on downloaded content
+          const mimeCheck = validateMime(audioBuffer, mimeType);
+          if (!mimeCheck.valid) {
+            return NextResponse.json(
+              { error: mimeCheck.message || "Downloaded file content-type mismatch" },
+              { status: 400 }
+            );
+          }
+        } catch (err: unknown) {
+          clearTimeout(timeout);
+          const message = err instanceof Error ? err.message : "Fetch error";
+          return NextResponse.json({ error: `URL fetch failed: ${message}` }, { status: 400 });
         }
-      } catch (err: unknown) {
-        clearTimeout(timeout);
-        const message = err instanceof Error ? err.message : "Fetch error";
-        return NextResponse.json({ error: `URL fetch failed: ${message}` }, { status: 400 });
+      } else {
+        return NextResponse.json({ error: "storageKey or url is required" }, { status: 400 });
       }
     }
 
